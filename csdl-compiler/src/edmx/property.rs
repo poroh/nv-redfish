@@ -140,7 +140,7 @@ impl DeStructuralProperty {
 impl DeNavigationProperty {
     /// # Errors
     ///
-    /// Actually, doesn't return any errors. Keep it for consistency.
+    /// `ValidateError::NavigationProperty` error if more than one edmx:OnDelete specified.
     pub fn validate(self) -> Result<Property, ValidateError> {
         let (mut on_deletes, referential_constraints, annotations) = self.items.into_iter().fold(
             (Vec::new(), Vec::new(), Vec::new()),

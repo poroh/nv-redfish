@@ -23,6 +23,7 @@ use crate::edmx::complex_type::ComplexType;
 use crate::edmx::complex_type::DeComplexType;
 use crate::edmx::entity_type::DeEntityType;
 use crate::edmx::entity_type::EntityType;
+use crate::edmx::enum_type::DeEnumType;
 use crate::edmx::enum_type::EnumType;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -41,7 +42,7 @@ pub struct DeSchema {
 pub enum DeSchemaItem {
     EntityType(DeEntityType),
     ComplexType(DeComplexType),
-    EnumType(EnumType),
+    EnumType(DeEnumType),
     TypeDefinition(TypeDefinition),
     EntityContainer(EntityContainer),
     Term(Term),
@@ -82,7 +83,7 @@ impl DeSchema {
                             ts.push(v.validate().map(|v| (v.name.clone(), Type::ComplexType(v))));
                         }
                         DeSchemaItem::EnumType(v) => {
-                            ts.push(Ok((v.name.clone(), Type::EnumType(v))));
+                            ts.push(v.validate().map(|v| (v.name.clone(), Type::EnumType(v))));
                         }
                         DeSchemaItem::TypeDefinition(v) => {
                             ts.push(Ok((v.name.clone(), Type::TypeDefinition(v))));
