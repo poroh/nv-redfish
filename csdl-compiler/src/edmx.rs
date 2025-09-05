@@ -40,6 +40,9 @@ pub mod entity_type;
 /// 9 Complex Type
 pub mod complex_type;
 
+/// 9 Complex Type
+pub mod enum_type;
+
 use quick_xml::DeError;
 use serde::Deserialize;
 
@@ -66,58 +69,6 @@ pub enum ValidateError {
 
 /// Reexport of Edmx type to root.
 pub type Edmx = edmx_root::Edmx;
-
-#[derive(Debug, Deserialize)]
-pub struct Key {
-    #[serde(rename = "PropertyRef", default)]
-    pub property_refs: Vec<PropertyRef>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PropertyRef {
-    #[serde(rename = "@Name")]
-    pub name: String,
-    #[serde(rename = "@Alias")]
-    pub alias: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ReferentialConstraint {
-    #[serde(rename = "@Property")]
-    pub property: String,
-    #[serde(rename = "@ReferencedProperty")]
-    pub referenced_property: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct OnDelete {
-    #[serde(rename = "@Action")]
-    pub action: String, // e.g., "Cascade", "None"
-}
-
-#[derive(Debug, Deserialize)]
-pub struct EnumType {
-    #[serde(rename = "@Name")]
-    pub name: String,
-    #[serde(rename = "@UnderlyingType")]
-    pub underlying_type: Option<String>,
-    #[serde(rename = "@IsFlags")]
-    pub is_flags: Option<bool>,
-    #[serde(rename = "Member", default)]
-    pub members: Vec<EnumMember>,
-    #[serde(rename = "Annotation", default)]
-    pub annotations: Vec<Annotation>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct EnumMember {
-    #[serde(rename = "@Name")]
-    pub name: String,
-    #[serde(rename = "@Value")]
-    pub value: Option<String>,
-    #[serde(rename = "Annotation", default)]
-    pub annotations: Vec<Annotation>,
-}
 
 #[derive(Debug, Deserialize)]
 pub struct TypeDefinition {
@@ -166,7 +117,6 @@ pub struct NavigationPropertyBinding {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
 pub struct Singleton {
     #[serde(rename = "@Name")]
     pub name: String,

@@ -37,6 +37,7 @@ pub enum DeReferenceItem {
 }
 
 /// Validated reference stuct
+#[derive(Debug)]
 pub struct Reference {
     pub uri: String,
     pub includes: Vec<Include>,

@@ -15,63 +15,112 @@
 
 use crate::ValidateError;
 use crate::edmx::Annotation;
-use crate::edmx::OnDelete;
 use crate::edmx::PropertyName;
-use crate::edmx::ReferentialConstraint;
 use crate::edmx::TypeName;
 use serde::Deserialize;
 
+/// 6.1 Element edm:Property
 #[derive(Debug, Deserialize)]
 pub struct DeStructuralProperty {
+    /// 6.1.1 Attribute `Name`
     #[serde(rename = "@Name")]
     pub name: PropertyName,
+    /// 6.1.2 Attribute `Type`
     #[serde(rename = "@Type")]
     pub ptype: TypeName,
+    /// 6.2.1 Attribute `Nullable`
     #[serde(rename = "@Nullable")]
     pub nullable: Option<bool>,
+    /// 6.2.2 Attribute `MaxLength`
     #[serde(rename = "@MaxLength")]
     pub max_length: Option<String>,
+    /// 6.2.3 Attribute `Precision`
     #[serde(rename = "@Precision")]
     pub precision: Option<i32>,
+    /// 6.2.4 Attribute `Scale`
     #[serde(rename = "@Scale")]
-    pub scale: Option<String>, // "variable" or number
+    pub scale: Option<String>,
+    /// 6.2.5 Attribute `Unicode`
     #[serde(rename = "@Unicode")]
     pub unicode: Option<bool>,
+    /// 6.2.6 Attribute `SRID`
+    /// Non-negative integer or special value `variable`.
+    #[serde(rename = "@SRID")]
+    pub srid: Option<String>,
+    /// 6.2.7 Attribute `DefaultValue`
     #[serde(rename = "@DefaultValue")]
     pub default_value: Option<String>,
     #[serde(rename = "Annotation", default)]
     pub annotations: Vec<Annotation>,
 }
 
+/// 7.1 Element edm:NavigationProperty
 #[derive(Debug, Deserialize)]
 pub struct DeNavigationProperty {
+    /// 7.1.1 Attribute `Name`
     #[serde(rename = "@Name")]
     pub name: PropertyName,
+    /// 7.1.2 Attribute `Type`
     #[serde(rename = "@Type")]
     pub ptype: TypeName,
+    /// 7.1.3 Attribute `Nullable`
     #[serde(rename = "@Nullable")]
     pub nullable: Option<bool>,
+    /// 7.1.4 Attribute `Partner`
     #[serde(rename = "@Partner")]
     pub partner: Option<String>,
+    /// 7.1.5 Attribute `ContainsTarget`
     #[serde(rename = "@ContainsTarget")]
     pub contains_target: Option<bool>,
-    #[serde(rename = "ReferentialConstraint", default)]
-    pub referential_constraints: Vec<ReferentialConstraint>,
-    #[serde(rename = "OnDelete")]
-    pub on_delete: Option<OnDelete>,
-    #[serde(rename = "Annotation", default)]
-    pub annotations: Vec<Annotation>,
+    /// Items of edm:NavigationProperty
+    #[serde(rename = "$value", default)]
+    pub items: Vec<DeNavigationPropertyItem>,
 }
 
+/// Items of edm:NavigationProperty
+#[derive(Debug, Deserialize)]
+pub enum DeNavigationPropertyItem {
+    /// 7.2 Element edm:ReferentialConstraint
+    ReferentialConstrain(ReferentialConstraint),
+    /// 7.3 Element edm:OnDelete
+    OnDelete(OnDelete),
+    Annotation(Annotation),
+}
+
+/// 7.2 Element edm:ReferentialConstraint
+#[derive(Debug, Deserialize)]
+pub struct ReferentialConstraint {
+    /// 7.2.1 Attribute `Property`
+    #[serde(rename = "@Property")]
+    pub property: String,
+    /// 7.2.2 Attribute `ReferencedProperty`
+    #[serde(rename = "@ReferencedProperty")]
+    pub referenced_property: String,
+}
+
+/// 7.3 Element edm:OnDelete
+#[derive(Debug, Deserialize)]
+pub struct OnDelete {
+    /// 7.3.1 Attribute Action
+    #[serde(rename = "@Action")]
+    pub action: String,
+}
+
+/// Validated element of edm:NavigationProperty or edm:Property
 #[derive(Debug)]
 pub struct Property {
+    /// Name of the property.
     pub name: PropertyName,
+    /// Attributes of the property.
     pub attrs: PropertyAttrs,
 }
 
+/// Attributes of the property.
 #[derive(Debug)]
 pub enum PropertyAttrs {
+    /// Properties of the structural property.
     StructuralProperty(DeStructuralProperty),
+    /// Properties of the navigation property.
     NavigationProperty(DeNavigationProperty),
 }
 

@@ -16,7 +16,6 @@
 use crate::ValidateError;
 use crate::edmx::Annotation;
 use crate::edmx::EntityContainer;
-use crate::edmx::EnumType;
 use crate::edmx::SchemaNamespace;
 use crate::edmx::Term;
 use crate::edmx::TypeDefinition;
@@ -24,6 +23,7 @@ use crate::edmx::complex_type::ComplexType;
 use crate::edmx::complex_type::DeComplexType;
 use crate::edmx::entity_type::DeEntityType;
 use crate::edmx::entity_type::EntityType;
+use crate::edmx::enum_type::EnumType;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -48,6 +48,7 @@ pub enum DeSchemaItem {
     Annotation(Annotation),
 }
 
+#[derive(Debug)]
 pub enum Type {
     EntityType(EntityType),
     ComplexType(ComplexType),
@@ -57,6 +58,7 @@ pub enum Type {
     Term(Term),
 }
 
+#[derive(Debug)]
 pub struct Schema {
     pub namespace: SchemaNamespace,
     pub types: HashMap<String, Type>,

@@ -45,6 +45,7 @@ enum DeEdmxItem {
 }
 
 /// Validated Edmx document.
+#[derive(Debug)]
 pub struct Edmx {
     /// Validated `DataServices`
     pub data_services: DataServices,

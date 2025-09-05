@@ -129,6 +129,7 @@ mod test {
             edmx.data_services.schemas.get(1).unwrap().annotations.len(),
             2
         );
+        println!("{edmx:?}");
 
         Ok(())
     }

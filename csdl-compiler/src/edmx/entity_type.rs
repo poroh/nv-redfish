@@ -15,29 +15,56 @@
 
 use crate::ValidateError;
 use crate::edmx::Annotation;
-use crate::edmx::Key;
+use crate::edmx::PropertyName;
 use crate::edmx::TypeName;
 use crate::edmx::property::DeNavigationProperty;
 use crate::edmx::property::DeStructuralProperty;
 use crate::edmx::property::Property;
 use serde::Deserialize;
 
+/// 8.1 Element edm:EntityType
 #[derive(Debug, Deserialize)]
 pub struct DeEntityType {
+    /// 8.1.1 Attribute Name
     #[serde(rename = "@Name")]
     pub name: TypeName,
+    /// 8.1.2 Attribute `BaseType`
     #[serde(rename = "@BaseType")]
     pub base_type: Option<TypeName>,
+    /// 8.1.3 Attribute `Abstract`
     #[serde(rename = "@Abstract")]
     pub r#abstract: Option<bool>,
+    /// 8.1.4 Attribute `OpenType`
     #[serde(rename = "@OpenType")]
     pub open_type: Option<bool>,
+    /// 8.1.5 Attribute `HasStream`
     #[serde(rename = "@HasStream")]
     pub has_stream: Option<bool>,
+    /// Items of edm:EntityType
     #[serde(rename = "$value", default)]
     pub items: Vec<DeEntityTypeItem>,
 }
 
+/// 8.2 Element edm:Key
+#[derive(Debug, Deserialize)]
+pub struct Key {
+    /// Items of edm:Key
+    #[serde(rename = "PropertyRef", default)]
+    pub property_ref: Vec<PropertyRef>,
+}
+
+/// 8.3 Element edm:PropertyRef
+#[derive(Debug, Deserialize)]
+pub struct PropertyRef {
+    /// 8.3.1 Attribute Name
+    #[serde(rename = "@Name")]
+    pub name: PropertyName,
+    /// 8.3.2 Attribute Alias
+    #[serde(rename = "@Alias")]
+    pub alias: Option<PropertyName>,
+}
+
+/// Items of edm:EntityType
 #[derive(Debug, Deserialize)]
 pub enum DeEntityTypeItem {
     Key(Key),
@@ -47,6 +74,7 @@ pub enum DeEntityTypeItem {
     Annotation(Annotation),
 }
 
+/// Validated edm:EntityType
 #[derive(Debug)]
 pub struct EntityType {
     pub name: TypeName,

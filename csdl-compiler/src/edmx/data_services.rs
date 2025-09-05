@@ -28,12 +28,14 @@ pub struct DeDataServices {
 }
 
 /// Validated `DataServices`.
+#[derive(Debug)]
 pub struct DataServices {
     pub schemas: Vec<Schema>,
 }
 
 impl DeDataServices {
     /// # Errors
+    ///
     /// Validation error if any of Schemas is invalid.
     pub fn validate(self) -> Result<DataServices, ValidateError> {
         Ok(DataServices {

@@ -21,22 +21,27 @@ use crate::edmx::property::DeStructuralProperty;
 use crate::edmx::property::Property;
 use serde::Deserialize;
 
+/// 9.1 Element edm:ComplexType
 #[derive(Debug, Deserialize)]
 pub struct DeComplexType {
+    /// 9.1.1 Attribute `Name`
     #[serde(rename = "@Name")]
     pub name: TypeName,
+    /// 9.1.2 Attribute `BaseType`
     #[serde(rename = "@BaseType")]
     pub base_type: Option<TypeName>,
+    /// 9.1.3 Attribute `Abstract`
     #[serde(rename = "@Abstract")]
     pub r#abstract: Option<bool>,
+    /// 9.1.4 Attribute `OpenType`
     #[serde(rename = "@OpenType")]
     pub open_type: Option<bool>,
-    #[serde(rename = "@HasStream")]
-    pub has_stream: Option<bool>,
+    /// Items of edm:ComplexType
     #[serde(rename = "$value", default)]
     pub items: Vec<DeComplexTypeItem>,
 }
 
+/// Items of edm:ComplexType
 #[derive(Debug, Deserialize)]
 pub enum DeComplexTypeItem {
     #[serde(rename = "Property")]
@@ -45,6 +50,7 @@ pub enum DeComplexTypeItem {
     Annotation(Annotation),
 }
 
+/// Validated edm:ComplexType
 #[derive(Debug)]
 pub struct ComplexType {
     pub name: TypeName,
