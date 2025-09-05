@@ -106,6 +106,8 @@ impl RedfishTypeRegistry {
 }
 
 impl RedfishResource {
+    /// # Errors
+    /// TODO: Errors from generated code, proper error and code
     pub fn from_edmx(edmx: &Edmx) -> Result<(Vec<Self>, RedfishTypeRegistry), String> {
         let mut resources = Vec::new();
         let mut type_registry = RedfishTypeRegistry::new();
