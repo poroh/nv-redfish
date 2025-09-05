@@ -53,6 +53,7 @@ pub enum SchemaItem {
     NavigationProperty(NavigationPropertyData),
     ComplexType(ComplexTypeData),
     Enum(EnumData),
+    Action(ActionData),
 }
 
 #[derive(Debug)]
@@ -95,6 +96,21 @@ pub struct EnumData {
 pub struct EnumMember {
     pub name: String,
     pub description: Option<String>,
+}
+
+/// TODO: Actions are not yet parsed by the EDMX parser, so this is placeholder
+#[derive(Debug)]
+pub struct ActionData {
+    pub metadata: ItemMetadata,
+    pub is_bound: bool,
+    pub parameters: Vec<ActionParameter>,
+}
+
+#[derive(Debug)]
+pub struct ActionParameter {
+    pub metadata: ItemMetadata,
+    pub parameter_type: PropertyType,
+    pub nullable: bool,
 }
 
 #[derive(Debug)]

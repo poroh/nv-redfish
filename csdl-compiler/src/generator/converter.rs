@@ -360,7 +360,7 @@ impl RedfishResource {
                         deprecated_in: None,
                     });
                 }
-                _ => {}
+                _ => {} // TODO: Add support for Actions in parser
             }
         }
 
