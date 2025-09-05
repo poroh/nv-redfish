@@ -166,12 +166,34 @@ pub struct Annotation {
     pub enum_member: Option<String>,
     #[serde(rename = "Collection")]
     pub collection: Option<AnnotationCollection>,
+    #[serde(rename = "Record")]
+    pub record: Option<AnnotationRecord>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct AnnotationCollection {
     #[serde(rename = "String", default)]
     pub strings: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AnnotationRecord {
+    #[serde(rename = "PropertyValue")]
+    pub property_value: PropertyValue,
+    #[serde(rename = "Annotation", default)]
+    pub annotations: Vec<Annotation>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PropertyValue {
+    #[serde(rename = "@Property")]
+    pub property: String,
+    #[serde(rename = "@Bool")]
+    pub bool_value: Option<bool>,
+    #[serde(rename = "@String")]
+    pub string_value: Option<String>,
+    #[serde(rename = "@Int")]
+    pub int_value: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]

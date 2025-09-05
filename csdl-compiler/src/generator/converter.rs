@@ -18,9 +18,9 @@
 //! This module handles the conversion from parsed EDMX structures to the Redfish domain model
 
 use super::{
-    Capabilities, ComplexTypeData, EnumData, EnumMember, ItemMetadata, NavigationPropertyData,
-    Permission, PropertyData, PropertyType, RedfishResource, ResourceReference, ResourceItem,
-    ReferencedType, Version, VersionedField,
+    Capabilities, CapabilityInfo, ComplexTypeData, Constraints, EnumData, EnumMember, ItemMetadata,
+    NavigationPropertyData, Permission, PropertyData, PropertyType, RedfishResource,
+    ReferencedType, ResourceItem, ResourceReference, Version, VersionedField,
 };
 use crate::edmx::{
     property::PropertyAttrs,
@@ -50,14 +50,15 @@ impl RedfishTypeRegistry {
 
     fn add_versioned_type(&mut self, versioned_type: VersionedField<ReferencedType>) {
         let rc_type = Rc::new(versioned_type);
-        
+
         // Add to lookup by type name
         let type_name = match &rc_type.field {
             ReferencedType::ComplexType(complex_type) => &complex_type.metadata.name,
             ReferencedType::Enum(enum_type) => &enum_type.metadata.name,
         };
-        self.versioned_lookup.insert(type_name.clone(), Rc::clone(&rc_type));
-        
+        self.versioned_lookup
+            .insert(type_name.clone(), Rc::clone(&rc_type));
+
         self.versioned_types.push(rc_type);
     }
 
@@ -111,8 +112,10 @@ impl RedfishResource {
         let mut resources = Vec::new();
         let mut type_registry = RedfishTypeRegistry::new();
 
-        let mut base_metadata: HashMap<String, (String, Option<String>, Vec<String>)> =
-            HashMap::new();
+        let mut base_metadata: HashMap<
+            String,
+            (String, Option<String>, Vec<String>, Capabilities),
+        > = HashMap::new();
 
         for schema in &edmx.data_services.schemas {
             if Self::parse_version_from_namespace(&schema.namespace)?.is_none() {
@@ -149,9 +152,11 @@ impl RedfishResource {
                                 }
                             }
 
+                            let capabilities = Self::extract_capabilities(&entity_type.annotations);
+
                             base_metadata.insert(
                                 resource_name.clone(),
-                                (description, long_description, uris),
+                                (description, long_description, uris, capabilities),
                             );
                             break;
                         }
@@ -174,7 +179,7 @@ impl RedfishResource {
                 let resource = resource_map
                     .entry(resource_name.clone())
                     .or_insert_with(|| {
-                        let mut                         new_resource = RedfishResource {
+                        let mut new_resource = RedfishResource {
                             metadata: ItemMetadata {
                                 name: resource_name.clone(),
                                 description: format!("Resource {}", resource_name),
@@ -189,22 +194,24 @@ impl RedfishResource {
                             },
                         };
 
-                        if let Some((description, long_description, uris)) =
+                        if let Some((description, long_description, uris, capabilities)) =
                             base_metadata.get(&resource_name)
                         {
                             new_resource.metadata.description = description.clone();
                             new_resource.metadata.long_description = long_description.clone();
                             new_resource.uris = uris.clone();
+                            new_resource.capabilities = capabilities.clone();
                         }
 
                         new_resource
                     });
 
-                                            let (resource_items, referenced_types) = Self::extract_items_from_schema(schema, &version)?;
-                            resource.items.extend(resource_items);
-                            for ref_type in referenced_types {
-                                type_registry.add_versioned_type(ref_type);
-                            }
+                let (resource_items, referenced_types) =
+                    Self::extract_items_from_schema(schema, &version)?;
+                resource.items.extend(resource_items);
+                for ref_type in referenced_types {
+                    type_registry.add_versioned_type(ref_type);
+                }
             }
         }
 
@@ -221,12 +228,16 @@ impl RedfishResource {
         type_registry: &RedfishTypeRegistry,
     ) -> Result<Vec<RedfishResource>, String> {
         let mut resolved_resources = Vec::new();
-        
+
         for resource in resources {
-            let resolved_items = resource.items
+            let resolved_items = resource
+                .items
                 .into_iter()
                 .map(|versioned_item| {
-                    let resolved_field = Self::resolve_resource_item_references(versioned_item.field, type_registry)?;
+                    let resolved_field = Self::resolve_resource_item_references(
+                        versioned_item.field,
+                        type_registry,
+                    )?;
                     Ok(VersionedField {
                         field: resolved_field,
                         introduced_in: versioned_item.introduced_in,
@@ -234,7 +245,7 @@ impl RedfishResource {
                     })
                 })
                 .collect::<Result<Vec<_>, String>>()?;
-            
+
             resolved_resources.push(RedfishResource {
                 metadata: resource.metadata,
                 uris: resource.uris,
@@ -242,7 +253,7 @@ impl RedfishResource {
                 capabilities: resource.capabilities,
             });
         }
-        
+
         Ok(resolved_resources)
     }
 
@@ -252,11 +263,15 @@ impl RedfishResource {
     ) -> Result<ResourceItem, String> {
         match item {
             ResourceItem::Property(mut property_data) => {
-                property_data.property_type = Self::resolve_property_type_references(property_data.property_type, type_registry)?;
+                property_data.property_type = Self::resolve_property_type_references(
+                    property_data.property_type,
+                    type_registry,
+                )?;
                 Ok(ResourceItem::Property(property_data))
             }
             ResourceItem::NavigationProperty(mut nav_data) => {
-                nav_data.target_type = Self::resolve_type_reference(&nav_data.target_type, type_registry)?;
+                nav_data.target_type =
+                    Self::resolve_type_reference(&nav_data.target_type, type_registry)?;
                 Ok(ResourceItem::NavigationProperty(nav_data))
             }
             ResourceItem::Action(action_data) => {
@@ -272,7 +287,8 @@ impl RedfishResource {
     ) -> Result<PropertyType, String> {
         match property_type {
             PropertyType::Collection(inner_type) => {
-                let resolved_inner = Self::resolve_property_type_references((*inner_type).clone(), type_registry)?;
+                let resolved_inner =
+                    Self::resolve_property_type_references((*inner_type).clone(), type_registry)?;
                 Ok(PropertyType::Collection(Rc::new(resolved_inner)))
             }
             PropertyType::Reference(type_ref) => {
@@ -311,17 +327,31 @@ impl RedfishResource {
                 Ok(ResourceReference::TypeName(type_name.to_string()))
             }
             // Other reference types are already resolved - Rc::clone is cheap (just reference counting)
-            ResourceReference::LocalVersionedType(rc_type) => Ok(ResourceReference::LocalVersionedType(Rc::clone(rc_type))),
-            ResourceReference::LocalType(rc_type) => Ok(ResourceReference::LocalType(Rc::clone(rc_type))),
-            ResourceReference::External(rc_resource) => Ok(ResourceReference::External(Rc::clone(rc_resource))),
-            ResourceReference::VersionedExternal(rc_versioned) => Ok(ResourceReference::VersionedExternal(Rc::clone(rc_versioned))),
+            ResourceReference::LocalVersionedType(rc_type) => {
+                Ok(ResourceReference::LocalVersionedType(Rc::clone(rc_type)))
+            }
+            ResourceReference::LocalType(rc_type) => {
+                Ok(ResourceReference::LocalType(Rc::clone(rc_type)))
+            }
+            ResourceReference::External(rc_resource) => {
+                Ok(ResourceReference::External(Rc::clone(rc_resource)))
+            }
+            ResourceReference::VersionedExternal(rc_versioned) => Ok(
+                ResourceReference::VersionedExternal(Rc::clone(rc_versioned)),
+            ),
         }
     }
 
     fn extract_items_from_schema(
         schema: &Schema,
         version: &Version,
-    ) -> Result<(Vec<VersionedField<ResourceItem>>, Vec<VersionedField<ReferencedType>>), String> {
+    ) -> Result<
+        (
+            Vec<VersionedField<ResourceItem>>,
+            Vec<VersionedField<ReferencedType>>,
+        ),
+        String,
+    > {
         let mut resource_items = Vec::new();
         let mut referenced_types = Vec::new();
 
@@ -351,7 +381,7 @@ impl RedfishResource {
                                     property_type: Self::convert_property_type(
                                         &structural_prop.ptype,
                                     )?,
-                                    nullable: structural_prop.nullable.unwrap_or(false),
+                                    nullable: structural_prop.nullable,
                                     permissions: Self::convert_permissions(
                                         &structural_prop.annotations,
                                     ),
@@ -362,7 +392,9 @@ impl RedfishResource {
                                             a.term.contains("Measures") && a.term.contains("Unit")
                                         })
                                         .and_then(|a| a.string.clone()),
-                                    constraints: None,
+                                    constraints: Self::extract_constraints(
+                                        &structural_prop.annotations,
+                                    ),
                                 });
                                 resource_items.push(VersionedField {
                                     field: item,
@@ -371,35 +403,38 @@ impl RedfishResource {
                                 });
                             }
                             PropertyAttrs::NavigationProperty(nav_prop) => {
-                                let item = ResourceItem::NavigationProperty(NavigationPropertyData {
-                                    metadata: ItemMetadata {
-                                        name: property.name.clone(),
-                                        description: nav_prop
+                                let item =
+                                    ResourceItem::NavigationProperty(NavigationPropertyData {
+                                        metadata: ItemMetadata {
+                                            name: property.name.clone(),
+                                            description: nav_prop
+                                                .annotations
+                                                .iter()
+                                                .find(|a| a.term == "OData.Description")
+                                                .and_then(|a| a.string.clone())
+                                                .unwrap_or_else(|| {
+                                                    format!("Navigation property {}", property.name)
+                                                }),
+                                            long_description: nav_prop
+                                                .annotations
+                                                .iter()
+                                                .find(|a| a.term == "OData.LongDescription")
+                                                .and_then(|a| a.string.clone()),
+                                        },
+                                        target_type: ResourceReference::TypeName(
+                                            nav_prop.ptype.clone(),
+                                        ),
+                                        is_collection: nav_prop.ptype.starts_with("Collection("),
+                                        nullable: nav_prop.nullable,
+                                        permissions: Self::convert_permissions(
+                                            &nav_prop.annotations,
+                                        ),
+                                        auto_expand: nav_prop
                                             .annotations
                                             .iter()
-                                            .find(|a| a.term == "OData.Description")
-                                            .and_then(|a| a.string.clone())
-                                            .unwrap_or_else(|| {
-                                                format!("Navigation property {}", property.name)
-                                            }),
-                                        long_description: nav_prop
-                                            .annotations
-                                            .iter()
-                                            .find(|a| a.term == "OData.LongDescription")
-                                            .and_then(|a| a.string.clone()),
-                                    },
-                                    target_type: ResourceReference::TypeName(
-                                        nav_prop.ptype.clone(),
-                                    ),
-                                    is_collection: nav_prop.ptype.starts_with("Collection("),
-                                    nullable: nav_prop.nullable.unwrap_or(false),
-                                    permissions: Self::convert_permissions(&nav_prop.annotations),
-                                    auto_expand: nav_prop
-                                        .annotations
-                                        .iter()
-                                        .any(|a| a.term.contains("AutoExpand")),
-                                    excerpt_copy: None,
-                                });
+                                            .any(|a| a.term.contains("AutoExpand")),
+                                        excerpt_copy: None,
+                                    });
                                 resource_items.push(VersionedField {
                                     field: item,
                                     introduced_in: version.clone(),
@@ -436,7 +471,7 @@ impl RedfishResource {
                                     property_type: Self::convert_property_type(
                                         &structural_prop.ptype,
                                     )?,
-                                    nullable: structural_prop.nullable.unwrap_or(false),
+                                    nullable: structural_prop.nullable,
                                     permissions: Self::convert_permissions(
                                         &structural_prop.annotations,
                                     ),
@@ -447,7 +482,9 @@ impl RedfishResource {
                                             a.term.contains("Measures") && a.term.contains("Unit")
                                         })
                                         .and_then(|a| a.string.clone()),
-                                    constraints: None,
+                                    constraints: Self::extract_constraints(
+                                        &structural_prop.annotations,
+                                    ),
                                 });
                             }
                             PropertyAttrs::NavigationProperty(nav_prop) => {
@@ -472,7 +509,7 @@ impl RedfishResource {
                                         nav_prop.ptype.clone(),
                                     ),
                                     is_collection: nav_prop.ptype.starts_with("Collection("),
-                                    nullable: nav_prop.nullable.unwrap_or(false),
+                                    nullable: nav_prop.nullable,
                                     permissions: Self::convert_permissions(&nav_prop.annotations),
                                     auto_expand: nav_prop
                                         .annotations
@@ -502,9 +539,12 @@ impl RedfishResource {
                         base_type: None, // TODO: Need full types support
                         properties,
                         navigation_properties,
-                        additional_properties: complex_type.annotations.iter().any(|a| {
-                            a.term == "OData.AdditionalProperties" && a.bool_value == Some(true)
-                        }),
+                        additional_properties: complex_type
+                            .annotations
+                            .iter()
+                            .find(|a| a.term == "OData.AdditionalProperties")
+                            .and_then(|a| a.bool_value)
+                            .unwrap_or(false),
                     });
                     referenced_types.push(VersionedField {
                         field: item,
@@ -623,6 +663,118 @@ impl RedfishResource {
         }
         Permission::None
     }
+
+    fn extract_constraints(annotations: &[crate::edmx::Annotation]) -> Option<Constraints> {
+        let mut minimum = None;
+        let mut maximum = None;
+        let mut pattern = None;
+
+        for annotation in annotations {
+            match annotation.term.as_str() {
+                "Validation.Minimum" => {
+                    if let Some(int_val) = annotation.int_value {
+                        minimum = Some(int_val);
+                    }
+                }
+                "Validation.Maximum" => {
+                    if let Some(int_val) = annotation.int_value {
+                        maximum = Some(int_val);
+                    }
+                }
+                "Validation.Pattern" => {
+                    pattern = annotation.string.clone();
+                }
+                _ => {}
+            }
+        }
+
+        if minimum.is_some() || maximum.is_some() || pattern.is_some() {
+            Some(Constraints {
+                minimum,
+                maximum,
+                pattern,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn extract_capabilities(annotations: &[crate::edmx::Annotation]) -> Capabilities {
+        let mut insertable = None;
+        let mut updatable = None;
+        let mut deletable = None;
+
+        for annotation in annotations {
+            match annotation.term.as_str() {
+                "Capabilities.InsertRestrictions" => {
+                    if let Some(record) = &annotation.record {
+                        if record.property_value.property == "Insertable" {
+                            if let Some(enabled) = record.property_value.bool_value {
+                                let description = record
+                                    .annotations
+                                    .iter()
+                                    .find(|a| a.term == "OData.Description")
+                                    .and_then(|a| a.string.clone());
+                                insertable = Some(CapabilityInfo {
+                                    enabled,
+                                    description,
+                                });
+                            }
+                        }
+                    }
+                }
+                "Capabilities.UpdateRestrictions" => {
+                    if let Some(record) = &annotation.record {
+                        if record.property_value.property == "Updatable" {
+                            if let Some(enabled) = record.property_value.bool_value {
+                                let description = record
+                                    .annotations
+                                    .iter()
+                                    .find(|a| a.term == "OData.Description")
+                                    .and_then(|a| a.string.clone())
+                                    .or_else(|| {
+                                        // Check for description at the record level
+                                        record
+                                            .annotations
+                                            .iter()
+                                            .find(|a| a.term == "OData.Description")
+                                            .and_then(|a| a.string.clone())
+                                    });
+                                updatable = Some(CapabilityInfo {
+                                    enabled,
+                                    description,
+                                });
+                            }
+                        }
+                    }
+                }
+                "Capabilities.DeleteRestrictions" => {
+                    if let Some(record) = &annotation.record {
+                        if record.property_value.property == "Deletable" {
+                            if let Some(enabled) = record.property_value.bool_value {
+                                let description = record
+                                    .annotations
+                                    .iter()
+                                    .find(|a| a.term == "OData.Description")
+                                    .and_then(|a| a.string.clone());
+                                deletable = Some(CapabilityInfo {
+                                    enabled,
+                                    description,
+                                });
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Capabilities {
+            insertable,
+            updatable,
+            deletable,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -690,43 +842,59 @@ mod tests {
             .count();
 
         assert!(
-             properties_count > 0 || nav_properties_count > 0,
-             "Should have at least some properties or navigation properties"
-         );
+            properties_count > 0 || nav_properties_count > 0,
+            "Should have at least some properties or navigation properties"
+        );
 
-                            // Verify type registry has ComplexTypes and Enums
-                    let versioned_complex_types_count = type_registry.versioned_types
-                        .iter()
-                        .filter(|t| matches!(t.field, ReferencedType::ComplexType(_)))
-                        .count();
-                    
-                    let versioned_enums_count = type_registry.versioned_types
-                        .iter()
-                        .filter(|t| matches!(t.field, ReferencedType::Enum(_)))
-                        .count();
+        // Verify type registry has ComplexTypes and Enums
+        let versioned_complex_types_count = type_registry
+            .versioned_types
+            .iter()
+            .filter(|t| matches!(t.field, ReferencedType::ComplexType(_)))
+            .count();
 
-                    let base_complex_types_count = type_registry.base_types
-                        .iter()
-                        .filter(|t| matches!(t.as_ref(), ReferencedType::ComplexType(_)))
-                        .count();
-                    
-                    let base_enums_count = type_registry.base_types
-                        .iter()
-                        .filter(|t| matches!(t.as_ref(), ReferencedType::Enum(_)))
-                        .count();
+        let versioned_enums_count = type_registry
+            .versioned_types
+            .iter()
+            .filter(|t| matches!(t.field, ReferencedType::Enum(_)))
+            .count();
 
-                    let total_complex_types = versioned_complex_types_count + base_complex_types_count;
-                    let total_enums = versioned_enums_count + base_enums_count;
+        let base_complex_types_count = type_registry
+            .base_types
+            .iter()
+            .filter(|t| matches!(t.as_ref(), ReferencedType::ComplexType(_)))
+            .count();
 
-        assert!(total_complex_types > 0, "Should have ComplexTypes in type registry");
+        let base_enums_count = type_registry
+            .base_types
+            .iter()
+            .filter(|t| matches!(t.as_ref(), ReferencedType::Enum(_)))
+            .count();
+
+        let total_complex_types = versioned_complex_types_count + base_complex_types_count;
+        let total_enums = versioned_enums_count + base_enums_count;
+
+        assert!(
+            total_complex_types > 0,
+            "Should have ComplexTypes in type registry"
+        );
         assert!(total_enums > 0, "Should have Enums in type registry");
- 
-         println!("=== Resources ===");
-         println!("{coolant_connector:#?}");
-         println!("\n=== Type Registry ===");
-         println!("Versioned ComplexTypes: {}, Versioned Enums: {}", versioned_complex_types_count, versioned_enums_count);
-         println!("Base ComplexTypes: {}, Base Enums: {}", base_complex_types_count, base_enums_count);
-         println!("Total ComplexTypes: {}, Total Enums: {}", total_complex_types, total_enums);
+
+        println!("=== Resources ===");
+        println!("{coolant_connector:#?}");
+        println!("\n=== Type Registry ===");
+        println!(
+            "Versioned ComplexTypes: {}, Versioned Enums: {}",
+            versioned_complex_types_count, versioned_enums_count
+        );
+        println!(
+            "Base ComplexTypes: {}, Base Enums: {}",
+            base_complex_types_count, base_enums_count
+        );
+        println!(
+            "Total ComplexTypes: {}, Total Enums: {}",
+            total_complex_types, total_enums
+        );
 
         Ok(())
     }

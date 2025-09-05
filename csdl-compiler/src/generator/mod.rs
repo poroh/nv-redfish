@@ -58,7 +58,7 @@ pub enum ResourceItem {
 pub struct PropertyData {
     pub metadata: ItemMetadata,
     pub property_type: PropertyType,
-    pub nullable: bool,
+    pub nullable: Option<bool>,
     pub permissions: Permission,
     pub units: Option<String>,
     pub constraints: Option<Constraints>,
@@ -69,7 +69,7 @@ pub struct NavigationPropertyData {
     pub metadata: ItemMetadata,
     pub target_type: ResourceReference,
     pub is_collection: bool,
-    pub nullable: bool,
+    pub nullable: Option<bool>,
     pub permissions: Permission,
     pub auto_expand: bool,
     pub excerpt_copy: Option<String>,
@@ -108,7 +108,7 @@ pub struct ActionData {
 pub struct ActionParameter {
     pub metadata: ItemMetadata,
     pub parameter_type: PropertyType,
-    pub nullable: bool,
+    pub nullable: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -157,14 +157,14 @@ pub struct Constraints {
     pub pattern: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Capabilities {
     pub insertable: Option<CapabilityInfo>,
     pub updatable: Option<CapabilityInfo>,
     pub deletable: Option<CapabilityInfo>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CapabilityInfo {
     pub enabled: bool,
     pub description: Option<String>,
