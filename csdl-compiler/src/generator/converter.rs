@@ -31,18 +31,14 @@ use alloc::rc::Rc;
 #[derive(Debug)]
 pub struct RedfishTypeRegistry {
     pub versioned_types: Vec<Rc<VersionedField<ReferencedType>>>,
-    pub base_types: Vec<Rc<ReferencedType>>,
     versioned_lookup: HashMap<String, Rc<VersionedField<ReferencedType>>>,
-    base_lookup: HashMap<String, Rc<ReferencedType>>,
 }
 
 impl RedfishTypeRegistry {
     fn new() -> Self {
         Self {
             versioned_types: Vec::new(),
-            base_types: Vec::new(),
             versioned_lookup: HashMap::new(),
-            base_lookup: HashMap::new(),
         }
     }
 
@@ -63,32 +59,12 @@ impl RedfishTypeRegistry {
     fn find_type(&self, type_name: &str) -> Option<ResourceReference> {
         // Check versioned types first (direct name match)
         if let Some(found) = self.versioned_lookup.get(type_name) {
-            return Some(ResourceReference::LocalVersionedType(Rc::clone(found)));
-        }
-
-        // Check base types (direct name match)
-        if let Some(found) = self.base_lookup.get(type_name) {
             return Some(ResourceReference::LocalType(Rc::clone(found)));
         }
 
         // Check for fully qualified name matches in versioned types
         for rc_type in self.versioned_lookup.values() {
             let matches = match &rc_type.field {
-                ReferencedType::ComplexType(complex_type) => {
-                    type_name.ends_with(&format!(".{}", complex_type.metadata.name))
-                }
-                ReferencedType::Enum(enum_type) => {
-                    type_name.ends_with(&format!(".{}", enum_type.metadata.name))
-                }
-            };
-            if matches {
-                return Some(ResourceReference::LocalVersionedType(Rc::clone(rc_type)));
-            }
-        }
-
-        // Check for fully qualified name matches in base types
-        for rc_type in self.base_lookup.values() {
-            let matches = match &**rc_type {
                 ReferencedType::ComplexType(complex_type) => {
                     type_name.ends_with(&format!(".{}", complex_type.metadata.name))
                 }
@@ -327,18 +303,12 @@ impl RedfishResource {
                 Ok(ResourceReference::TypeName(type_name.to_string()))
             }
             // Other reference types are already resolved - Rc::clone is cheap (just reference counting)
-            ResourceReference::LocalVersionedType(rc_type) => {
-                Ok(ResourceReference::LocalVersionedType(Rc::clone(rc_type)))
-            }
             ResourceReference::LocalType(rc_type) => {
                 Ok(ResourceReference::LocalType(Rc::clone(rc_type)))
             }
             ResourceReference::External(rc_resource) => {
                 Ok(ResourceReference::External(Rc::clone(rc_resource)))
-            }
-            ResourceReference::VersionedExternal(rc_versioned) => Ok(
-                ResourceReference::VersionedExternal(Rc::clone(rc_versioned)),
-            ),
+            },
         }
     }
 
@@ -859,20 +829,8 @@ mod tests {
             .filter(|t| matches!(t.field, ReferencedType::Enum(_)))
             .count();
 
-        let base_complex_types_count = type_registry
-            .base_types
-            .iter()
-            .filter(|t| matches!(t.as_ref(), ReferencedType::ComplexType(_)))
-            .count();
-
-        let base_enums_count = type_registry
-            .base_types
-            .iter()
-            .filter(|t| matches!(t.as_ref(), ReferencedType::Enum(_)))
-            .count();
-
-        let total_complex_types = versioned_complex_types_count + base_complex_types_count;
-        let total_enums = versioned_enums_count + base_enums_count;
+        let total_complex_types = versioned_complex_types_count;
+        let total_enums = versioned_enums_count;
 
         assert!(
             total_complex_types > 0,
@@ -886,10 +844,6 @@ mod tests {
         println!(
             "Versioned ComplexTypes: {}, Versioned Enums: {}",
             versioned_complex_types_count, versioned_enums_count
-        );
-        println!(
-            "Base ComplexTypes: {}, Base Enums: {}",
-            base_complex_types_count, base_enums_count
         );
         println!(
             "Total ComplexTypes: {}, Total Enums: {}",

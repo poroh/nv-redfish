@@ -132,10 +132,8 @@ pub enum ReferencedType {
 
 #[derive(Debug, Clone)]
 pub enum ResourceReference {
-    LocalVersionedType(Rc<VersionedField<ReferencedType>>),
-    LocalType(Rc<ReferencedType>),
+    LocalType(Rc<VersionedField<ReferencedType>>),
     External(Rc<RedfishResource>),
-    VersionedExternal(Rc<VersionedField<RedfishResource>>),
 
     // TODO: This is temporary, just to be able to test without compiling all references for all external resources
     TypeName(String),
