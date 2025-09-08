@@ -18,6 +18,14 @@ use crate::edmx::PropertyName;
 use crate::edmx::TypeName;
 use crate::edmx::annotation::Annotation;
 use serde::Deserialize;
+use tagged_types::TaggedType;
+
+pub type IsNullable = TaggedType<bool, IsNullableTag>;
+#[derive(tagged_types::Tag)]
+#[implement(Copy, Clone)]
+#[transparent(Debug, Deserialize)]
+#[capability(inner_access)]
+pub enum IsNullableTag {}
 
 /// 6.1 Element edm:Property
 #[derive(Debug, Deserialize)]
@@ -30,7 +38,7 @@ pub struct DeStructuralProperty {
     pub ptype: TypeName,
     /// 6.2.1 Attribute `Nullable`
     #[serde(rename = "@Nullable")]
-    pub nullable: Option<bool>,
+    pub nullable: Option<IsNullable>,
     /// 6.2.2 Attribute `MaxLength`
     #[serde(rename = "@MaxLength")]
     pub max_length: Option<String>,
@@ -65,7 +73,7 @@ pub struct DeNavigationProperty {
     pub ptype: TypeName,
     /// 7.1.3 Attribute `Nullable`
     #[serde(rename = "@Nullable")]
-    pub nullable: Option<bool>,
+    pub nullable: Option<IsNullable>,
     /// 7.1.4 Attribute `Partner`
     #[serde(rename = "@Partner")]
     pub partner: Option<String>,
@@ -181,7 +189,7 @@ impl DeNavigationProperty {
 pub struct NavigationProperty {
     pub name: PropertyName,
     pub ptype: TypeName,
-    pub nullable: Option<bool>,
+    pub nullable: Option<IsNullable>,
     pub partner: Option<String>,
     pub contains_target: Option<bool>,
     pub annotations: Vec<Annotation>,

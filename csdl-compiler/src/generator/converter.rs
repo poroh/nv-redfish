@@ -23,7 +23,7 @@ use super::{
     ReferencedType, ResourceItem, ResourceReference, Version, VersionedField,
 };
 use crate::edmx::{
-    Edmx, TermName, TypeName,
+    Edmx, TypeName,
     annotation::Annotation,
     property::PropertyAttrs,
     schema::{Schema, Type},

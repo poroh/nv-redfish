@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::edmx::property::IsNullable;
 use crate::odata::annotations::{Description, LongDescription, ODataAnnotations};
 use alloc::rc::Rc;
 use tagged_types::TaggedType;
@@ -69,7 +70,7 @@ pub enum ResourceItem {
 pub struct PropertyData {
     pub metadata: ItemMetadata,
     pub property_type: PropertyType,
-    pub nullable: Option<bool>,
+    pub nullable: Option<IsNullable>,
     pub permissions: Permission,
     pub units: Option<String>,
     pub constraints: Option<Constraints>,
@@ -80,7 +81,7 @@ pub struct NavigationPropertyData {
     pub metadata: ItemMetadata,
     pub target_type: ResourceReference,
     pub is_collection: bool,
-    pub nullable: Option<bool>,
+    pub nullable: Option<IsNullable>,
     pub permissions: Permission,
     pub auto_expand: bool,
     pub excerpt_copy: Option<String>,
