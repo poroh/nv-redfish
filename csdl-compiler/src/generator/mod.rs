@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::edmx::property::IsNullable;
+use crate::edmx::IsNullable;
 use crate::odata::annotations::{Description, LongDescription, ODataAnnotations};
 use alloc::rc::Rc;
 use tagged_types::TaggedType;

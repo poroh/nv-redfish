@@ -45,6 +45,9 @@ pub mod complex_type;
 /// 10 Enumeration Type
 pub mod enum_type;
 
+/// 12.1 Element edm:Action
+pub mod action;
+
 /// 14.3 Element edm:Annotation
 pub mod annotation;
 
@@ -67,8 +70,29 @@ pub type TermName = TaggedType<String, TermNameTag>;
 #[capability(inner_access)]
 pub enum TermNameTag {}
 
+pub type ActionName = TaggedType<String, TermNameTag>;
+#[derive(tagged_types::Tag)]
+#[implement(Clone, Hash, PartialEq, Eq)]
+#[transparent(Debug, Display, Deserialize)]
+#[capability(inner_access)]
+pub enum ActionNameTag {}
+
 pub type SchemaNamespace = String;
 pub type PropertyName = String;
+
+pub type IsNullable = TaggedType<bool, IsNullableTag>;
+#[derive(tagged_types::Tag)]
+#[implement(Copy, Clone)]
+#[transparent(Debug, Deserialize)]
+#[capability(inner_access)]
+pub enum IsNullableTag {}
+
+pub type IsBound = TaggedType<bool, IsBoundTag>;
+#[derive(tagged_types::Tag)]
+#[implement(Copy, Clone)]
+#[transparent(Debug, Deserialize)]
+#[capability(inner_access)]
+pub enum IsBoundTag {}
 
 /// EDMX compilation errors.
 #[derive(Debug)]
@@ -79,8 +103,10 @@ pub enum ValidateError {
     WrongDataServicesNumber,
     /// In the `EntityType` too many keys.
     TooManyKeys,
-    /// In the `NavigationProperty` too `OnDelete` items.
+    /// In the `NavigationProperty` too many `OnDelete` items.
     TooManyOnDelete,
+    /// In the `Action` too many `ReturnType` items.
+    TooManyReturnTypes,
     /// Schema validation error.
     Schema(SchemaNamespace, Box<ValidateError>),
     /// `ComplexType` validation error.
@@ -89,6 +115,8 @@ pub enum ValidateError {
     EntityType(TypeName, Box<ValidateError>),
     /// `NavigationProperty` validation error.
     NavigationProperty(PropertyName, Box<ValidateError>),
+    /// `Action` validation error.
+    Action(ActionName, Box<ValidateError>),
 }
 
 /// Reexport of Edmx type to root.
@@ -194,4 +222,29 @@ pub struct Term {
     pub default_value: Option<String>,
     #[serde(rename = "Annotation", default)]
     pub annotations: Vec<Annotation>,
+}
+
+/// 12.3 Element edm:ReturnType
+#[derive(Debug, Deserialize)]
+pub struct ReturnType {
+    /// 12.3.1 Attribute Type
+    #[serde(rename = "@Type")]
+    pub rtype: TypeName,
+    /// 12.3.2 Attribute Nullable
+    #[serde(rename = "@Nullable")]
+    pub nullable: Option<IsNullable>,
+}
+
+/// 12.4 Element edm:Parameter
+#[derive(Debug, Deserialize)]
+pub struct Parameter {
+    /// 12.4.1 Attribute Name
+    #[serde(rename = "@Name")]
+    pub name: String,
+    /// 12.4.2 Attribute Type
+    #[serde(rename = "@Type")]
+    pub ptype: String,
+    /// 12.4.3 Attribute Nullable
+    #[serde(rename = "@Nullable")]
+    pub nullable: Option<IsNullable>,
 }

@@ -19,6 +19,8 @@ use crate::edmx::SchemaNamespace;
 use crate::edmx::Term;
 use crate::edmx::TypeDefinition;
 use crate::edmx::TypeName;
+use crate::edmx::action::Action;
+use crate::edmx::action::DeAction;
 use crate::edmx::annotation::Annotation;
 use crate::edmx::complex_type::ComplexType;
 use crate::edmx::complex_type::DeComplexType;
@@ -48,6 +50,7 @@ pub enum DeSchemaItem {
     EntityContainer(EntityContainer),
     Term(Term),
     Annotation(Annotation),
+    Action(DeAction),
 }
 
 #[derive(Debug)]
@@ -64,6 +67,7 @@ pub enum Type {
 pub struct Schema {
     pub namespace: SchemaNamespace,
     pub types: HashMap<TypeName, Type>,
+    pub actions: Vec<Action>,
     pub annotations: Vec<Annotation>,
 }
 
@@ -72,42 +76,49 @@ impl DeSchema {
     ///
     /// Returns error if any of items failed to validate.
     pub fn validate(self) -> Result<Schema, ValidateError> {
-        let (types, annotations) =
-            self.items
-                .into_iter()
-                .fold((Vec::new(), Vec::new()), |(mut ts, mut anns), v| {
-                    match v {
-                        DeSchemaItem::EntityType(v) => {
-                            ts.push(v.validate().map(|v| (v.name.clone(), Type::EntityType(v))));
-                        }
-                        DeSchemaItem::ComplexType(v) => {
-                            ts.push(v.validate().map(|v| (v.name.clone(), Type::ComplexType(v))));
-                        }
-                        DeSchemaItem::EnumType(v) => {
-                            ts.push(v.validate().map(|v| (v.name.clone(), Type::EnumType(v))));
-                        }
-                        DeSchemaItem::TypeDefinition(v) => {
-                            ts.push(Ok((v.name.clone(), Type::TypeDefinition(v))));
-                        }
-                        DeSchemaItem::EntityContainer(v) => {
-                            ts.push(Ok((v.name.clone(), Type::EntityContainer(v))));
-                        }
-                        DeSchemaItem::Term(v) => {
-                            ts.push(Ok((v.name.clone(), (Type::Term(v)))));
-                        }
-                        DeSchemaItem::Annotation(v) => anns.push(v),
+        let (types, annotations, actions) = self.items.into_iter().fold(
+            (Vec::new(), Vec::new(), Vec::new()),
+            |(mut ts, mut anns, mut acts), v| {
+                match v {
+                    DeSchemaItem::EntityType(v) => {
+                        ts.push(v.validate().map(|v| (v.name.clone(), Type::EntityType(v))));
                     }
-                    (ts, anns)
-                });
+                    DeSchemaItem::ComplexType(v) => {
+                        ts.push(v.validate().map(|v| (v.name.clone(), Type::ComplexType(v))));
+                    }
+                    DeSchemaItem::EnumType(v) => {
+                        ts.push(v.validate().map(|v| (v.name.clone(), Type::EnumType(v))));
+                    }
+                    DeSchemaItem::TypeDefinition(v) => {
+                        ts.push(Ok((v.name.clone(), Type::TypeDefinition(v))));
+                    }
+                    DeSchemaItem::EntityContainer(v) => {
+                        ts.push(Ok((v.name.clone(), Type::EntityContainer(v))));
+                    }
+                    DeSchemaItem::Term(v) => {
+                        ts.push(Ok((v.name.clone(), (Type::Term(v)))));
+                    }
+                    DeSchemaItem::Annotation(v) => anns.push(v),
+                    DeSchemaItem::Action(v) => acts.push(v.validate()),
+                }
+                (ts, anns, acts)
+            },
+        );
         let namespace = self.namespace;
         let types = types
             .into_iter()
             .collect::<Result<HashMap<_, _>, _>>()
             .map_err(|e| ValidateError::Schema(namespace.clone(), Box::new(e)))?;
 
+        let actions = actions
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| ValidateError::Schema(namespace.clone(), Box::new(e)))?;
+
         Ok(Schema {
             namespace,
             types,
+            actions,
             annotations,
         })
     }

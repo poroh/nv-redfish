@@ -14,18 +14,11 @@
 // limitations under the License.
 
 use crate::ValidateError;
+use crate::edmx::IsNullable;
 use crate::edmx::PropertyName;
 use crate::edmx::TypeName;
 use crate::edmx::annotation::Annotation;
 use serde::Deserialize;
-use tagged_types::TaggedType;
-
-pub type IsNullable = TaggedType<bool, IsNullableTag>;
-#[derive(tagged_types::Tag)]
-#[implement(Copy, Clone)]
-#[transparent(Debug, Deserialize)]
-#[capability(inner_access)]
-pub enum IsNullableTag {}
 
 /// 6.1 Element edm:Property
 #[derive(Debug, Deserialize)]

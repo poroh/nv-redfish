@@ -16,6 +16,10 @@ path = "src/lib.rs"
 name = "csdl-compiler-bin"
 path = "src/main.rs"
 
+[[bin]]
+name = "test-csdl-parser"
+path = "tests/test-csdl-parser.rs"
+
 [dependencies]
 serde = { workspace = true, features = [ "derive" ]}
 quick-xml = { workspace = true, features = ["serialize"] }
