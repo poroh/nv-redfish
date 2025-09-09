@@ -15,6 +15,7 @@
 
 //! Types defined in 17 Attribute Values
 
+use crate::edmx::QualifiedTypeName;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::de::Error as DeError;
@@ -39,8 +40,8 @@ impl Display for Error {
     }
 }
 
-/// 17.1 Namespace
-#[derive(Clone, Debug)]
+/// 17.1 `Namespace`
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Namespace {
     pub ids: Vec<SimpleIdentifier>,
 }
@@ -86,7 +87,7 @@ impl<'de> Deserialize<'de> for Namespace {
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> FmtResult {
                 formatter.write_str("Namespace string")
             }
-            fn visit_str<E: DeError>(self, value: &str) -> Result<Namespace, E> {
+            fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
                 value.parse().map_err(DeError::custom)
             }
         }
@@ -95,6 +96,7 @@ impl<'de> Deserialize<'de> for Namespace {
     }
 }
 
+/// 17.2 `SimpleIdentifier`
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SimpleIdentifier(String);
 
@@ -148,7 +150,7 @@ impl<'de> Deserialize<'de> for SimpleIdentifier {
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> FmtResult {
                 formatter.write_str("SimpleIdentifier string")
             }
-            fn visit_str<E: DeError>(self, value: &str) -> Result<SimpleIdentifier, E> {
+            fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
                 value.parse().map_err(DeError::custom)
             }
         }
@@ -157,7 +159,8 @@ impl<'de> Deserialize<'de> for SimpleIdentifier {
     }
 }
 
-#[derive(Debug)]
+/// 17.3 `QualifiedName`
+#[derive(Debug, PartialEq, Eq)]
 pub struct QualifiedName {
     pub namespace: Namespace,
     pub name: SimpleIdentifier,
@@ -190,7 +193,47 @@ impl<'de> Deserialize<'de> for QualifiedName {
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> FmtResult {
                 formatter.write_str("QualifiedName string")
             }
-            fn visit_str<E: DeError>(self, value: &str) -> Result<QualifiedName, E> {
+            fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
+                value.parse().map_err(DeError::custom)
+            }
+        }
+
+        de.deserialize_string(QnVisitor {})
+    }
+}
+
+/// 17.4 `TypeName`
+#[derive(Debug, PartialEq, Eq)]
+pub enum TypeName {
+    One(QualifiedTypeName),
+    CollectionOf(QualifiedTypeName),
+}
+
+impl FromStr for TypeName {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        const COLLECTION_PREFIX: &str = "Collection(";
+        const COLLECTION_SUFFIX: &str = ")";
+        if s.starts_with(COLLECTION_PREFIX) && s.ends_with(COLLECTION_SUFFIX) {
+            let qtype = s[COLLECTION_PREFIX.len()..s.len() - COLLECTION_SUFFIX.len()].parse()?;
+            Ok(Self::CollectionOf(qtype))
+        } else {
+            Ok(Self::One(s.parse()?))
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for TypeName {
+    fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        struct QnVisitor {}
+        impl Visitor<'_> for QnVisitor {
+            type Value = TypeName;
+
+            fn expecting(&self, formatter: &mut Formatter) -> FmtResult {
+                formatter.write_str("property type string")
+            }
+
+            fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
                 value.parse().map_err(DeError::custom)
             }
         }

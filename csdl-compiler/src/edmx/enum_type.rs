@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use crate::ValidateError;
+use crate::edmx::LocalTypeName;
 use crate::edmx::QualifiedTypeName;
-use crate::edmx::TypeName;
 use crate::edmx::annotation::Annotation;
 use crate::edmx::attribute_values::Error as QualifiedNameError;
 use serde::Deserialize;
@@ -34,7 +34,7 @@ pub type EnumMemberName = String;
 pub struct DeEnumType {
     /// 10.1.1 Attribute `Name`
     #[serde(rename = "@Name")]
-    pub name: TypeName,
+    pub name: LocalTypeName,
     /// 10.1.2 Attribute `UnderlyingType`
     #[serde(rename = "@UnderlyingType")]
     pub underlying_type: Option<EnumUnderlyingType>,
@@ -71,7 +71,7 @@ pub struct EnumMember {
 /// Validated edm:EnumType.
 #[derive(Debug)]
 pub struct EnumType {
-    pub name: TypeName,
+    pub name: LocalTypeName,
     pub underlying_type: Option<EnumUnderlyingType>,
     pub is_flags: Option<bool>,
     pub members: Vec<EnumMember>,

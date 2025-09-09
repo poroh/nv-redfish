@@ -15,10 +15,10 @@
 
 use crate::ValidateError;
 use crate::edmx::EntityContainer;
+use crate::edmx::LocalTypeName;
 use crate::edmx::SchemaNamespace;
 use crate::edmx::Term;
 use crate::edmx::TypeDefinition;
-use crate::edmx::TypeName;
 use crate::edmx::action::Action;
 use crate::edmx::action::DeAction;
 use crate::edmx::annotation::Annotation;
@@ -66,7 +66,7 @@ pub enum Type {
 #[derive(Debug)]
 pub struct Schema {
     pub namespace: SchemaNamespace,
-    pub types: HashMap<TypeName, Type>,
+    pub types: HashMap<LocalTypeName, Type>,
     pub actions: Vec<Action>,
     pub annotations: Vec<Annotation>,
 }

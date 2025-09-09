@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use crate::ValidateError;
+use crate::edmx::LocalTypeName;
 use crate::edmx::QualifiedTypeName;
-use crate::edmx::TypeName;
 use crate::edmx::annotation::Annotation;
 use crate::edmx::property::DeNavigationProperty;
 use crate::edmx::property::DeStructuralProperty;
@@ -27,7 +27,7 @@ use serde::Deserialize;
 pub struct DeComplexType {
     /// 9.1.1 Attribute `Name`
     #[serde(rename = "@Name")]
-    pub name: TypeName,
+    pub name: LocalTypeName,
     /// 9.1.2 Attribute `BaseType`
     #[serde(rename = "@BaseType")]
     pub base_type: Option<QualifiedTypeName>,
@@ -54,7 +54,7 @@ pub enum DeComplexTypeItem {
 /// Validated edm:ComplexType
 #[derive(Debug)]
 pub struct ComplexType {
-    pub name: TypeName,
+    pub name: LocalTypeName,
     pub properties: Vec<Property>,
     pub annotations: Vec<Annotation>,
 }

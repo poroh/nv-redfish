@@ -58,6 +58,7 @@ use annotation::Annotation;
 use attribute_values::Namespace;
 use attribute_values::QualifiedName;
 use attribute_values::SimpleIdentifier;
+use attribute_values::TypeName;
 use quick_xml::DeError;
 use serde::Deserialize;
 use tagged_types::TaggedType;
@@ -69,12 +70,14 @@ pub type QualifiedTypeName = TaggedType<QualifiedName, QualifiedTypeNameTag>;
 #[capability(inner_access)]
 pub enum QualifiedTypeNameTag {}
 
-pub type TypeName = TaggedType<SimpleIdentifier, TypeNameTag>;
+/// This is name of type inside Schema. This type is used when types
+/// are defined.
+pub type LocalTypeName = TaggedType<SimpleIdentifier, LocalTypeNameTag>;
 #[derive(tagged_types::Tag)]
 #[implement(Clone, Hash, PartialEq, Eq)]
 #[transparent(Debug, Display, Deserialize)]
 #[capability(inner_access)]
-pub enum TypeNameTag {}
+pub enum LocalTypeNameTag {}
 
 pub type TermName = TaggedType<String, TermNameTag>;
 #[derive(tagged_types::Tag)]
@@ -98,6 +101,13 @@ pub type PropertyName = TaggedType<SimpleIdentifier, PropertyNameTag>;
 #[transparent(Debug, Display, Deserialize)]
 #[capability(inner_access)]
 pub enum PropertyNameTag {}
+
+pub type ParameterName = TaggedType<SimpleIdentifier, ParameterNameTag>;
+#[derive(tagged_types::Tag)]
+#[implement(Clone, PartialEq, Eq)]
+#[transparent(Debug, Display, Deserialize)]
+#[capability(inner_access)]
+pub enum ParameterNameTag {}
 
 pub type IsNullable = TaggedType<bool, IsNullableTag>;
 #[derive(tagged_types::Tag)]
@@ -129,9 +139,9 @@ pub enum ValidateError {
     /// Schema validation error.
     Schema(SchemaNamespace, Box<ValidateError>),
     /// `ComplexType` validation error.
-    ComplexType(TypeName, Box<ValidateError>),
+    ComplexType(LocalTypeName, Box<ValidateError>),
     /// `EntityType` validation error.
-    EntityType(TypeName, Box<ValidateError>),
+    EntityType(LocalTypeName, Box<ValidateError>),
     /// `NavigationProperty` validation error.
     NavigationProperty(PropertyName, Box<ValidateError>),
     /// `Action` validation error.
@@ -144,7 +154,7 @@ pub type Edmx = edmx_root::Edmx;
 #[derive(Debug, Deserialize)]
 pub struct TypeDefinition {
     #[serde(rename = "@Name")]
-    pub name: TypeName,
+    pub name: LocalTypeName,
     #[serde(rename = "@UnderlyingType")]
     pub underlying_type: QualifiedTypeName,
     #[serde(rename = "Annotation", default)]
@@ -154,7 +164,7 @@ pub struct TypeDefinition {
 #[derive(Debug, Deserialize)]
 pub struct EntityContainer {
     #[serde(rename = "@Name")]
-    pub name: TypeName,
+    pub name: LocalTypeName,
     #[serde(rename = "EntitySet", default)]
     pub entity_sets: Vec<EntitySet>,
     #[serde(rename = "Singleton", default)]
@@ -232,9 +242,9 @@ pub struct Annotations {
 #[derive(Debug, Deserialize)]
 pub struct Term {
     #[serde(rename = "@Name")]
-    pub name: TypeName,
+    pub name: LocalTypeName,
     #[serde(rename = "@Type")]
-    pub ttype: Option<String>,
+    pub ttype: Option<TypeName>,
     #[serde(rename = "@AppliesTo")]
     pub applies_to: Option<String>,
     #[serde(rename = "@DefaultValue")]
@@ -248,7 +258,7 @@ pub struct Term {
 pub struct ReturnType {
     /// 12.3.1 Attribute Type
     #[serde(rename = "@Type")]
-    pub rtype: QualifiedTypeName,
+    pub rtype: TypeName,
     /// 12.3.2 Attribute Nullable
     #[serde(rename = "@Nullable")]
     pub nullable: Option<IsNullable>,
@@ -259,10 +269,10 @@ pub struct ReturnType {
 pub struct Parameter {
     /// 12.4.1 Attribute Name
     #[serde(rename = "@Name")]
-    pub name: String,
+    pub name: ParameterName,
     /// 12.4.2 Attribute Type
     #[serde(rename = "@Type")]
-    pub ptype: String,
+    pub ptype: TypeName,
     /// 12.4.3 Attribute Nullable
     #[serde(rename = "@Nullable")]
     pub nullable: Option<IsNullable>,

@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::edmx::{IsBound, IsNullable, PropertyName, SchemaNamespace, TypeName};
+use crate::edmx::{IsBound, IsNullable, LocalTypeName, PropertyName, SchemaNamespace};
 use crate::odata::annotations::{Description, LongDescription};
 use alloc::rc::Rc;
 use tagged_types::TaggedType;
@@ -46,11 +46,10 @@ pub enum ResourceTypeKind {
     EnumType(Vec<EnumMember>),
 }
 
-
 #[derive(Debug)]
 pub struct ResourceTypeName {
     pub namespace: SchemaNamespace,
-    pub name: TypeName,
+    pub name: LocalTypeName,
 }
 
 #[derive(Debug)]
