@@ -17,7 +17,15 @@ use crate::ValidateError;
 use crate::edmx::QualifiedTypeName;
 use crate::edmx::TypeName;
 use crate::edmx::annotation::Annotation;
+use crate::edmx::attribute_values::Error as QualifiedNameError;
 use serde::Deserialize;
+use serde::Deserializer;
+use serde::de::Error as DeError;
+use serde::de::Visitor;
+use std::fmt::Display;
+use std::fmt::Formatter;
+use std::fmt::Result as FmtResult;
+use std::str::FromStr;
 
 pub type EnumMemberName = String;
 
@@ -29,7 +37,7 @@ pub struct DeEnumType {
     pub name: TypeName,
     /// 10.1.2 Attribute `UnderlyingType`
     #[serde(rename = "@UnderlyingType")]
-    pub underlying_type: Option<QualifiedTypeName>,
+    pub underlying_type: Option<EnumUnderlyingType>,
     /// 10.1.3 Attribute `IsFlags`
     #[serde(rename = "@IsFlags")]
     pub is_flags: Option<bool>,
@@ -64,7 +72,7 @@ pub struct EnumMember {
 #[derive(Debug)]
 pub struct EnumType {
     pub name: TypeName,
-    pub underlying_type: Option<QualifiedTypeName>,
+    pub underlying_type: Option<EnumUnderlyingType>,
     pub is_flags: Option<bool>,
     pub members: Vec<EnumMember>,
     pub annotations: Vec<Annotation>,
@@ -92,5 +100,68 @@ impl DeEnumType {
             members,
             annotations,
         })
+    }
+}
+
+#[derive(Debug)]
+pub enum Error {
+    Syntax(QualifiedNameError),
+    BadUnderlyingType(String),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::Syntax(err) => write!(f, "wrong enum underlying type syntax: {err}"),
+            Self::BadUnderlyingType(id) => write!(f, "bad enum underlying type {id}"),
+        }
+    }
+}
+
+/// 10.1.2 Attribute `UnderlyingType`
+#[derive(Debug, Default)]
+pub enum EnumUnderlyingType {
+    Byte,
+    SByte,
+    Int16,
+    #[default]
+    Int32,
+    Int64,
+}
+
+impl FromStr for EnumUnderlyingType {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let qname: QualifiedTypeName = s.parse().map_err(Error::Syntax)?;
+        if qname.inner().namespace.is_edm() {
+            match qname.inner().name.inner().as_str() {
+                "Byte" => Ok(Self::Byte),
+                "SByte" => Ok(Self::SByte),
+                "Int16" => Ok(Self::Int16),
+                "Int32" => Ok(Self::Int32),
+                "Int64" => Ok(Self::Int64),
+                _ => Err(Error::BadUnderlyingType(s.into())),
+            }
+        } else {
+            Err(Error::BadUnderlyingType(s.into()))
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for EnumUnderlyingType {
+    fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        struct UtVisitor {}
+        impl Visitor<'_> for UtVisitor {
+            type Value = EnumUnderlyingType;
+
+            fn expecting(&self, formatter: &mut Formatter) -> FmtResult {
+                formatter.write_str("Enum UnderlyingType string")
+            }
+            fn visit_str<E: DeError>(self, value: &str) -> Result<EnumUnderlyingType, E> {
+                value.parse().map_err(DeError::custom)
+            }
+        }
+
+        de.deserialize_string(UtVisitor {})
     }
 }

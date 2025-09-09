@@ -91,7 +91,13 @@ pub type ActionName = TaggedType<String, TermNameTag>;
 pub enum ActionNameTag {}
 
 pub type SchemaNamespace = Namespace;
-pub type PropertyName = String;
+
+pub type PropertyName = TaggedType<SimpleIdentifier, PropertyNameTag>;
+#[derive(tagged_types::Tag)]
+#[implement(Clone, PartialEq, Eq)]
+#[transparent(Debug, Display, Deserialize)]
+#[capability(inner_access)]
+pub enum PropertyNameTag {}
 
 pub type IsNullable = TaggedType<bool, IsNullableTag>;
 #[derive(tagged_types::Tag)]

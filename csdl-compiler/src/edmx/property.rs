@@ -197,6 +197,11 @@ pub struct NavigationProperty {
     pub referential_constraints: Vec<ReferentialConstraint>,
 }
 
+/// Defines `Property` & `NavigationProperty` attribute type.
+///
+/// Note: that today we don't sepearate `EntityType` from other
+/// types. Howerver, `NavigationProperty` can only refer to `EntityType`'s
+/// qualified name. So here is the room for type improvements.
 #[derive(Debug)]
 pub enum PropertyType {
     One(QualifiedTypeName),
@@ -226,6 +231,7 @@ impl<'de> Deserialize<'de> for PropertyType {
             fn expecting(&self, formatter: &mut Formatter) -> FmtResult {
                 formatter.write_str("property type string")
             }
+
             fn visit_str<E: DeError>(self, value: &str) -> Result<PropertyType, E> {
                 value.parse().map_err(DeError::custom)
             }

@@ -45,6 +45,12 @@ pub struct Namespace {
     pub ids: Vec<SimpleIdentifier>,
 }
 
+impl Namespace {
+    #[must_use]
+    pub fn is_edm(&self) -> bool {
+        self.ids.len() == 1 && self.ids[0].inner() == "Edm"
+    }
+}
 impl FromStr for Namespace {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
