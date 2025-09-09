@@ -4,7 +4,7 @@
 
 all:
 	cargo build
-	cargo test -- --no-capture
+	cargo test
 	cargo clippy
 	cargo doc
 

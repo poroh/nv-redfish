@@ -41,12 +41,12 @@ fn main() -> Result<(), Error> {
     let mut content = String::new();
     file.read_to_string(&mut content)
         .map_err(|err| Error::Io(fname.clone(), err))?;
-    let edmx = Edmx::parse(&content).map_err(Error::Edmx)?;
-    let (resources, type_registry) =
-        RedfishResource::from_edmx(&edmx).map_err(Error::RedfishResource)?;
-    println!("========================= Type Registry ===========================================");
-    println!("{type_registry:#?}");
-    println!("=========================== Resources =============================================");
-    println!("{resources:#?}");
+    let _edmx = Edmx::parse(&content).map_err(Error::Edmx)?;
+    //let (resources, type_registry) =
+    //    RedfishResource::from_edmx(&edmx).map_err(Error::RedfishResource)?;
+    //println!("========================= Type Registry ===========================================");
+    //println!("{type_registry:#?}");
+    //println!("=========================== Resources =============================================");
+    //println!("{resources:#?}");
     Ok(())
 }
