@@ -96,7 +96,7 @@ mod test {
                </Schema>
              </edmx:DataServices>
            </edmx:Edmx>"#;
-        let computed = TypeName::new("Computed".into());
+        let computed = TypeName::new("Computed".parse().unwrap());
         let edmx: Edmx = Edmx::parse(&data).map_err(Error::Validate)?;
         assert_eq!(edmx.data_services.schemas.len(), 1);
         assert_eq!(edmx.data_services.schemas[0].types.len(), 1);

@@ -15,7 +15,6 @@
 
 use csdl_compiler::edmx::Edmx;
 use csdl_compiler::edmx::ValidateError;
-use csdl_compiler::generator::RedfishResource;
 use std::io::Error as IoError;
 use std::io::Read;
 

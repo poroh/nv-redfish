@@ -27,12 +27,14 @@ use std::str::FromStr;
 #[derive(Debug)]
 pub enum Error {
     InvalidSimpleIdentifier(String),
+    InvalidQualifiedIdentifier(String),
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             Self::InvalidSimpleIdentifier(id) => write!(f, "invalid simple identifier {id}"),
+            Self::InvalidQualifiedIdentifier(id) => write!(f, "invalid qualified identifier {id}"),
         }
     }
 }
@@ -87,7 +89,7 @@ impl<'de> Deserialize<'de> for Namespace {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SimpleIdentifier(String);
 
 impl SimpleIdentifier {
@@ -146,5 +148,47 @@ impl<'de> Deserialize<'de> for SimpleIdentifier {
         }
 
         de.deserialize_string(SiVisitor {})
+    }
+}
+
+#[derive(Debug)]
+pub struct QualifiedName {
+    pub namespace: Namespace,
+    pub name: SimpleIdentifier,
+}
+
+impl FromStr for QualifiedName {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut ids = s
+            .split('.')
+            .map(SimpleIdentifier::from_str)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| Error::InvalidQualifiedIdentifier(s.into()))?;
+        let name = ids
+            .pop()
+            .ok_or_else(|| Error::InvalidQualifiedIdentifier(s.into()))?;
+        Ok(Self {
+            namespace: Namespace { ids },
+            name,
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for QualifiedName {
+    fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        struct QnVisitor {}
+        impl Visitor<'_> for QnVisitor {
+            type Value = QualifiedName;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> FmtResult {
+                formatter.write_str("QualifiedName string")
+            }
+            fn visit_str<E: DeError>(self, value: &str) -> Result<QualifiedName, E> {
+                value.parse().map_err(DeError::custom)
+            }
+        }
+
+        de.deserialize_string(QnVisitor {})
     }
 }

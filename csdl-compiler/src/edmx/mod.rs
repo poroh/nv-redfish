@@ -55,11 +55,21 @@ pub mod annotation;
 pub mod attribute_values;
 
 use annotation::Annotation;
+use attribute_values::Namespace;
+use attribute_values::QualifiedName;
+use attribute_values::SimpleIdentifier;
 use quick_xml::DeError;
 use serde::Deserialize;
 use tagged_types::TaggedType;
 
-pub type TypeName = TaggedType<String, TypeNameTag>;
+pub type QualifiedTypeName = TaggedType<QualifiedName, QualifiedTypeNameTag>;
+#[derive(tagged_types::Tag)]
+#[implement(Clone, Hash, PartialEq, Eq)]
+#[transparent(Debug, FromStr, Display, Deserialize)]
+#[capability(inner_access)]
+pub enum QualifiedTypeNameTag {}
+
+pub type TypeName = TaggedType<SimpleIdentifier, TypeNameTag>;
 #[derive(tagged_types::Tag)]
 #[implement(Clone, Hash, PartialEq, Eq)]
 #[transparent(Debug, Display, Deserialize)]
@@ -80,7 +90,7 @@ pub type ActionName = TaggedType<String, TermNameTag>;
 #[capability(inner_access)]
 pub enum ActionNameTag {}
 
-pub type SchemaNamespace = String;
+pub type SchemaNamespace = Namespace;
 pub type PropertyName = String;
 
 pub type IsNullable = TaggedType<bool, IsNullableTag>;
@@ -130,7 +140,7 @@ pub struct TypeDefinition {
     #[serde(rename = "@Name")]
     pub name: TypeName,
     #[serde(rename = "@UnderlyingType")]
-    pub underlying_type: TypeName,
+    pub underlying_type: QualifiedTypeName,
     #[serde(rename = "Annotation", default)]
     pub annotations: Vec<Annotation>,
 }
@@ -232,7 +242,7 @@ pub struct Term {
 pub struct ReturnType {
     /// 12.3.1 Attribute Type
     #[serde(rename = "@Type")]
-    pub rtype: TypeName,
+    pub rtype: QualifiedTypeName,
     /// 12.3.2 Attribute Nullable
     #[serde(rename = "@Nullable")]
     pub nullable: Option<IsNullable>,

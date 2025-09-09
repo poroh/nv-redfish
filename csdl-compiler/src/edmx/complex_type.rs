@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::ValidateError;
+use crate::edmx::QualifiedTypeName;
 use crate::edmx::TypeName;
 use crate::edmx::annotation::Annotation;
 use crate::edmx::property::DeNavigationProperty;
@@ -29,7 +30,7 @@ pub struct DeComplexType {
     pub name: TypeName,
     /// 9.1.2 Attribute `BaseType`
     #[serde(rename = "@BaseType")]
-    pub base_type: Option<TypeName>,
+    pub base_type: Option<QualifiedTypeName>,
     /// 9.1.3 Attribute `Abstract`
     #[serde(rename = "@Abstract")]
     pub r#abstract: Option<bool>,

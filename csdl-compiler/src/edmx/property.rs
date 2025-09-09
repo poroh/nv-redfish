@@ -16,9 +16,16 @@
 use crate::ValidateError;
 use crate::edmx::IsNullable;
 use crate::edmx::PropertyName;
-use crate::edmx::TypeName;
+use crate::edmx::QualifiedTypeName;
 use crate::edmx::annotation::Annotation;
+use crate::edmx::attribute_values::Error as AttributeValuesError;
 use serde::Deserialize;
+use serde::Deserializer;
+use serde::de::Error as DeError;
+use serde::de::Visitor;
+use std::fmt::Formatter;
+use std::fmt::Result as FmtResult;
+use std::str::FromStr;
 
 /// 6.1 Element edm:Property
 #[derive(Debug, Deserialize)]
@@ -28,7 +35,7 @@ pub struct DeStructuralProperty {
     pub name: PropertyName,
     /// 6.1.2 Attribute `Type`
     #[serde(rename = "@Type")]
-    pub ptype: TypeName,
+    pub ptype: PropertyType,
     /// 6.2.1 Attribute `Nullable`
     #[serde(rename = "@Nullable")]
     pub nullable: Option<IsNullable>,
@@ -63,7 +70,7 @@ pub struct DeNavigationProperty {
     pub name: PropertyName,
     /// 7.1.2 Attribute `Type`
     #[serde(rename = "@Type")]
-    pub ptype: TypeName,
+    pub ptype: PropertyType,
     /// 7.1.3 Attribute `Nullable`
     #[serde(rename = "@Nullable")]
     pub nullable: Option<IsNullable>,
@@ -181,11 +188,49 @@ impl DeNavigationProperty {
 #[derive(Debug)]
 pub struct NavigationProperty {
     pub name: PropertyName,
-    pub ptype: TypeName,
+    pub ptype: PropertyType,
     pub nullable: Option<IsNullable>,
     pub partner: Option<String>,
     pub contains_target: Option<bool>,
     pub annotations: Vec<Annotation>,
     pub on_delete: Option<OnDelete>,
     pub referential_constraints: Vec<ReferentialConstraint>,
+}
+
+#[derive(Debug)]
+pub enum PropertyType {
+    One(QualifiedTypeName),
+    CollectionOf(QualifiedTypeName),
+}
+
+impl FromStr for PropertyType {
+    type Err = AttributeValuesError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        const COLLECTION_PREFIX: &str = "Collection(";
+        const COLLECTION_SUFFIX: &str = ")";
+        if s.starts_with(COLLECTION_PREFIX) && s.ends_with(COLLECTION_SUFFIX) {
+            let qtype = s[COLLECTION_PREFIX.len()..s.len() - COLLECTION_SUFFIX.len()].parse()?;
+            Ok(Self::CollectionOf(qtype))
+        } else {
+            Ok(Self::One(s.parse()?))
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for PropertyType {
+    fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        struct QnVisitor {}
+        impl Visitor<'_> for QnVisitor {
+            type Value = PropertyType;
+
+            fn expecting(&self, formatter: &mut Formatter) -> FmtResult {
+                formatter.write_str("property type string")
+            }
+            fn visit_str<E: DeError>(self, value: &str) -> Result<PropertyType, E> {
+                value.parse().map_err(DeError::custom)
+            }
+        }
+
+        de.deserialize_string(QnVisitor {})
+    }
 }

@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::ValidateError;
+use crate::edmx::QualifiedTypeName;
 use crate::edmx::TypeName;
 use crate::edmx::annotation::Annotation;
 use serde::Deserialize;
@@ -28,7 +29,7 @@ pub struct DeEnumType {
     pub name: TypeName,
     /// 10.1.2 Attribute `UnderlyingType`
     #[serde(rename = "@UnderlyingType")]
-    pub underlying_type: Option<TypeName>,
+    pub underlying_type: Option<QualifiedTypeName>,
     /// 10.1.3 Attribute `IsFlags`
     #[serde(rename = "@IsFlags")]
     pub is_flags: Option<bool>,
@@ -63,7 +64,7 @@ pub struct EnumMember {
 #[derive(Debug)]
 pub struct EnumType {
     pub name: TypeName,
-    pub underlying_type: Option<TypeName>,
+    pub underlying_type: Option<QualifiedTypeName>,
     pub is_flags: Option<bool>,
     pub members: Vec<EnumMember>,
     pub annotations: Vec<Annotation>,
