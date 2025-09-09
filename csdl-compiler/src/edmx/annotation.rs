@@ -15,7 +15,7 @@
 
 //! Deserialization and validation of Annotations
 
-use crate::edmx::TermName;
+use crate::edmx::QualifiedTypeName;
 use serde::Deserialize;
 
 /// 14.3 Element edm:Annotation
@@ -23,7 +23,7 @@ use serde::Deserialize;
 pub struct Annotation {
     /// 14.3.1 Attribute Term
     #[serde(rename = "@Term")]
-    pub term: TermName,
+    pub term: QualifiedTypeName,
     #[serde(rename = "@String")]
     pub string: Option<String>,
     #[serde(rename = "@Bool")]

@@ -79,14 +79,7 @@ pub type LocalTypeName = TaggedType<SimpleIdentifier, LocalTypeNameTag>;
 #[capability(inner_access)]
 pub enum LocalTypeNameTag {}
 
-pub type TermName = TaggedType<String, TermNameTag>;
-#[derive(tagged_types::Tag)]
-#[implement(Clone, Hash, PartialEq, Eq)]
-#[transparent(Debug, Display, Deserialize)]
-#[capability(inner_access)]
-pub enum TermNameTag {}
-
-pub type ActionName = TaggedType<String, TermNameTag>;
+pub type ActionName = TaggedType<String, ActionNameTag>;
 #[derive(tagged_types::Tag)]
 #[implement(Clone, Hash, PartialEq, Eq)]
 #[transparent(Debug, Display, Deserialize)]

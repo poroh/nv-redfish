@@ -41,6 +41,27 @@ pub type LongDescriptionRef<'a> = TaggedType<&'a String, LongDescriptionTag>;
 #[capability(inner_access, cloned)]
 pub enum LongDescriptionTag {}
 
+trait IsODataNamespace {
+    fn is_odata_namespace(&self) -> bool;
+}
+
+impl IsODataNamespace for Namespace {
+    fn is_odata_namespace(&self) -> bool {
+        self.term.inner().namespace.ids.len() == 1
+            && self.term.inner().namespace.ids[0].inner() == "OData"
+    }
+}
+
+pub trait ODataAnnotation {
+    fn is_odata_annotation(&self) -> bool;
+}
+
+impl ODataAnnotation for Annotation {
+    fn is_odata_annotation(&self, name: &str) -> bool {
+        self.term.inner().namespace.is_odata_namespace() && self.term.inner().name.inner() == name
+    }
+}
+
 pub trait ODataAnnotations {
     fn annotations(&self) -> &Vec<Annotation>;
 
@@ -49,7 +70,7 @@ pub trait ODataAnnotations {
     fn odata_description(&self) -> Option<DescriptionRef<'_>> {
         self.annotations()
             .iter()
-            .find(|a| a.term.inner() == "OData.Description")
+            .find(|a| a.is_odata_annotation("Description"))
             .and_then(|a| a.string.as_ref())
             .map(DescriptionRef::new)
     }
@@ -62,7 +83,7 @@ pub trait ODataAnnotations {
     fn odata_long_description(&self) -> Option<LongDescriptionRef<'_>> {
         self.annotations()
             .iter()
-            .find(|a| a.term.inner() == "OData.LongDescription")
+            .find(|a| a.is_odata_annotation("LongDescription"))
             .and_then(|a| a.string.as_ref())
             .map(LongDescriptionRef::new)
     }
@@ -70,7 +91,7 @@ pub trait ODataAnnotations {
     fn odata_additional_properties(&self) -> Option<&Annotation> {
         self.annotations()
             .iter()
-            .find(|a| a.term.inner() == "OData.AdditionalProperties")
+            .find(|a| a.is_odata_annotation("AdditionalProperties"))
     }
 }
 
