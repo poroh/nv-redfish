@@ -26,6 +26,7 @@ struct DeEdmx {
     /// 3.1.1 Attribute Version
     /// The edmx:Edmx element MUST provide the value 4.0 for the
     /// Version attribute.
+    #[allow(dead_code)]
     #[serde(rename = "@Version")]
     pub version: String,
     /// Child elements of Edmx.

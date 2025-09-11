@@ -129,6 +129,9 @@ pub enum ValidateError {
     TooManyOnDelete,
     /// In the `Action` too many `ReturnType` items.
     TooManyReturnTypes,
+    /// Not supported more than one entity container in Schema.
+    /// This is the case for Redfish. Keep it this way for parser.
+    ManyContainersNotSupported,
     /// Schema validation error.
     Schema(SchemaNamespace, Box<ValidateError>),
     /// `ComplexType` validation error.

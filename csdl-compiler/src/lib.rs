@@ -13,7 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate defines compiler for [Common Schema Definition Language (CSDL)](https://docs.oasis-open.org/odata/odata/v4.0/odata-v4.0-part3-csdl.html)
+//! This crate defines compiler for [Common Schema Definition Language
+//! (CSDL)](https://docs.oasis-open.org/odata/odata/v4.0/odata-v4.0-part3-csdl.html)
 
 #![deny(
     clippy::all,
@@ -37,6 +38,8 @@
 )]
 //#![deny(missing_docs)]
 
+/// Redfish schema compiler.
+pub mod compiler;
 /// Entity Data Model XML definitions.
 pub mod edmx;
 /// Redfish code generator.
@@ -62,7 +65,7 @@ pub enum Error {
 mod test {
     use super::Error;
     use super::edmx::Edmx;
-    use super::edmx::LocalTypeName;
+    use super::edmx::attribute_values::SimpleIdentifier;
     use crate::edmx::schema::Type;
     use std::fs;
     use std::path::Path;
@@ -96,7 +99,7 @@ mod test {
                </Schema>
              </edmx:DataServices>
            </edmx:Edmx>"#;
-        let computed = LocalTypeName::new("Computed".parse().unwrap());
+        let computed: SimpleIdentifier = "Computed".parse().unwrap();
         let edmx: Edmx = Edmx::parse(&data).map_err(Error::Validate)?;
         assert_eq!(edmx.data_services.schemas.len(), 1);
         assert_eq!(edmx.data_services.schemas[0].types.len(), 1);
@@ -134,8 +137,6 @@ mod test {
             edmx.data_services.schemas.get(1).unwrap().annotations.len(),
             2
         );
-        println!("{edmx:?}");
-
         Ok(())
     }
 }

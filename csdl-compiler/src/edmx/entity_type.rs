@@ -79,6 +79,7 @@ pub enum DeEntityTypeItem {
 #[derive(Debug)]
 pub struct EntityType {
     pub name: LocalTypeName,
+    pub base_type: Option<QualifiedTypeName>,
     pub key: Option<Key>,
     pub properties: Vec<Property>,
     pub annotations: Vec<Annotation>,
@@ -118,6 +119,7 @@ impl DeEntityType {
         Ok(EntityType {
             name,
             key,
+            base_type: self.base_type,
             properties,
             annotations,
         })

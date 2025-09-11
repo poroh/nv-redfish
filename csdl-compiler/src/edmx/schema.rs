@@ -15,8 +15,8 @@
 
 use crate::ValidateError;
 use crate::edmx::EntityContainer;
-use crate::edmx::LocalTypeName;
 use crate::edmx::SchemaNamespace;
+use crate::edmx::SimpleIdentifier;
 use crate::edmx::Term;
 use crate::edmx::TypeDefinition;
 use crate::edmx::action::Action;
@@ -59,14 +59,14 @@ pub enum Type {
     ComplexType(ComplexType),
     EnumType(EnumType),
     TypeDefinition(TypeDefinition),
-    EntityContainer(EntityContainer),
     Term(Term),
 }
 
 #[derive(Debug)]
 pub struct Schema {
     pub namespace: SchemaNamespace,
-    pub types: HashMap<LocalTypeName, Type>,
+    pub types: HashMap<SimpleIdentifier, Type>,
+    pub entity_container: Option<EntityContainer>,
     pub actions: Vec<Action>,
     pub annotations: Vec<Annotation>,
 }
@@ -76,32 +76,41 @@ impl DeSchema {
     ///
     /// Returns error if any of items failed to validate.
     pub fn validate(self) -> Result<Schema, ValidateError> {
-        let (types, annotations, actions) = self.items.into_iter().fold(
-            (Vec::new(), Vec::new(), Vec::new()),
-            |(mut ts, mut anns, mut acts), v| {
+        let (types, annotations, actions, mut entity_containers) = self.items.into_iter().fold(
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+            |(mut ts, mut anns, mut acts, mut ecs), v| {
                 match v {
                     DeSchemaItem::EntityType(v) => {
-                        ts.push(v.validate().map(|v| (v.name.clone(), Type::EntityType(v))));
+                        ts.push(
+                            v.validate()
+                                .map(|v| (v.name.clone().into_inner(), Type::EntityType(v))),
+                        );
                     }
                     DeSchemaItem::ComplexType(v) => {
-                        ts.push(v.validate().map(|v| (v.name.clone(), Type::ComplexType(v))));
+                        ts.push(
+                            v.validate()
+                                .map(|v| (v.name.clone().into_inner(), Type::ComplexType(v))),
+                        );
                     }
                     DeSchemaItem::EnumType(v) => {
-                        ts.push(v.validate().map(|v| (v.name.clone(), Type::EnumType(v))));
+                        ts.push(
+                            v.validate()
+                                .map(|v| (v.name.clone().into_inner(), Type::EnumType(v))),
+                        );
                     }
                     DeSchemaItem::TypeDefinition(v) => {
-                        ts.push(Ok((v.name.clone(), Type::TypeDefinition(v))));
+                        ts.push(Ok((v.name.clone().into_inner(), Type::TypeDefinition(v))));
                     }
                     DeSchemaItem::EntityContainer(v) => {
-                        ts.push(Ok((v.name.clone(), Type::EntityContainer(v))));
+                        ecs.push(v);
                     }
                     DeSchemaItem::Term(v) => {
-                        ts.push(Ok((v.name.clone(), (Type::Term(v)))));
+                        ts.push(Ok((v.name.clone().into_inner(), (Type::Term(v)))));
                     }
                     DeSchemaItem::Annotation(v) => anns.push(v),
                     DeSchemaItem::Action(v) => acts.push(v.validate()),
                 }
-                (ts, anns, acts)
+                (ts, anns, acts, ecs)
             },
         );
         let namespace = self.namespace;
@@ -115,9 +124,18 @@ impl DeSchema {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| ValidateError::Schema(namespace.clone(), Box::new(e)))?;
 
+        if entity_containers.len() > 1 {
+            return Err(ValidateError::Schema(
+                namespace,
+                Box::new(ValidateError::ManyContainersNotSupported),
+            ));
+        }
+        let entity_container = entity_containers.pop();
+
         Ok(Schema {
             namespace,
             types,
+            entity_container,
             actions,
             annotations,
         })

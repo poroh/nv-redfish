@@ -41,7 +41,7 @@ impl Display for Error {
 }
 
 /// 17.1 `Namespace`
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Namespace {
     pub ids: Vec<SimpleIdentifier>,
 }
@@ -160,7 +160,7 @@ impl<'de> Deserialize<'de> for SimpleIdentifier {
 }
 
 /// 17.3 `QualifiedName`
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct QualifiedName {
     pub namespace: Namespace,
     pub name: SimpleIdentifier,
