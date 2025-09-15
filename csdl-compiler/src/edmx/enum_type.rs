@@ -126,7 +126,7 @@ impl Display for Error {
 }
 
 /// 10.1.2 Attribute `UnderlyingType`
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum EnumUnderlyingType {
     Byte,
     SByte,

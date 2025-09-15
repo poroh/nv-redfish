@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use csdl_compiler::compiler::SchemaBundle;
 use csdl_compiler::edmx::Edmx;
 use csdl_compiler::edmx::ValidateError;
 use std::io::Error as IoError;
@@ -23,29 +24,35 @@ use std::io::Read;
 enum Error {
     ParameterNeeded,
     Io(String, IoError),
-    Edmx(ValidateError),
-    RedfishResource(String),
+    Edmx(String, ValidateError),
+    Compile(String),
 }
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 2 {
         println!("Usage:");
-        println!(" {} <redfish-csdl-file>", args[0]);
+        println!(" {} <redfish-csdl-file> ...", args[0]);
         return Err(Error::ParameterNeeded);
     }
-    let fname = args[1].clone();
-    let mut file =
-        std::fs::File::open(args[1].clone()).map_err(|err| Error::Io(fname.clone(), err))?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)
-        .map_err(|err| Error::Io(fname.clone(), err))?;
-    let _edmx = Edmx::parse(&content).map_err(Error::Edmx)?;
-    //let (resources, type_registry) =
-    //    RedfishResource::from_edmx(&edmx).map_err(Error::RedfishResource)?;
-    //println!("========================= Type Registry ===========================================");
-    //println!("{type_registry:#?}");
-    //println!("=========================== Resources =============================================");
-    //println!("{resources:#?}");
+    let schema_bundle =
+        args[1..]
+            .iter()
+            .try_fold(SchemaBundle::default(), |mut schema_bundle, fname| {
+                let mut file =
+                    std::fs::File::open(fname).map_err(|err| Error::Io(fname.clone(), err))?;
+                let mut content = String::new();
+                file.read_to_string(&mut content)
+                    .map_err(|err| Error::Io(fname.clone(), err))?;
+                schema_bundle
+                    .edmx_docs
+                    .push(Edmx::parse(&content).map_err(|e| Error::Edmx(fname.clone(), e))?);
+                Ok(schema_bundle)
+            })?;
+    let compiled = schema_bundle
+        .compile()
+        .inspect_err(|e| println!("{e:#?}"))
+        .map_err(|_| Error::Compile("compilation error".into()))?;
+    println!("{compiled:#?}");
     Ok(())
 }

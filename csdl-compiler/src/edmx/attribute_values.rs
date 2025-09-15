@@ -209,6 +209,15 @@ pub enum TypeName {
     CollectionOf(QualifiedTypeName),
 }
 
+impl TypeName {
+    #[must_use]
+    pub const fn qualified_type_name(&self) -> &QualifiedTypeName {
+        match self {
+            Self::One(v) | Self::CollectionOf(v) => v,
+        }
+    }
+}
+
 impl FromStr for TypeName {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {

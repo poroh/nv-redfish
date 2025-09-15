@@ -41,20 +41,20 @@ impl<'a> SchemaIndex<'a> {
                 .collect(),
             child_map: edmx_docs.iter().fold(HashMap::new(), |map, doc| {
                 doc.data_services.schemas.iter().fold(map, |map, s| {
-                    s.types.iter().fold(map, |mut map, (_, t)| match t {
-                        Type::EntityType(EntityType {
+                    s.entity_types.iter().fold(map, |mut map, (_, t)| {
+                        if let EntityType {
                             name,
                             base_type: Some(base_type),
                             ..
-                        }) => {
+                        } = t
+                        {
                             let qname = QualifiedName::new(&s.namespace, name.inner());
                             let base_type: QualifiedName = base_type.into();
                             map.entry(base_type)
                                 .and_modify(|e| e.push(qname))
                                 .or_insert_with(|| vec![qname]);
-                            map
                         }
-                        _ => map,
+                        map
                     })
                 })
             }),
@@ -70,13 +70,8 @@ impl<'a> SchemaIndex<'a> {
     /// Find entity type by type name
     #[must_use]
     pub fn find_entity_type(&self, qtype: &QualifiedTypeName) -> Option<&'a EntityType> {
-        self.get(&qtype.inner().namespace).and_then(|ns| {
-            if let Some(Type::EntityType(t)) = ns.types.get(&qtype.inner().name) {
-                Some(t)
-            } else {
-                None
-            }
-        })
+        self.get(&qtype.inner().namespace)
+            .and_then(|ns| ns.entity_types.get(&qtype.inner().name))
     }
 
     /// Find most specific child.
@@ -90,7 +85,7 @@ impl<'a> SchemaIndex<'a> {
     ) -> Result<(QualifiedName<'a>, &'a EntityType), Error<'a>> {
         while let Some(children) = self.child_map.get(&qtype) {
             if children.len() > 1 {
-                return Err(Error::AmbigousHeirarchy(qtype));
+                return Err(Error::AmbigousHeirarchy(qtype, children.clone()));
             }
             if let Some(child) = children.first() {
                 qtype = *child;
@@ -99,16 +94,16 @@ impl<'a> SchemaIndex<'a> {
             }
         }
         self.get(qtype.namespace)
-            .and_then(|ns| {
-                if let Some(Type::EntityType(t)) = ns.types.get(qtype.name) {
-                    Some(t)
-                } else {
-                    None
-                }
-            })
-            // This should never happen.
+            .and_then(|ns| ns.entity_types.get(qtype.name))
             .ok_or(Error::EntityTypeNotFound(qtype))
             .map(|v| (qtype, v))
+    }
+
+    /// Find entity type by type name
+    #[must_use]
+    pub fn find_type(&self, qtype: &QualifiedTypeName) -> Option<&'a Type> {
+        self.get(&qtype.inner().namespace)
+            .and_then(|ns| ns.types.get(&qtype.inner().name))
     }
 }
 

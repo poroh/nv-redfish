@@ -21,6 +21,9 @@ use crate::compiler::QualifiedName;
 #[derive(Default)]
 pub struct Stack<'a, 'stack> {
     parent: Option<&'stack Stack<'a, 'stack>>,
+    // If entity type is currently being compiled we use this
+    // field to prevent infinite recursion.
+    entity_type: Option<QualifiedName<'a>>,
     current: Compiled<'a>,
 }
 
@@ -29,13 +32,21 @@ impl<'a, 'stack> Stack<'a, 'stack> {
     pub fn new_frame(&'stack self) -> Self {
         Self {
             parent: Some(self),
+            entity_type: None,
             current: Compiled::default(),
         }
     }
 
     #[must_use]
+    pub const fn with_enitity_type(mut self, name: QualifiedName<'a>) -> Self {
+        self.entity_type = Some(name);
+        self
+    }
+
+    #[must_use]
     pub fn contains_entity(&self, qtype: QualifiedName<'a>) -> bool {
         self.current.entity_types.contains_key(&qtype)
+            || self.entity_type.is_some_and(|v| v == qtype)
             || self.parent.is_some_and(|p| p.contains_entity(qtype))
     }
 
@@ -43,6 +54,7 @@ impl<'a, 'stack> Stack<'a, 'stack> {
     pub fn merge(self, c: Compiled<'a>) -> Self {
         Self {
             parent: self.parent,
+            entity_type: self.entity_type,
             current: self.current.merge(c),
         }
     }

@@ -66,7 +66,6 @@ mod test {
     use super::Error;
     use super::edmx::Edmx;
     use super::edmx::attribute_values::SimpleIdentifier;
-    use crate::edmx::schema::Type;
     use std::fs;
     use std::path::Path;
 
@@ -102,12 +101,9 @@ mod test {
         let computed: SimpleIdentifier = "Computed".parse().unwrap();
         let edmx: Edmx = Edmx::parse(&data).map_err(Error::Validate)?;
         assert_eq!(edmx.data_services.schemas.len(), 1);
-        assert_eq!(edmx.data_services.schemas[0].types.len(), 1);
-        assert!(matches!(
-            edmx.data_services.schemas[0].types.get(&computed),
-            Some(Type::Term(..))
-        ));
-        if let Some(Type::Term(term)) = &edmx.data_services.schemas[0].types.get(&computed) {
+        assert_eq!(edmx.data_services.schemas[0].terms.len(), 1);
+        assert!(edmx.data_services.schemas[0].terms.get(&computed).is_some());
+        if let Some(term) = &edmx.data_services.schemas[0].terms.get(&computed) {
             assert_eq!(term.ttype.as_ref().unwrap(), &"Core.Tag".parse().unwrap());
             assert_eq!(term.default_value.as_ref().unwrap(), "true");
         }
@@ -132,7 +128,16 @@ mod test {
         .map_err(Error::FileRead)?;
         let edmx: Edmx = Edmx::parse(&data).map_err(Error::Validate)?;
         assert_eq!(edmx.data_services.schemas.len(), 6);
-        assert_eq!(edmx.data_services.schemas.get(1).unwrap().types.len(), 5);
+        assert_eq!(edmx.data_services.schemas.get(1).unwrap().types.len(), 4);
+        assert_eq!(
+            edmx.data_services
+                .schemas
+                .get(1)
+                .unwrap()
+                .entity_types
+                .len(),
+            1
+        );
         assert_eq!(
             edmx.data_services.schemas.get(1).unwrap().annotations.len(),
             2

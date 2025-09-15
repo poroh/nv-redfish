@@ -29,8 +29,11 @@ use crate::edmx::attribute_values::Namespace;
 use crate::edmx::attribute_values::SimpleIdentifier;
 use crate::edmx::attribute_values::TypeName;
 use crate::edmx::entity_type::EntityType;
+use crate::edmx::enum_type::EnumUnderlyingType;
+use crate::edmx::property::Property;
 use crate::edmx::property::PropertyAttrs;
 use crate::edmx::schema::Schema;
+use crate::edmx::schema::Type;
 use crate::odata::annotations::DescriptionRef;
 use crate::odata::annotations::LongDescriptionRef;
 use crate::odata::annotations::ODataAnnotations as _;
@@ -41,14 +44,19 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub enum Error<'a> {
     Unimplemented,
-    AmbigousHeirarchy(QualifiedName<'a>),
+    AmbigousHeirarchy(QualifiedName<'a>, Vec<QualifiedName<'a>>),
     EntityTypeNotFound(QualifiedName<'a>),
     EntityType(&'a QualifiedTypeName, Box<Error<'a>>),
+    TypeNotFound(QualifiedName<'a>),
+    TypeDefinitionOfNotPrimitiveType(QualifiedName<'a>),
+    TypeDefinition(QualifiedName<'a>, Box<Error<'a>>),
+    ComplexType(QualifiedName<'a>, Box<Error<'a>>),
     Property(&'a PropertyName, Box<Error<'a>>),
     Singleton(&'a SimpleIdentifier, Box<Error<'a>>),
     Schema(&'a Namespace, Box<Error<'a>>),
 }
 
+#[derive(Default)]
 pub struct SchemaBundle {
     pub edmx_docs: Vec<Edmx>,
 }
@@ -161,18 +169,47 @@ impl SchemaBundle {
         schema_index: &SchemaIndex<'a>,
         stack: &Stack<'a, '_>,
     ) -> Result<Compiled<'a>, Error<'a>> {
+        let stack = stack.new_frame().with_enitity_type(name);
         // Ensure that base entity type compiled if present.
         let (base, compiled) = if let Some(base_type) = &schema_entity_type.base_type {
-            let compiled = Self::ensure_entity_type(base_type, schema_index, stack)?;
+            let compiled = Self::ensure_entity_type(base_type, schema_index, &stack)?;
             (Some(base_type.into()), compiled)
         } else {
             (None, Compiled::default())
         };
         let stack = stack.new_frame().merge(compiled);
-        // Compile properties
-        let (stack, nav_properties, properties) = schema_entity_type.properties.iter().try_fold(
+
+        // Compile navigation and regular properties
+        let (stack, nav_properties, properties) =
+            Self::compile_properties(&schema_entity_type.properties, schema_index, stack)?;
+
+        Ok(stack
+            .merge(Compiled::new_entity_type(CompiledEntityType {
+                name,
+                base,
+                properties,
+                nav_properties,
+                description: schema_entity_type.odata_description(),
+                long_description: schema_entity_type.odata_long_description(),
+            }))
+            .done())
+    }
+
+    fn compile_properties<'a, 'stack>(
+        props: &'a [Property],
+        schema_index: &SchemaIndex<'a>,
+        stack: Stack<'a, 'stack>,
+    ) -> Result<
+        (
+            Stack<'a, 'stack>,
+            Vec<CompiledNavProperty<'a>>,
+            Vec<CompiledProperty<'a>>,
+        ),
+        Error<'a>,
+    > {
+        props.iter().try_fold(
             (stack, Vec::new(), Vec::new()),
-            |(stack, np, mut p), sp| {
+            |(stack, mut np, mut p), sp| {
                 let stack = match &sp.attrs {
                     PropertyAttrs::StructuralProperty(v) => {
                         let compiled = Self::ensure_type(&v.ptype, schema_index, &stack)
@@ -186,21 +223,35 @@ impl SchemaBundle {
                         });
                         stack.merge(compiled)
                     }
-                    PropertyAttrs::NavigationProperty(_v) => stack,
+                    PropertyAttrs::NavigationProperty(v) => {
+                        let (_qtype, compiled) = schema_index
+                            // We are searching for deepest available child in tre
+                            // hierarchy of types for singleton. So, we can parse most
+                            // recent protocol versions.
+                            .find_child_entity_type(v.ptype.qualified_type_name().into())
+                            .and_then(|(qtype, et)| {
+                                if stack.contains_entity(qtype) {
+                                    // Aready compiled entity
+                                    Ok(Compiled::default())
+                                } else {
+                                    Self::compile_entity_type(qtype, et, schema_index, &stack)
+                                }
+                                .map(|compiled| (qtype, compiled))
+                            })
+                            .map_err(Box::new)
+                            .map_err(|e| Error::Property(&sp.name, e))?;
+                        np.push(CompiledNavProperty {
+                            name: &v.name,
+                            ptype: (&v.ptype).into(),
+                            description: v.odata_description(),
+                            long_description: v.odata_long_description(),
+                        });
+                        stack.merge(compiled)
+                    }
                 };
                 Ok((stack, np, p))
             },
-        )?;
-        Ok(stack
-            .merge(Compiled::new_entity_type(CompiledEntityType {
-                name,
-                base,
-                properties,
-                nav_properties,
-                description: schema_entity_type.odata_description(),
-                long_description: schema_entity_type.odata_long_description(),
-            }))
-            .done())
+        )
     }
 
     fn is_simple_type(qtype: &QualifiedTypeName) -> bool {
@@ -209,7 +260,7 @@ impl SchemaBundle {
 
     fn ensure_type<'a>(
         typename: &'a TypeName,
-        _schema_index: &SchemaIndex<'a>,
+        schema_index: &SchemaIndex<'a>,
         stack: &Stack<'a, '_>,
     ) -> Result<Compiled<'a>, Error<'a>> {
         let qtype = match typename {
@@ -218,9 +269,66 @@ impl SchemaBundle {
         if stack.contains_entity(qtype.into()) || Self::is_simple_type(qtype) {
             Ok(Compiled::default())
         } else {
-            // TODO: start from here...
-            Err(Error::Unimplemented)
+            Self::compile_type(qtype, schema_index, stack)
         }
+    }
+
+    fn compile_type<'a>(
+        qtype: &'a QualifiedTypeName,
+        schema_index: &SchemaIndex<'a>,
+        stack: &Stack<'a, '_>,
+    ) -> Result<Compiled<'a>, Error<'a>> {
+        schema_index
+            .find_type(qtype)
+            .ok_or_else(|| Error::TypeNotFound(qtype.into()))
+            .and_then(|t| match t {
+                Type::TypeDefinition(td) => {
+                    let underlying_type = (&td.underlying_type).into();
+                    if Self::is_simple_type(&td.underlying_type) {
+                        Ok(Compiled::new_type_definition(CompiledTypeDefinition {
+                            name: qtype.into(),
+                            underlying_type,
+                        }))
+                    } else {
+                        Err(Error::TypeDefinitionOfNotPrimitiveType(underlying_type))
+                    }
+                }
+                Type::EnumType(et) => {
+                    let underlying_type = et.underlying_type.unwrap_or_default();
+                    Ok(Compiled::new_enum_type(CompiledEnumType {
+                        name: qtype.into(),
+                        underlying_type,
+                    }))
+                }
+                Type::ComplexType(ct) => {
+                    let name = qtype.into();
+                    // Ensure that base entity type compiled if present.
+                    let (base, compiled) = if let Some(base_type) = &ct.base_type {
+                        let compiled = Self::ensure_entity_type(base_type, schema_index, stack)?;
+                        (Some(base_type.into()), compiled)
+                    } else {
+                        (None, Compiled::default())
+                    };
+
+                    let stack = stack.new_frame().merge(compiled);
+
+                    let (stack, nav_properties, properties) =
+                        Self::compile_properties(&ct.properties, schema_index, stack.new_frame())
+                            .map_err(Box::new)
+                            .map_err(|e| Error::ComplexType(name, e))?;
+
+                    Ok(stack
+                        .merge(Compiled::new_complex_type(CompiledComplexType {
+                            name,
+                            base,
+                            properties,
+                            nav_properties,
+                            description: ct.odata_description(),
+                            long_description: ct.odata_long_description(),
+                        }))
+                        .done())
+                }
+            })
     }
 }
 
@@ -246,10 +354,11 @@ impl<'a> From<&'a QualifiedTypeName> for QualifiedName<'a> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Compiled<'a> {
     pub complex_types: HashMap<QualifiedName<'a>, CompiledComplexType<'a>>,
     pub entity_types: HashMap<QualifiedName<'a>, CompiledEntityType<'a>>,
+    pub types: HashMap<QualifiedName<'a>, CompiledType<'a>>,
     pub root_singletons: Vec<CompiledSingleton<'a>>,
 }
 
@@ -263,9 +372,37 @@ impl<'a> Compiled<'a> {
     }
 
     #[must_use]
+    pub fn new_complex_type(v: CompiledComplexType<'a>) -> Self {
+        Self {
+            complex_types: vec![(v.name, v)].into_iter().collect(),
+            ..Default::default()
+        }
+    }
+
+    #[must_use]
     pub fn new_singleton(v: CompiledSingleton<'a>) -> Self {
         Self {
             root_singletons: vec![v],
+            ..Default::default()
+        }
+    }
+
+    #[must_use]
+    pub fn new_type_definition(v: CompiledTypeDefinition<'a>) -> Self {
+        Self {
+            types: vec![(v.name, CompiledType::TypeDefinition(v))]
+                .into_iter()
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    #[must_use]
+    pub fn new_enum_type(v: CompiledEnumType<'a>) -> Self {
+        Self {
+            types: vec![(v.name, CompiledType::EnumType(v))]
+                .into_iter()
+                .collect(),
             ..Default::default()
         }
     }
@@ -279,10 +416,26 @@ impl<'a> Compiled<'a> {
     }
 }
 
+#[derive(Debug)]
 pub enum CompiledType<'a> {
+    TypeDefinition(CompiledTypeDefinition<'a>),
+    EnumType(CompiledEnumType<'a>),
     ComplexType(CompiledComplexType<'a>),
 }
 
+#[derive(Debug)]
+pub struct CompiledTypeDefinition<'a> {
+    pub name: QualifiedName<'a>,
+    pub underlying_type: QualifiedName<'a>,
+}
+
+#[derive(Debug)]
+pub struct CompiledEnumType<'a> {
+    pub name: QualifiedName<'a>,
+    pub underlying_type: EnumUnderlyingType,
+}
+
+#[derive(Debug)]
 pub struct CompiledEntityType<'a> {
     pub name: QualifiedName<'a>,
     pub base: Option<QualifiedName<'a>>,
@@ -292,14 +445,17 @@ pub struct CompiledEntityType<'a> {
     pub long_description: Option<LongDescriptionRef<'a>>,
 }
 
+#[derive(Debug)]
 pub struct CompiledComplexType<'a> {
-    pub base: QualifiedName<'a>,
+    pub name: QualifiedName<'a>,
+    pub base: Option<QualifiedName<'a>>,
     pub properties: Vec<CompiledProperty<'a>>,
     pub nav_properties: Vec<CompiledNavProperty<'a>>,
     pub description: Option<DescriptionRef<'a>>,
     pub long_description: Option<LongDescriptionRef<'a>>,
 }
 
+#[derive(Debug)]
 pub enum CompiledPropertyType<'a> {
     One(QualifiedName<'a>),
     CollectionOf(QualifiedName<'a>),
@@ -314,6 +470,7 @@ impl<'a> From<&'a TypeName> for CompiledPropertyType<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct CompiledProperty<'a> {
     pub name: &'a PropertyName,
     pub ptype: CompiledPropertyType<'a>,
@@ -321,12 +478,15 @@ pub struct CompiledProperty<'a> {
     pub long_description: Option<LongDescriptionRef<'a>>,
 }
 
+#[derive(Debug)]
 pub struct CompiledNavProperty<'a> {
     pub name: &'a PropertyName,
+    pub ptype: CompiledPropertyType<'a>,
     pub description: Option<DescriptionRef<'a>>,
     pub long_description: Option<LongDescriptionRef<'a>>,
 }
 
+#[derive(Debug)]
 pub struct CompiledSingleton<'a> {
     pub name: &'a SimpleIdentifier,
     pub stype: QualifiedName<'a>,

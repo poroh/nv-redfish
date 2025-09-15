@@ -55,6 +55,7 @@ pub enum DeComplexTypeItem {
 #[derive(Debug)]
 pub struct ComplexType {
     pub name: LocalTypeName,
+    pub base_type: Option<QualifiedTypeName>,
     pub properties: Vec<Property>,
     pub annotations: Vec<Annotation>,
 }
@@ -82,6 +83,7 @@ impl DeComplexType {
             .map_err(|e| ValidateError::ComplexType(name.clone(), Box::new(e)))?;
         Ok(ComplexType {
             name,
+            base_type: self.base_type,
             properties,
             annotations,
         })

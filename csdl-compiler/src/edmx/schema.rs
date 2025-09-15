@@ -31,16 +31,20 @@ use crate::edmx::enum_type::EnumType;
 use serde::Deserialize;
 use std::collections::HashMap;
 
+/// 5.1 Element edm:Schema
+///
+/// This is object for deserialization.
 #[derive(Debug, Deserialize)]
 pub struct DeSchema {
+    /// 5.1.1 Attribute Namespace
     #[serde(rename = "@Namespace")]
     pub namespace: SchemaNamespace,
-    #[serde(rename = "@Alias")]
-    pub alias: Option<String>,
+    /// Children of schema.
     #[serde(rename = "$value", default)]
     pub items: Vec<DeSchemaItem>,
 }
 
+/// Deserialization of schema children.
 #[derive(Debug, Deserialize)]
 pub enum DeSchemaItem {
     EntityType(DeEntityType),
@@ -55,17 +59,18 @@ pub enum DeSchemaItem {
 
 #[derive(Debug)]
 pub enum Type {
-    EntityType(EntityType),
     ComplexType(ComplexType),
     EnumType(EnumType),
     TypeDefinition(TypeDefinition),
-    Term(Term),
 }
 
+/// Validated schema.
 #[derive(Debug)]
 pub struct Schema {
     pub namespace: SchemaNamespace,
+    pub entity_types: HashMap<SimpleIdentifier, EntityType>,
     pub types: HashMap<SimpleIdentifier, Type>,
+    pub terms: HashMap<SimpleIdentifier, Term>,
     pub entity_container: Option<EntityContainer>,
     pub actions: Vec<Action>,
     pub annotations: Vec<Annotation>,
@@ -76,45 +81,55 @@ impl DeSchema {
     ///
     /// Returns error if any of items failed to validate.
     pub fn validate(self) -> Result<Schema, ValidateError> {
-        let (types, annotations, actions, mut entity_containers) = self.items.into_iter().fold(
-            (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-            |(mut ts, mut anns, mut acts, mut ecs), v| {
-                match v {
-                    DeSchemaItem::EntityType(v) => {
-                        ts.push(
-                            v.validate()
-                                .map(|v| (v.name.clone().into_inner(), Type::EntityType(v))),
-                        );
+        let (types, entity_types, annotations, terms, actions, mut entity_containers) =
+            self.items.into_iter().fold(
+                (
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                ),
+                |(mut ts, mut ets, mut anns, mut terms, mut acts, mut ecs), v| {
+                    match v {
+                        DeSchemaItem::EntityType(v) => {
+                            ets.push(v.validate().map(|v| (v.name.clone().into_inner(), v)));
+                        }
+                        DeSchemaItem::ComplexType(v) => {
+                            ts.push(
+                                v.validate()
+                                    .map(|v| (v.name.clone().into_inner(), Type::ComplexType(v))),
+                            );
+                        }
+                        DeSchemaItem::EnumType(v) => {
+                            ts.push(
+                                v.validate()
+                                    .map(|v| (v.name.clone().into_inner(), Type::EnumType(v))),
+                            );
+                        }
+                        DeSchemaItem::TypeDefinition(v) => {
+                            ts.push(Ok((v.name.clone().into_inner(), Type::TypeDefinition(v))));
+                        }
+                        DeSchemaItem::EntityContainer(v) => {
+                            ecs.push(v);
+                        }
+                        DeSchemaItem::Term(v) => {
+                            terms.push(Ok((v.name.clone().into_inner(), v)));
+                        }
+                        DeSchemaItem::Annotation(v) => anns.push(v),
+                        DeSchemaItem::Action(v) => acts.push(v.validate()),
                     }
-                    DeSchemaItem::ComplexType(v) => {
-                        ts.push(
-                            v.validate()
-                                .map(|v| (v.name.clone().into_inner(), Type::ComplexType(v))),
-                        );
-                    }
-                    DeSchemaItem::EnumType(v) => {
-                        ts.push(
-                            v.validate()
-                                .map(|v| (v.name.clone().into_inner(), Type::EnumType(v))),
-                        );
-                    }
-                    DeSchemaItem::TypeDefinition(v) => {
-                        ts.push(Ok((v.name.clone().into_inner(), Type::TypeDefinition(v))));
-                    }
-                    DeSchemaItem::EntityContainer(v) => {
-                        ecs.push(v);
-                    }
-                    DeSchemaItem::Term(v) => {
-                        ts.push(Ok((v.name.clone().into_inner(), (Type::Term(v)))));
-                    }
-                    DeSchemaItem::Annotation(v) => anns.push(v),
-                    DeSchemaItem::Action(v) => acts.push(v.validate()),
-                }
-                (ts, anns, acts, ecs)
-            },
-        );
+                    (ts, ets, anns, terms, acts, ecs)
+                },
+            );
         let namespace = self.namespace;
         let types = types
+            .into_iter()
+            .collect::<Result<HashMap<_, _>, _>>()
+            .map_err(|e| ValidateError::Schema(namespace.clone(), Box::new(e)))?;
+
+        let entity_types = entity_types
             .into_iter()
             .collect::<Result<HashMap<_, _>, _>>()
             .map_err(|e| ValidateError::Schema(namespace.clone(), Box::new(e)))?;
@@ -122,6 +137,11 @@ impl DeSchema {
         let actions = actions
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| ValidateError::Schema(namespace.clone(), Box::new(e)))?;
+
+        let terms = terms
+            .into_iter()
+            .collect::<Result<HashMap<_, _>, _>>()
             .map_err(|e| ValidateError::Schema(namespace.clone(), Box::new(e)))?;
 
         if entity_containers.len() > 1 {
@@ -134,7 +154,9 @@ impl DeSchema {
 
         Ok(Schema {
             namespace,
+            entity_types,
             types,
+            terms,
             entity_container,
             actions,
             annotations,
