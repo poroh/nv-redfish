@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Remove empty complex types optimization
+//! Remove empty entity types optimization
 
 use crate::compiler::Compiled;
 use crate::compiler::CompiledEntityType;
@@ -60,7 +60,7 @@ pub fn remove_empty_entity_types<'a>(input: Compiled<'a>) -> Compiled<'a> {
 }
 
 const fn et_is_empty(et: &CompiledEntityType<'_>) -> bool {
-    et.properties.is_empty() && et.nav_properties.is_empty()
+    et.properties.is_empty() && et.nav_properties.is_empty() && et.key.is_none()
 }
 
 fn replace<'a>(target: &QualifiedName<'a>, replacements: &Replacements<'a>) -> QualifiedName<'a> {

@@ -34,6 +34,7 @@ use crate::edmx::Singleton;
 use crate::edmx::attribute_values::SimpleIdentifier;
 use crate::edmx::attribute_values::TypeName;
 use crate::edmx::entity_type::EntityType;
+use crate::edmx::entity_type::Key;
 use crate::edmx::enum_type::EnumUnderlyingType;
 use crate::edmx::property::Property;
 use crate::edmx::property::PropertyAttrs;
@@ -193,6 +194,7 @@ impl SchemaBundle {
             .merge(Compiled::new_entity_type(CompiledEntityType {
                 name,
                 base,
+                key: schema_entity_type.key.as_ref(),
                 properties,
                 nav_properties,
                 description: schema_entity_type.odata_description(),
@@ -478,6 +480,7 @@ pub trait MapBase<'a> {
 pub struct CompiledEntityType<'a> {
     pub name: QualifiedName<'a>,
     pub base: Option<QualifiedName<'a>>,
+    pub key: Option<&'a Key>,
     pub properties: Vec<CompiledProperty<'a>>,
     pub nav_properties: Vec<CompiledNavProperty<'a>>,
     pub description: Option<DescriptionRef<'a>>,

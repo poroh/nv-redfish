@@ -13,16 +13,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod prune_complex_type_inheritance;
+mod prune_entity_type_inheritance;
 mod remove_empty_complex_types;
 mod remove_empty_entity_types;
 
 use crate::compiler::Compiled;
+use prune_complex_type_inheritance::prune_complex_type_inheritance;
+use prune_entity_type_inheritance::prune_entity_type_inheritance;
 use remove_empty_complex_types::remove_empty_complex_types;
 use remove_empty_entity_types::remove_empty_entity_types;
 
 #[must_use]
 pub fn optimize(input: Compiled<'_>) -> Compiled<'_> {
-    [remove_empty_complex_types, remove_empty_entity_types]
-        .iter()
-        .fold(input, |input, f| f(input))
+    [
+        remove_empty_complex_types,
+        remove_empty_entity_types,
+        prune_complex_type_inheritance,
+        prune_entity_type_inheritance,
+    ]
+    .iter()
+    .fold(input, |input, f| f(input))
 }
