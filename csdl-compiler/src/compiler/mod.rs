@@ -62,7 +62,7 @@ impl SchemaBundle {
     ///  # Errors
     ///
     /// Returns compile error if any type cannot be resolved.
-    pub fn compile(&self) -> Result<Compiled<'_>, Error> {
+    pub fn compile(&self, singletons: &[SimpleIdentifier]) -> Result<Compiled<'_>, Error> {
         let schema_index = SchemaIndex::build(&self.edmx_docs);
         let stack = Stack::default();
         self.edmx_docs
@@ -74,7 +74,7 @@ impl SchemaBundle {
                     .schemas
                     .iter()
                     .try_fold(cstack, |stack, s| {
-                        Self::compile_schema(s, &schema_index, stack.new_frame())
+                        Self::compile_schema(s, singletons, &schema_index, stack.new_frame())
                             .map(|v| stack.merge(v))
                     })?
                     .done();
@@ -85,6 +85,7 @@ impl SchemaBundle {
 
     fn compile_schema<'a>(
         s: &'a Schema,
+        singletons: &[SimpleIdentifier],
         schema_index: &SchemaIndex<'a>,
         stack: Stack<'a, '_>,
     ) -> Result<Compiled<'a>, Error<'a>> {
@@ -95,7 +96,11 @@ impl SchemaBundle {
                     .singletons
                     .iter()
                     .try_fold(stack, |stack, s| {
-                        Self::compile_singleton(s, schema_index, &stack).map(|v| stack.merge(v))
+                        if singletons.contains(&s.name) {
+                            Self::compile_singleton(s, schema_index, &stack).map(|v| stack.merge(v))
+                        } else {
+                            Ok(stack)
+                        }
                     })
                     .map_err(Box::new)
                     .map_err(|e| Error::Schema(&s.namespace, e))
@@ -537,7 +542,7 @@ mod test {
         let bundle = SchemaBundle {
             edmx_docs: vec![Edmx::parse(schema).unwrap()],
         };
-        let compiled = bundle.compile().unwrap();
+        let compiled = bundle.compile(&["Service".parse().unwrap()]).unwrap();
         assert_eq!(compiled.root_singletons.len(), 1);
         let mut cur_type = &compiled.root_singletons.first().unwrap().stype;
         loop {

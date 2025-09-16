@@ -18,6 +18,7 @@ use csdl_compiler::compiler::SchemaBundle;
 use csdl_compiler::compiler::SimpleTypeAttrs;
 use csdl_compiler::edmx::Edmx;
 use csdl_compiler::edmx::ValidateError;
+use csdl_compiler::edmx::attribute_values::Error as AttributeValuesError;
 use std::io::Error as IoError;
 use std::io::Read;
 
@@ -28,17 +29,19 @@ enum Error {
     Io(String, IoError),
     Edmx(String, ValidateError),
     Compile(String),
+    WrongRootService(AttributeValuesError),
 }
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
+    if args.len() < 3 {
         println!("Usage:");
-        println!(" {} <redfish-csdl-file> ...", args[0]);
+        println!(" {} <root service> <redfish-csdl-file> ...", args[0]);
         return Err(Error::ParameterNeeded);
     }
+    let root_service = args[1].parse().map_err(Error::WrongRootService)?;
     let schema_bundle =
-        args[1..]
+        args[2..]
             .iter()
             .try_fold(SchemaBundle::default(), |mut schema_bundle, fname| {
                 let mut file =
@@ -52,7 +55,7 @@ fn main() -> Result<(), Error> {
                 Ok(schema_bundle)
             })?;
     let compiled = schema_bundle
-        .compile()
+        .compile(&[root_service])
         .inspect_err(|e| println!("{e}"))
         .map_err(|_| Error::Compile("compilation error".into()))?;
 
