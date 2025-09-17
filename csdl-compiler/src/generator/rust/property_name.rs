@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::edmx::attribute_values::SimpleIdentifier;
-use heck::AsUpperCamelCase;
+use crate::edmx::PropertyName as EdmxPropertyName;
+use heck::AsSnakeCase;
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -25,29 +25,32 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub struct StructName<'a>(&'a SimpleIdentifier);
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Ord, PartialOrd)]
+pub struct PropertyName<'a>(&'a EdmxPropertyName);
 
-impl<'a> StructName<'a> {
+impl<'a> PropertyName<'a> {
     #[must_use]
-    pub const fn new(v: &'a SimpleIdentifier) -> Self {
+    pub const fn new(v: &'a EdmxPropertyName) -> Self {
         Self(v)
     }
 }
 
-impl ToTokens for StructName<'_> {
+impl ToTokens for PropertyName<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append(Ident::new(&self.to_string(), Span::call_site()));
+        match self.to_string().as_str() {
+            "type" => tokens.append(Ident::new_raw("type", Span::call_site())),
+            _ => tokens.append(Ident::new(&self.to_string(), Span::call_site())),
+        }
     }
 }
 
-impl Display for StructName<'_> {
+impl Display for PropertyName<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        AsUpperCamelCase(self.0).fmt(f)
+        AsSnakeCase(self.0.inner()).fmt(f)
     }
 }
 
-impl Debug for StructName<'_> {
+impl Debug for PropertyName<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         Display::fmt(self, f)
     }

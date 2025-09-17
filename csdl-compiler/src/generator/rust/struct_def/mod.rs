@@ -13,14 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Name of structure in structure definition.
-pub mod name;
-
 use crate::compiler::CompiledOData;
-use crate::generator::rust::StructName;
+use crate::compiler::CompiledProperties;
+use crate::compiler::CompiledPropertyType;
+use crate::generator::rust::Config;
+use crate::generator::rust::FullTypeName;
+use crate::generator::rust::PropertyName;
+use crate::generator::rust::TypeName;
 use crate::generator::rust::doc::format_and_generate as doc_format_and_generate;
 use proc_macro2::Delimiter;
 use proc_macro2::Group;
+use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
@@ -28,18 +31,48 @@ use quote::quote;
 /// Definition of Rust struct.
 #[derive(Debug)]
 pub struct StructDef<'a> {
-    pub name: StructName<'a>,
+    pub name: TypeName<'a>,
+    pub properties: CompiledProperties<'a>,
     pub odata: CompiledOData<'a>,
 }
 
 impl StructDef<'_> {
     /// Generate rust code for the structure.
-    pub fn generate(self, tokens: &mut TokenStream) {
-        let content = TokenStream::new();
+    pub fn generate(self, tokens: &mut TokenStream, config: &Config) {
+        let mut content = TokenStream::new();
+        for p in self.properties.properties {
+            match p.ptype {
+                CompiledPropertyType::One(v) => {
+                    let rename = Literal::string(p.name.inner().inner());
+                    let name = PropertyName::new(p.name);
+                    let ptype = FullTypeName::new(v, config);
+                    content.extend([
+                        doc_format_and_generate(p.name, &p.odata),
+                        quote! {
+                            #[serde(rename=#rename)]
+                            #name: Option<#ptype>,
+                        },
+                    ]);
+                }
+                CompiledPropertyType::CollectionOf(v) => {
+                    let rename = Literal::string(p.name.inner().inner());
+                    let name = PropertyName::new(p.name);
+                    let ptype = FullTypeName::new(v, config);
+                    content.extend([
+                        doc_format_and_generate(p.name, &p.odata),
+                        quote! {
+                            #[serde(rename=#rename, default)]
+                            #name: Vec<#ptype>,
+                        },
+                    ]);
+                }
+            }
+        }
         let name = self.name;
         tokens.extend([
             doc_format_and_generate(self.name, &self.odata),
             quote! {
+                #[serde(Deserialize)]
                 pub struct #name
             },
             TokenTree::Group(Group::new(Delimiter::Brace, content)).into(),

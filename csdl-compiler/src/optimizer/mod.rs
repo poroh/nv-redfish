@@ -13,6 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! This is collection of optimizations of compiled data structures.
+//! Each submodule of this module contains one or more optimizations
+//! combinded by same topic.
+//!
+//! Any optimization function is function that consumes old compiled
+//! data structure and produce new, optimized one.
+
 mod prune_complex_type_inheritance;
 mod prune_entity_type_inheritance;
 mod prune_namespaces;

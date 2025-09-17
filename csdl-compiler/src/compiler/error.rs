@@ -21,7 +21,7 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
 
-/// Compilation error
+/// Compilation error.
 #[derive(Debug)]
 pub enum Error<'a> {
     Unimplemented,

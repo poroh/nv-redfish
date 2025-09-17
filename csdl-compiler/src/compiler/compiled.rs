@@ -23,7 +23,7 @@ use crate::compiler::SimpleType;
 use crate::compiler::SimpleTypeAttrs;
 use std::collections::HashMap;
 
-/// Compiled data frome schema.
+/// Compiled data from schema.
 #[derive(Default, Debug)]
 pub struct Compiled<'a> {
     pub complex_types: HashMap<QualifiedName<'a>, CompiledComplexType<'a>>,
@@ -33,6 +33,8 @@ pub struct Compiled<'a> {
 }
 
 impl<'a> Compiled<'a> {
+    /// Creates compiled data structure that contains only one compiled
+    /// entity type.
     #[must_use]
     pub fn new_entity_type(v: CompiledEntityType<'a>) -> Self {
         Self {
@@ -41,6 +43,8 @@ impl<'a> Compiled<'a> {
         }
     }
 
+    /// Creates compiled data structure that contains only one compiled
+    /// complex type.
     #[must_use]
     pub fn new_complex_type(v: CompiledComplexType<'a>) -> Self {
         Self {
@@ -49,6 +53,8 @@ impl<'a> Compiled<'a> {
         }
     }
 
+    /// Creates compiled data structure that contains only one compiled
+    /// singleton.
     #[must_use]
     pub fn new_singleton(v: CompiledSingleton<'a>) -> Self {
         Self {
@@ -57,6 +63,8 @@ impl<'a> Compiled<'a> {
         }
     }
 
+    /// Creates compiled data structure that contains only one type
+    /// definition.
     #[must_use]
     pub fn new_type_definition(v: CompiledTypeDefinition<'a>) -> Self {
         Self {
@@ -73,6 +81,8 @@ impl<'a> Compiled<'a> {
         }
     }
 
+    /// Creates compiled data structure that contains only one enum
+    /// type.
     #[must_use]
     pub fn new_enum_type(v: CompiledEnumType<'a>) -> Self {
         Self {
@@ -89,6 +99,7 @@ impl<'a> Compiled<'a> {
         }
     }
 
+    /// Merge two compiled data structures.
     #[must_use]
     pub fn merge(mut self, other: Self) -> Self {
         self.complex_types.extend(other.complex_types);

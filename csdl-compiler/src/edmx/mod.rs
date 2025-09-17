@@ -90,7 +90,7 @@ pub type SchemaNamespace = Namespace;
 
 pub type PropertyName = TaggedType<SimpleIdentifier, PropertyNameTag>;
 #[derive(tagged_types::Tag)]
-#[implement(Clone, PartialEq, Eq)]
+#[implement(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[transparent(Debug, Display, Deserialize)]
 #[capability(inner_access)]
 pub enum PropertyNameTag {}

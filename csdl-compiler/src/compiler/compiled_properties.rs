@@ -16,6 +16,7 @@
 use crate::compiler::CompiledNavProperty;
 use crate::compiler::CompiledProperty;
 
+/// Combination of all compiled properties and navigation properties.
 #[derive(Default, Debug)]
 pub struct CompiledProperties<'a> {
     pub properties: Vec<CompiledProperty<'a>>,
@@ -23,7 +24,9 @@ pub struct CompiledProperties<'a> {
 }
 
 impl CompiledProperties<'_> {
-    /// Join properties in reverse order.
+    /// Join properties in reverse order. This function is useful when
+    /// compiler have list of current object and all parents and it
+    /// needs all properties in order from parent to child.
     #[must_use]
     pub fn rev_join(src: Vec<Self>) -> Self {
         let (properties, nav_properties): (Vec<_>, Vec<_>) = src

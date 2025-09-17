@@ -17,32 +17,40 @@ pub mod name;
 
 use crate::compiler::CompiledComplexType;
 use crate::compiler::CompiledEntityType;
+use crate::generator::rust::Config;
 use crate::generator::rust::Error;
 use crate::generator::rust::ModName;
 use crate::generator::rust::StructDef;
-use crate::generator::rust::StructName;
+use crate::generator::rust::TypeName;
 use proc_macro2::Delimiter;
 use proc_macro2::Group;
+use proc_macro2::Ident;
+use proc_macro2::Punct;
+use proc_macro2::Spacing;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::iter::repeat_n;
 
 #[derive(Default, Debug)]
 pub struct ModDef<'a> {
     name: Option<ModName<'a>>,
-    structs: HashMap<StructName<'a>, StructDef<'a>>,
+    structs: HashMap<TypeName<'a>, StructDef<'a>>,
     sub_mods: HashMap<ModName<'a>, ModDef<'a>>,
+    depth: usize,
 }
 
 impl<'a> ModDef<'a> {
     #[must_use]
-    pub fn new(name: ModName<'a>) -> Self {
+    pub fn new(name: ModName<'a>, depth: usize) -> Self {
         Self {
             name: Some(name),
             structs: HashMap::new(),
             sub_mods: HashMap::new(),
+            depth,
         }
     }
 
@@ -67,19 +75,20 @@ impl<'a> ModDef<'a> {
             let mod_name = ModName::new(id);
             self.sub_mods
                 .remove(&mod_name)
-                .unwrap_or_else(|| ModDef::new(mod_name))
+                .unwrap_or_else(|| ModDef::new(mod_name, depth))
                 .inner_add_complex_type(ct, depth + 1)
                 .map(|submod| {
                     self.sub_mods.insert(mod_name, submod);
                     self
                 })
         } else {
-            let struct_name = StructName::new(short_name);
+            let struct_name = TypeName::new(short_name);
             match self.structs.entry(struct_name) {
                 Entry::Occupied(_) => Err(Error::NameConflict(ct.name)),
                 Entry::Vacant(v) => {
                     v.insert(StructDef {
                         name: struct_name,
+                        properties: ct.properties,
                         odata: ct.odata,
                     });
                     Ok(self)
@@ -90,7 +99,7 @@ impl<'a> ModDef<'a> {
         }
     }
 
-    /// Add complex type to the module.
+    /// Add entity type to the module.
     ///
     /// # Errors
     ///
@@ -111,19 +120,20 @@ impl<'a> ModDef<'a> {
             let mod_name = ModName::new(id);
             self.sub_mods
                 .remove(&mod_name)
-                .unwrap_or_else(|| ModDef::new(mod_name))
+                .unwrap_or_else(|| ModDef::new(mod_name, depth))
                 .inner_add_entity_type(et, depth + 1)
                 .map(|submod| {
                     self.sub_mods.insert(mod_name, submod);
                     self
                 })
         } else {
-            let struct_name = StructName::new(short_name);
+            let struct_name = TypeName::new(short_name);
             match self.structs.entry(struct_name) {
                 Entry::Occupied(_) => Err(Error::NameConflict(et.name)),
                 Entry::Vacant(v) => {
                     v.insert(StructDef {
                         name: struct_name,
+                        properties: et.properties,
                         odata: et.odata,
                     });
                     Ok(self)
@@ -134,7 +144,8 @@ impl<'a> ModDef<'a> {
         }
     }
 
-    pub fn generate(self, tokens: &mut TokenStream) {
+    /// Generate Rust code.
+    pub fn generate(self, tokens: &mut TokenStream, config: &Config) {
         let mut sub_mods = self.sub_mods.into_values().collect::<Vec<_>>();
         sub_mods.sort_by_key(|v| v.name);
 
@@ -143,16 +154,22 @@ impl<'a> ModDef<'a> {
 
         let generate = |ts: &mut TokenStream| {
             for s in structs {
-                s.generate(ts);
+                s.generate(ts, config);
             }
 
             for m in sub_mods {
-                m.generate(ts);
+                m.generate(ts, config);
             }
         };
 
         if let Some(name) = self.name {
             let mut content = TokenStream::new();
+            content.extend([
+                Self::generate_ref_to_top_module(self.depth, config),
+                quote! {
+                    use serde::Deserialize;
+                },
+            ]);
             generate(&mut content);
             tokens.extend([
                 quote! {
@@ -163,5 +180,24 @@ impl<'a> ModDef<'a> {
         } else {
             generate(tokens);
         }
+    }
+
+    fn generate_ref_to_top_module(depth: usize, config: &Config) -> TokenStream {
+        let top = &config.top_module_alias;
+        let supers = repeat_n(
+            [
+                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                TokenTree::Ident(Ident::new("super", Span::call_site())),
+            ],
+            depth,
+        )
+        .flatten()
+        .collect::<Vec<_>>();
+        let mut ts = TokenStream::new();
+        ts.extend(quote! { use super });
+        ts.extend(supers);
+        ts.extend(quote! { as #top ; });
+        ts
     }
 }
