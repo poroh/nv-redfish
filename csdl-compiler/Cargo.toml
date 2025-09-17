@@ -37,3 +37,6 @@ quote = { workspace = true }
 proc-macro2 = { workspace = true }
 prettyplease = { workspace = true }
 syn = { workspace = true }
+
+[dev-dependencies]
+serde_json = "1.0.143"

@@ -16,10 +16,10 @@
 //! Types defined in 17 Attribute Values
 
 use crate::edmx::QualifiedTypeName;
-use serde::Deserialize;
-use serde::Deserializer;
 use serde::de::Error as DeError;
 use serde::de::Visitor;
+use serde::Deserialize;
+use serde::Deserializer;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
@@ -254,5 +254,306 @@ impl<'de> Deserialize<'de> for TypeName {
         }
 
         de.deserialize_string(QnVisitor {})
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::from_str as json_from_str;
+
+    #[test]
+    fn test_namespace_valid() {
+        // According to 17.1 Namespace, it's dot-separated SimpleIdentifiers
+        let valid_cases = vec![
+            "Namespace",
+            "My.Namespace",
+            "My.Complex.Namespace",
+            "Edm", // Special case should work and be identified as EDM
+        ];
+
+        for case in valid_cases {
+            let ns = Namespace::from_str(case);
+            assert!(ns.is_ok(), "Failed to parse valid Namespace: {}", case);
+
+            // Verify the correct number of identifiers are parsed
+            let ns = ns.unwrap();
+            let expected_count = case.chars().filter(|c| *c == '.').count() + 1;
+            assert_eq!(ns.ids.len(), expected_count);
+        }
+    }
+
+    #[test]
+    fn test_namespace_invalid() {
+        let invalid_cases = vec![
+            "Invalid.123Name", // Invalid SimpleIdentifier
+            "Namespace.",      // Trailing dot
+            ".Namespace",      // Leading dot
+            "Namespace..Name", // Double dot
+            "",                // Empty string
+        ];
+
+        for case in invalid_cases {
+            assert!(
+                Namespace::from_str(case).is_err(),
+                "Should reject invalid Namespace: {}",
+                case
+            );
+        }
+    }
+
+    #[test]
+    fn test_namespace_is_edm() {
+        let edm = Namespace::from_str("Edm").unwrap();
+        assert!(edm.is_edm());
+
+        let not_edm = vec![
+            Namespace::from_str("NotEdm").unwrap(),
+            Namespace::from_str("Edm.Something").unwrap(),
+            Namespace::from_str("Something.Edm").unwrap(),
+        ];
+
+        for ns in not_edm {
+            assert!(!ns.is_edm());
+        }
+    }
+
+    #[test]
+    fn test_namespace_display() {
+        let test_cases = vec![
+            ("SingleNamespace", "SingleNamespace"),
+            ("My.Namespace", "My.Namespace"),
+            ("Complex.Name.Space", "Complex.Name.Space"),
+        ];
+
+        for (input, expected) in test_cases {
+            let ns = Namespace::from_str(input).unwrap();
+            assert_eq!(ns.to_string(), expected);
+        }
+    }
+
+    #[test]
+    fn test_namespace_deserialize() {
+        let json = r#""My.Valid.Namespace""#;
+        let ns: Namespace = json_from_str(json).expect("Should deserialize valid Namespace");
+        assert_eq!(ns.ids.len(), 3);
+
+        let json_invalid = r#""Invalid..Namespace""#;
+        let result: Result<Namespace, _> = json_from_str(json_invalid);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_simple_identifier_valid() {
+        // According to 17.2 SimpleIdentifier, it must start with a letter or underscore
+        // and contains only alphanumeric characters and underscores
+        let valid_cases = vec![
+            "Name",
+            "name",
+            "_name",
+            "Name123",
+            "Name_with_underscores",
+            "a", // Single letter is valid
+        ];
+
+        for case in valid_cases {
+            assert!(
+                SimpleIdentifier::from_str(case).is_ok(),
+                "Failed to parse valid SimpleIdentifier: {}",
+                case
+            );
+        }
+    }
+
+    #[test]
+    fn test_simple_identifier_invalid() {
+        // Invalid cases: starting with digit, containing special characters
+        let invalid_cases = vec![
+            "123Name",           // Starts with digit
+            "Name-with-hyphens", // Contains hyphens
+            "Name.with.dots",    // Contains dots
+            "Name with spaces",  // Contains spaces
+            "",                  // Empty string
+            "$Name",             // Starts with special character
+        ];
+
+        for case in invalid_cases {
+            assert!(
+                SimpleIdentifier::from_str(case).is_err(),
+                "Should reject invalid SimpleIdentifier: {}",
+                case
+            );
+        }
+    }
+
+    #[test]
+    fn test_simple_identifier_display() {
+        let id = SimpleIdentifier::from_str("TestId").unwrap();
+        assert_eq!(id.to_string(), "TestId");
+    }
+
+    #[test]
+    fn test_simple_identifier_deserialize() {
+        // Test JSON deserialization
+        let json = r#""ValidName""#;
+        let id: SimpleIdentifier =
+            json_from_str(json).expect("Should deserialize valid SimpleIdentifier");
+        assert_eq!(id.inner(), "ValidName");
+
+        let json_invalid = r#""Invalid-Name""#;
+        let result: Result<SimpleIdentifier, _> = json_from_str(json_invalid);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_qualified_name_valid() {
+        // According to 17.3 QualifiedName, it's a Namespace + SimpleIdentifier
+        let valid_cases = vec![
+            "Namespace.Name",
+            "My.Namespace.Name",
+            "Complex.Namespace.Structure.Name",
+        ];
+
+        for case in valid_cases {
+            let qn = QualifiedName::from_str(case);
+            assert!(qn.is_ok(), "Failed to parse valid QualifiedName: {}", case);
+
+            // Verify the name is the last part
+            let qn = qn.unwrap();
+            let parts: Vec<&str> = case.split('.').collect();
+            assert_eq!(qn.name.to_string(), *parts.last().unwrap());
+
+            // Verify namespace has correct number of parts
+            assert_eq!(qn.namespace.ids.len(), parts.len() - 1);
+        }
+    }
+
+    #[test]
+    fn test_qualified_name_invalid() {
+        let invalid_cases = vec![
+            "Invalid.123Name",      // Invalid SimpleIdentifier (starts with digit)
+            "Name-with-hyphens",    // Invalid SimpleIdentifier (contains hyphen)
+            "Namespace.",           // Trailing dot (empty SimpleIdentifier)
+            ".Namespace",           // Leading dot (empty SimpleIdentifier)
+            "Namespace..Name",      // Double dot (empty SimpleIdentifier)
+            "",                     // Empty string
+            "Name with spaces",     // Invalid SimpleIdentifier (contains space)
+            "Name.with.123invalid", // Invalid SimpleIdentifier in namespace
+        ];
+
+        for case in invalid_cases {
+            assert!(
+                QualifiedName::from_str(case).is_err(),
+                "Should reject invalid QualifiedName: {}",
+                case
+            );
+        }
+    }
+
+    #[test]
+    fn test_qualified_name_deserialize() {
+        let json = r#""My.Valid.Namespace.Name""#;
+        let qn: QualifiedName =
+            json_from_str(json).expect("Should deserialize valid QualifiedName");
+        assert_eq!(qn.name.to_string(), "Name");
+        assert_eq!(qn.namespace.ids.len(), 3);
+
+        let json_invalid = r#""Invalid..Name""#; // Double dot - invalid
+        let result: Result<QualifiedName, _> = json_from_str(json_invalid);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_type_name_valid() {
+        // According to 17.4 TypeName can be a qualified name or Collection(qualified name)
+        let valid_simple_cases = vec!["Edm.String", "My.Namespace.Type"];
+
+        let valid_collection_cases =
+            vec!["Collection(Edm.String)", "Collection(My.Namespace.Type)"];
+
+        // Test simple type names
+        for case in valid_simple_cases {
+            let tn = TypeName::from_str(case);
+            assert!(tn.is_ok(), "Failed to parse valid TypeName: {}", case);
+
+            assert!(
+                matches!(tn.unwrap(), TypeName::One(_)),
+                "Simple TypeName parsed as Collection: {}",
+                case
+            );
+        }
+
+        // Test collection type names
+        for case in valid_collection_cases {
+            let tn = TypeName::from_str(case);
+            assert!(
+                tn.is_ok(),
+                "Failed to parse valid Collection TypeName: {}",
+                case
+            );
+
+            assert!(
+                matches!(tn.unwrap(), TypeName::CollectionOf(_)),
+                "Collection TypeName parsed as simple: {}",
+                case
+            );
+        }
+    }
+
+    #[test]
+    fn test_type_name_invalid() {
+        let invalid_cases = vec![
+            "Collection()",            // Empty collection
+            "Collection(Edm/Invalid)", // Invalid qualified name
+            "Collection(Edm.String",   // Missing closing parenthesis
+            "CollectionEdm.String)",   // Invalid collection syntax
+            "Collection Edm.String",   // Space instead of parenthesis
+        ];
+
+        for case in invalid_cases {
+            assert!(
+                TypeName::from_str(case).is_err(),
+                "Should reject invalid TypeName: {}",
+                case
+            );
+        }
+    }
+
+    #[test]
+    fn test_type_name_deserialize() {
+        let simple_json = r#""Edm.String""#;
+        let simple: TypeName =
+            json_from_str(simple_json).expect("Should deserialize valid TypeName");
+
+        assert!(
+            matches!(simple, TypeName::One(_)),
+            "Simple TypeName deserialized as Collection"
+        );
+
+        let collection_json = r#""Collection(Edm.String)""#;
+        let collection: TypeName =
+            json_from_str(collection_json).expect("Should deserialize valid Collection TypeName");
+
+        assert!(
+            matches!(collection, TypeName::CollectionOf(_)),
+            "Collection TypeName deserialized as simple"
+        );
+    }
+
+    // Test error display implementations
+    #[test]
+    fn test_error_display() {
+        let simple_id_error = Error::InvalidSimpleIdentifier("123invalid".to_string());
+        let qualified_id_error =
+            Error::InvalidQualifiedIdentifier("invalid..qualified".to_string());
+
+        assert_eq!(
+            simple_id_error.to_string(),
+            "invalid simple identifier 123invalid"
+        );
+        assert_eq!(
+            qualified_id_error.to_string(),
+            "invalid qualified identifier invalid..qualified"
+        );
     }
 }
