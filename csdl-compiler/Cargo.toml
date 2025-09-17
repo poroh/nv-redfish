@@ -24,7 +24,16 @@ path = "tests/test-csdl-parser.rs"
 name = "test-schema-compilation"
 path = "tests/test-schema-compilation.rs"
 
+[[bin]]
+name = "test-schema-rust-gen"
+path = "tests/test-schema-rust-gen.rs"
+
 [dependencies]
 serde = { workspace = true, features = [ "derive" ]}
+heck = { workspace = true }
 quick-xml = { workspace = true, features = ["serialize"] }
 tagged-types = { workspace = true }
+quote = { workspace = true }
+proc-macro2 = { workspace = true }
+prettyplease = { workspace = true }
+syn = { workspace = true }

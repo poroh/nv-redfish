@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::edmx::attribute_values::Namespace;
+use crate::edmx::attribute_values::SimpleIdentifier;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -35,6 +36,25 @@ impl<'a> CompiledNamespace<'a> {
         Self {
             edmx_ns,
             len: edmx_ns.ids.len(),
+        }
+    }
+
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.len
+    }
+
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    #[must_use]
+    pub fn get_id(&self, depth: usize) -> Option<&'a SimpleIdentifier> {
+        if self.len > depth {
+            Some(&self.edmx_ns.ids[depth])
+        } else {
+            None
         }
     }
 

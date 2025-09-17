@@ -97,7 +97,7 @@ impl<'de> Deserialize<'de> for Namespace {
 }
 
 /// 17.2 `SimpleIdentifier`
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct SimpleIdentifier(String);
 
 impl SimpleIdentifier {
@@ -110,6 +110,12 @@ impl SimpleIdentifier {
 impl Display for SimpleIdentifier {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         self.0.fmt(f)
+    }
+}
+
+impl AsRef<str> for SimpleIdentifier {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
 
