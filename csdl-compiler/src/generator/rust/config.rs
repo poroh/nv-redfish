@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::edmx::PropertyName;
 use proc_macro2::Ident;
 use proc_macro2::Span;
 
@@ -20,12 +21,19 @@ use proc_macro2::Span;
 pub struct Config {
     /// Top module alias that is defined in each submodule.
     pub top_module_alias: Ident,
+    /// When one type derived from another we add `#serde(flatten)`
+    /// property to generated code. The name for the property is
+    /// defined by this parameter.
+    pub base_type_prop_name: PropertyName,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             top_module_alias: Ident::new("redfish", Span::call_site()),
+            base_type_prop_name: PropertyName::new(
+                "Base".parse().expect("should always be parsed"),
+            ),
         }
     }
 }

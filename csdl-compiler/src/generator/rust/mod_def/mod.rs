@@ -17,6 +17,9 @@ pub mod name;
 
 use crate::compiler::CompiledComplexType;
 use crate::compiler::CompiledEntityType;
+use crate::compiler::CompiledOData;
+use crate::compiler::CompiledProperties;
+use crate::compiler::QualifiedName;
 use crate::compiler::SimpleType;
 use crate::generator::rust::Config;
 use crate::generator::rust::Error;
@@ -65,41 +68,35 @@ impl<'a> ModDef<'a> {
     /// Returns `CreateStruct` error if failed to add new struct to the
     /// module.  it may only happen in case of name conflicts because
     /// of case conversion.
-    pub fn add_complex_type(self, ct: CompiledComplexType<'a>) -> Result<Self, Error<'a>> {
-        self.inner_add_complex_type(ct, 0)
+    pub fn add_complex_type(
+        self,
+        ct: CompiledComplexType<'a>,
+        config: &Config,
+    ) -> Result<Self, Error<'a>> {
+        self.inner_add_complex_type(ct, 0, config)
     }
 
     fn inner_add_complex_type(
         mut self,
         ct: CompiledComplexType<'a>,
         depth: usize,
+        config: &Config,
     ) -> Result<Self, Error<'a>> {
-        let short_name = ct.name.name;
         if let Some(id) = ct.name.namespace.get_id(depth) {
             let mod_name = ModName::new(id);
             self.sub_mods
                 .remove(&mod_name)
                 .unwrap_or_else(|| ModDef::new(mod_name, depth))
-                .inner_add_complex_type(ct, depth + 1)
+                .inner_add_complex_type(ct, depth + 1, config)
                 .map(|submod| {
                     self.sub_mods.insert(mod_name, submod);
                     self
                 })
         } else {
-            let struct_name = TypeName::new(short_name);
-            match self.structs.entry(struct_name) {
-                Entry::Occupied(_) => Err(Error::NameConflict(ct.name)),
-                Entry::Vacant(v) => {
-                    v.insert(StructDef {
-                        name: struct_name,
-                        properties: ct.properties,
-                        odata: ct.odata,
-                    });
-                    Ok(self)
-                }
-            }
-            .map_err(Box::new)
-            .map_err(|e| Error::CreateStruct(short_name, e))
+            let name = ct.name;
+            self.add_struct_def(ct.name, ct.base, ct.properties, ct.odata, config)
+                .map_err(Box::new)
+                .map_err(|e| Error::CreateStruct(name, e))
         }
     }
 
@@ -117,7 +114,6 @@ impl<'a> ModDef<'a> {
         st: SimpleType<'a>,
         depth: usize,
     ) -> Result<Self, Error<'a>> {
-        let short_name = st.name.name;
         if let Some(id) = st.name.namespace.get_id(depth) {
             let mod_name = ModName::new(id);
             self.sub_mods
@@ -129,17 +125,21 @@ impl<'a> ModDef<'a> {
                     self
                 })
         } else {
-            let name = TypeName::new(short_name);
+            let name = st.name;
+            let type_name = TypeName::new(st.name.name);
             let attrs = st.attrs;
-            match self.simples.entry(name) {
-                Entry::Occupied(_) => Err(Error::NameConflict(st.name)),
+            match self.simples.entry(type_name) {
+                Entry::Occupied(_) => Err(Error::NameConflict),
                 Entry::Vacant(v) => {
-                    v.insert(SimpleDef { name, attrs });
+                    v.insert(SimpleDef {
+                        name: type_name,
+                        attrs,
+                    });
                     Ok(self)
                 }
             }
             .map_err(Box::new)
-            .map_err(|e| Error::CreateStruct(short_name, e))
+            .map_err(|e| Error::CreateSimplType(name, e))
         }
     }
 
@@ -150,41 +150,54 @@ impl<'a> ModDef<'a> {
     /// Returns `CreateStruct` error if failed to add new struct to the
     /// module.  it may only happen in case of name conflicts because
     /// of case conversion.
-    pub fn add_entity_type(self, ct: CompiledEntityType<'a>) -> Result<Self, Error<'a>> {
-        self.inner_add_entity_type(ct, 0)
+    pub fn add_entity_type(
+        self,
+        ct: CompiledEntityType<'a>,
+        config: &Config,
+    ) -> Result<Self, Error<'a>> {
+        self.inner_add_entity_type(ct, 0, config)
     }
 
     fn inner_add_entity_type(
         mut self,
         et: CompiledEntityType<'a>,
         depth: usize,
+        config: &Config,
     ) -> Result<Self, Error<'a>> {
-        let short_name = et.name.name;
         if let Some(id) = et.name.namespace.get_id(depth) {
             let mod_name = ModName::new(id);
             self.sub_mods
                 .remove(&mod_name)
                 .unwrap_or_else(|| ModDef::new(mod_name, depth))
-                .inner_add_entity_type(et, depth + 1)
+                .inner_add_entity_type(et, depth + 1, config)
                 .map(|submod| {
                     self.sub_mods.insert(mod_name, submod);
                     self
                 })
         } else {
-            let struct_name = TypeName::new(short_name);
-            match self.structs.entry(struct_name) {
-                Entry::Occupied(_) => Err(Error::NameConflict(et.name)),
-                Entry::Vacant(v) => {
-                    v.insert(StructDef {
-                        name: struct_name,
-                        properties: et.properties,
-                        odata: et.odata,
-                    });
-                    Ok(self)
-                }
+            let name = et.name;
+            self.add_struct_def(et.name, et.base, et.properties, et.odata, config)
+                .map_err(Box::new)
+                .map_err(|e| Error::CreateStruct(name, e))
+        }
+    }
+
+    fn add_struct_def(
+        mut self,
+        qname: QualifiedName<'a>,
+        base: Option<QualifiedName<'a>>,
+        properties: CompiledProperties<'a>,
+        odata: CompiledOData<'a>,
+        config: &Config,
+    ) -> Result<Self, Error<'a>> {
+        let struct_name = TypeName::new(qname.name);
+        match self.structs.entry(struct_name) {
+            Entry::Occupied(_) => Err(Error::NameConflict),
+            Entry::Vacant(v) => {
+                StructDef::new(struct_name, base, properties, odata, config)
+                    .map(|st| v.insert(st))?;
+                Ok(self)
             }
-            .map_err(Box::new)
-            .map_err(|e| Error::CreateStruct(short_name, e))
         }
     }
 

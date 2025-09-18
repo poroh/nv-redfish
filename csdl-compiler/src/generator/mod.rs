@@ -15,19 +15,3 @@
 
 /// Generator of rust code.
 pub mod rust;
-
-use crate::compiler::Compiled;
-use std::fmt::Display;
-
-pub trait Error<'a>: Display {}
-
-pub trait CodeGenerator<'a> {
-    /// Creates new code generator from compiled data.
-    ///
-    /// # Errors
-    ///
-    /// Returns if error occured during creation.
-    fn new(compiled: Compiled<'a>) -> Result<Self, Box<dyn Error<'a> + 'a>>
-    where
-        Self: Sized;
-}

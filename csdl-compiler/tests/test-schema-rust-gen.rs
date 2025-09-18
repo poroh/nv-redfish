@@ -17,7 +17,6 @@ use csdl_compiler::compiler::SchemaBundle;
 use csdl_compiler::edmx::Edmx;
 use csdl_compiler::edmx::ValidateError;
 use csdl_compiler::edmx::attribute_values::Error as AttributeValuesError;
-use csdl_compiler::generator::CodeGenerator as _;
 use csdl_compiler::generator::rust::Config;
 use csdl_compiler::generator::rust::RustGenerator;
 use csdl_compiler::optimizer::optimize;
@@ -63,11 +62,11 @@ fn main() -> Result<(), Error> {
         .inspect_err(|e| println!("{e}"))
         .map_err(|_| Error::Compile("compilation error".into()))?;
     let compiled = optimize(compiled);
-    let generator = RustGenerator::new(compiled)
+    let generator = RustGenerator::new(compiled, Config::default())
         .inspect_err(|e| println!("{e}"))
         .map_err(|_| Error::Generate("generation error".into()))?;
 
-    let result = generator.generate(&Config::default()).to_string();
+    let result = generator.generate().to_string();
     // println!("{result}");
 
     let syntax_tree = syn::parse_file(&result).map_err(Error::ParseGenerated)?;
