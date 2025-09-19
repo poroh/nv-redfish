@@ -23,16 +23,13 @@
 //!  - If namespace more than one ids then submodules are generated in according to namespace.
 //!
 
-/// Mod definition.
-pub mod mod_def;
+/// Mod name
+pub mod mod_name;
 
-/// Struct definition.
-pub mod struct_def;
-
-/// Documentation generation.
+/// Documentation generation
 pub mod doc;
 
-/// Configuration of generation.
+/// Configuration of generation
 pub mod config;
 
 /// Short type name (only name)
@@ -43,6 +40,12 @@ pub mod full_type_name;
 
 /// Property name for structs
 pub mod property_name;
+
+/// Mod definition
+pub mod mod_def;
+
+/// Struct definition
+pub mod struct_def;
 
 /// Simple types definitions
 pub mod simple_def;
@@ -56,7 +59,7 @@ use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
 
 /// Reexport of `ModName`.
-pub type ModName<'a> = mod_def::name::ModName<'a>;
+pub type ModName<'a> = mod_name::ModName<'a>;
 /// Reexport of `ModDef`.
 pub type ModDef<'a> = mod_def::ModDef<'a>;
 /// Reexport of `StructDef`.

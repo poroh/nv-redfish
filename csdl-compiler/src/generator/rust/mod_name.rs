@@ -25,6 +25,9 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
 
+/// Module name built from edmx `SimpleIdentifier`.
+///
+/// Example of representation: `service_root`
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Ord, PartialOrd)]
 pub struct ModName<'a>(&'a SimpleIdentifier);
 

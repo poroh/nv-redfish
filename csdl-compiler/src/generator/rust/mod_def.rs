@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod name;
-
 use crate::compiler::CompiledComplexType;
 use crate::compiler::CompiledEntityType;
 use crate::compiler::CompiledOData;

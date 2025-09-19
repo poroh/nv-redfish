@@ -25,10 +25,14 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
 
+/// Property name built from edmx `PropertyName`.
+///
+/// Example of representation: `protocol_features_supported`
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Ord, PartialOrd)]
 pub struct PropertyName<'a>(&'a EdmxPropertyName);
 
 impl<'a> PropertyName<'a> {
+    /// Create new property name.
     #[must_use]
     pub const fn new(v: &'a EdmxPropertyName) -> Self {
         Self(v)

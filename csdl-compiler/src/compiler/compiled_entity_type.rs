@@ -1,0 +1,135 @@
+// SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use crate::compiler::Compiled;
+use crate::compiler::CompiledNavProperty;
+use crate::compiler::CompiledOData;
+use crate::compiler::CompiledProperties;
+use crate::compiler::CompiledProperty;
+use crate::compiler::Error;
+use crate::compiler::MapBase;
+use crate::compiler::PropertiesManipulation;
+use crate::compiler::QualifiedName;
+use crate::compiler::SchemaIndex;
+use crate::compiler::Stack;
+use crate::compiler::odata::MustHaveId;
+use crate::edmx::QualifiedTypeName;
+use crate::edmx::entity_type::EntityType;
+use crate::edmx::entity_type::Key;
+
+#[derive(Debug)]
+pub struct CompiledEntityType<'a> {
+    pub name: QualifiedName<'a>,
+    pub base: Option<QualifiedName<'a>>,
+    pub key: Option<&'a Key>,
+    pub properties: CompiledProperties<'a>,
+    pub odata: CompiledOData<'a>,
+}
+
+impl<'a> CompiledEntityType<'a> {
+    /// Compiles entity type with specified name. Note that it also
+    /// compiles all dependencies of the enity type.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if failed to compile any prerequisites of the
+    /// `schema_entity_type`.
+    pub fn compile(
+        name: QualifiedName<'a>,
+        schema_entity_type: &'a EntityType,
+        schema_index: &SchemaIndex<'a>,
+        stack: &Stack<'a, '_>,
+    ) -> Result<Compiled<'a>, Error<'a>> {
+        let stack = stack.new_frame().with_enitity_type(name);
+        // Ensure that base entity type compiled if present.
+        let (base, compiled) = if let Some(base_type) = &schema_entity_type.base_type {
+            let compiled = Self::ensure(base_type, schema_index, &stack)?;
+            (Some(base_type.into()), compiled)
+        } else {
+            (None, Compiled::default())
+        };
+        let stack = stack.new_frame().merge(compiled);
+
+        // Compile navigation and regular properties
+        let (compiled, properties) = CompiledProperties::compile(
+            &schema_entity_type.properties,
+            schema_index,
+            stack.new_frame(),
+        )?;
+
+        Ok(stack
+            .merge(compiled)
+            .merge(Compiled::new_entity_type(CompiledEntityType {
+                name,
+                base,
+                key: schema_entity_type.key.as_ref(),
+                properties,
+                odata: CompiledOData::new(MustHaveId::new(true), schema_entity_type),
+            }))
+            .done())
+    }
+
+    /// Checks if `EntityType` with name `qtype` is compiled. If not
+    /// then compile it.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if failed to compile entity type.
+    pub fn ensure(
+        qtype: &'a QualifiedTypeName,
+        schema_index: &SchemaIndex<'a>,
+        stack: &Stack<'a, '_>,
+    ) -> Result<Compiled<'a>, Error<'a>> {
+        if stack.contains_entity(qtype.into()) {
+            Ok(Compiled::default())
+        } else {
+            schema_index
+                .find_entity_type(qtype)
+                .ok_or_else(|| Error::EntityTypeNotFound(qtype.into()))
+                .and_then(|et| Self::compile(qtype.into(), et, schema_index, stack))
+                .map_err(Box::new)
+                .map_err(|e| Error::EntityType(qtype.into(), e))
+        }
+    }
+}
+
+impl<'a> PropertiesManipulation<'a> for CompiledEntityType<'a> {
+    fn map_properties<F>(mut self, f: F) -> Self
+    where
+        F: Fn(CompiledProperty<'a>) -> CompiledProperty<'a>,
+    {
+        self.properties.properties = self.properties.properties.into_iter().map(f).collect();
+        self
+    }
+
+    fn map_nav_properties<F>(mut self, f: F) -> Self
+    where
+        F: Fn(CompiledNavProperty<'a>) -> CompiledNavProperty<'a>,
+    {
+        self.properties.nav_properties =
+            self.properties.nav_properties.into_iter().map(f).collect();
+        self
+    }
+}
+
+impl<'a> MapBase<'a> for CompiledEntityType<'a> {
+    fn map_base<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(QualifiedName<'a>) -> QualifiedName<'a>,
+    {
+        self.base = self.base.map(f);
+        self
+    }
+}

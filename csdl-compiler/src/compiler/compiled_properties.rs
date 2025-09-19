@@ -13,12 +13,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::compiler::Compiled;
+use crate::compiler::CompiledEntityType;
 use crate::compiler::CompiledOData;
+use crate::compiler::Error;
 use crate::compiler::MapType;
+use crate::compiler::MustHaveId;
 use crate::compiler::QualifiedName;
+use crate::compiler::SchemaIndex;
+use crate::compiler::Stack;
+use crate::compiler::ensure_type;
 use crate::compiler::redfish::RedfishProperty;
 use crate::edmx::PropertyName;
 use crate::edmx::attribute_values::TypeName;
+use crate::edmx::property::Property;
+use crate::edmx::property::PropertyAttrs;
 
 /// Combination of all compiled properties and navigation properties.
 #[derive(Default, Debug)]
@@ -27,7 +36,76 @@ pub struct CompiledProperties<'a> {
     pub nav_properties: Vec<CompiledNavProperty<'a>>,
 }
 
-impl CompiledProperties<'_> {
+impl<'a> CompiledProperties<'a> {
+    /// Compile properties of the object (both navigation and
+    /// structural). Also it compiles all dependencies of the
+    /// properties.
+    ///
+    /// # Errors
+    ///
+    /// Returens error if failed to compile and dependency.
+    pub fn compile(
+        props: &'a [Property],
+        schema_index: &SchemaIndex<'a>,
+        stack: Stack<'a, '_>,
+    ) -> Result<(Compiled<'a>, Self), Error<'a>> {
+        props
+            .iter()
+            .try_fold(
+                (stack, CompiledProperties::default()),
+                |(stack, mut p), sp| {
+                    let stack = match &sp.attrs {
+                        PropertyAttrs::StructuralProperty(v) => {
+                            let compiled = ensure_type(&v.ptype, schema_index, &stack)
+                                .map_err(Box::new)
+                                .map_err(|e| Error::Property(&sp.name, e))?;
+                            p.properties.push(CompiledProperty {
+                                name: &v.name,
+                                ptype: (&v.ptype).into(),
+                                odata: CompiledOData::new(MustHaveId::new(false), v),
+                                redfish: RedfishProperty::new(v),
+                            });
+                            stack.merge(compiled)
+                        }
+                        PropertyAttrs::NavigationProperty(v) => {
+                            let (ptype, compiled) = schema_index
+                                // We are searching for deepest available child in tre
+                                // hierarchy of types for singleton. So, we can parse most
+                                // recent protocol versions.
+                                .find_child_entity_type(v.ptype.qualified_type_name().into())
+                                .and_then(|(qtype, et)| {
+                                    if stack.contains_entity(qtype) {
+                                        // Aready compiled entity
+                                        Ok(Compiled::default())
+                                    } else {
+                                        CompiledEntityType::compile(qtype, et, schema_index, &stack)
+                                            .map_err(Box::new)
+                                            .map_err(|e| Error::EntityType(qtype, e))
+                                    }
+                                    .map(|compiled| (qtype, compiled))
+                                })
+                                .map_err(Box::new)
+                                .map_err(|e| Error::Property(&sp.name, e))?;
+                            p.nav_properties.push(CompiledNavProperty {
+                                name: &v.name,
+                                ptype: match &v.ptype {
+                                    TypeName::One(_) => CompiledPropertyType::One(ptype),
+                                    TypeName::CollectionOf(_) => {
+                                        CompiledPropertyType::CollectionOf(ptype)
+                                    }
+                                },
+                                odata: CompiledOData::new(MustHaveId::new(false), v),
+                                redfish: RedfishProperty::new(v),
+                            });
+                            stack.merge(compiled)
+                        }
+                    };
+                    Ok((stack, p))
+                },
+            )
+            .map(|(stack, p)| (stack.done(), p))
+    }
+
     /// Join properties in reverse order. This function is useful when
     /// compiler have list of current object and all parents and it
     /// needs all properties in order from parent to child.

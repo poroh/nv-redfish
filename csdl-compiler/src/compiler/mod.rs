@@ -39,23 +39,29 @@ pub mod odata;
 /// Compiled redfish attrs
 pub mod redfish;
 
+/// Traits that are useful for compilation.
+pub mod compile_traits;
+
 /// Compiled properties of `ComplexType` or `EntityType`
 pub mod compiled_properties;
 
 /// Simple type (type definition or enum)
 pub mod simple_type;
 
+/// Compiled entity type
+pub mod compiled_entity_type;
+
+/// Compiled complex type
+pub mod compiled_complex_type;
+
+/// Compiled singleton
+pub mod compiled_singleton;
+
 use crate::compiler::odata::MustHaveId;
-use crate::compiler::redfish::RedfishProperty;
 use crate::edmx::Edmx;
 use crate::edmx::QualifiedTypeName;
-use crate::edmx::Singleton;
 use crate::edmx::attribute_values::SimpleIdentifier;
 use crate::edmx::attribute_values::TypeName;
-use crate::edmx::entity_type::EntityType;
-use crate::edmx::entity_type::Key;
-use crate::edmx::property::Property;
-use crate::edmx::property::PropertyAttrs;
 use crate::edmx::schema::Schema;
 use crate::edmx::schema::Type;
 use schema_index::SchemaIndex;
@@ -87,6 +93,19 @@ pub type SimpleTypeAttrs<'a> = simple_type::SimpleTypeAttrs<'a>;
 pub type CompiledTypeDefinition<'a> = simple_type::CompiledTypeDefinition<'a>;
 /// Reexport `CompiledEnumType` to the level of the compiler.
 pub type CompiledEnumType<'a> = simple_type::CompiledEnumType<'a>;
+/// Reexport `CompiledEntityType` to the level of the compiler.
+pub type CompiledEntityType<'a> = compiled_entity_type::CompiledEntityType<'a>;
+/// Reexport `CompiledComplexType` to the level of the compiler.
+pub type CompiledComplexType<'a> = compiled_complex_type::CompiledComplexType<'a>;
+/// Reexport `CompiledComplexType` to the level of the compiler.
+pub type CompiledSingleton<'a> = compiled_singleton::CompiledSingleton<'a>;
+
+/// Reexport `MapBase` to the level of the compiler.
+pub use compile_traits::MapBase;
+/// Reexport `MapType` to the level of the compiler.
+pub use compile_traits::MapType;
+/// Reexport `PropertiesManipulation` to the level of the compiler.
+pub use compile_traits::PropertiesManipulation;
 
 /// Collection of EDMX documents that are compiled together to produce
 /// code.
@@ -137,7 +156,8 @@ impl SchemaBundle {
                     .iter()
                     .try_fold(stack, |stack, s| {
                         if singletons.contains(&s.name) {
-                            Self::compile_singleton(s, schema_index, &stack).map(|v| stack.merge(v))
+                            CompiledSingleton::compile(s, schema_index, &stack)
+                                .map(|v| stack.merge(v))
                         } else {
                             Ok(stack)
                         }
@@ -148,354 +168,84 @@ impl SchemaBundle {
             },
         )
     }
+}
 
-    fn compile_singleton<'a>(
-        singleton: &'a Singleton,
-        schema_index: &SchemaIndex<'a>,
-        stack: &Stack<'a, '_>,
-    ) -> Result<Compiled<'a>, Error<'a>> {
-        schema_index
-            // We are searching for deepest available child in tre
-            // hierarchy of types for singleton. So, we can parse most
-            // recent protocol versions.
-            .find_child_entity_type((&singleton.stype).into())
-            .and_then(|(qtype, et)| {
-                if stack.contains_entity(qtype) {
-                    // Aready compiled singleton
-                    Ok(Compiled::default())
-                } else {
-                    Self::compile_entity_type(qtype, et, schema_index, stack)
-                        .map_err(Box::new)
-                        .map_err(|e| Error::EntityType(qtype, e))
-                }
-                .map(|compiled| (qtype, compiled))
-            })
-            .map_err(Box::new)
-            .map_err(|e| Error::Singleton(&singleton.name, e))
-            .map(|(qtype, compiled)| {
-                compiled.merge(Compiled::new_singleton(CompiledSingleton {
-                    name: &singleton.name,
-                    stype: qtype,
-                }))
-            })
+fn is_simple_type(qtype: &QualifiedTypeName) -> bool {
+    qtype.inner().namespace.is_edm()
+}
+
+fn ensure_type<'a>(
+    typename: &'a TypeName,
+    schema_index: &SchemaIndex<'a>,
+    stack: &Stack<'a, '_>,
+) -> Result<Compiled<'a>, Error<'a>> {
+    let qtype = match typename {
+        TypeName::One(v) | TypeName::CollectionOf(v) => v,
+    };
+    if stack.contains_entity(qtype.into()) || is_simple_type(qtype) {
+        Ok(Compiled::default())
+    } else {
+        compile_type(qtype, schema_index, stack)
     }
+}
 
-    fn ensure_entity_type<'a>(
-        qtype: &'a QualifiedTypeName,
-        schema_index: &SchemaIndex<'a>,
-        stack: &Stack<'a, '_>,
-    ) -> Result<Compiled<'a>, Error<'a>> {
-        if stack.contains_entity(qtype.into()) {
-            Ok(Compiled::default())
-        } else {
-            Self::find_and_compile_entity_type(qtype, schema_index, stack)
-        }
-    }
-
-    fn find_and_compile_entity_type<'a>(
-        qtype: &'a QualifiedTypeName,
-        schema_index: &SchemaIndex<'a>,
-        stack: &Stack<'a, '_>,
-    ) -> Result<Compiled<'a>, Error<'a>> {
-        schema_index
-            .find_entity_type(qtype)
-            .ok_or_else(|| Error::EntityTypeNotFound(qtype.into()))
-            .and_then(|et| Self::compile_entity_type(qtype.into(), et, schema_index, stack))
-            .map_err(Box::new)
-            .map_err(|e| Error::EntityType(qtype.into(), e))
-    }
-
-    fn compile_entity_type<'a>(
-        name: QualifiedName<'a>,
-        schema_entity_type: &'a EntityType,
-        schema_index: &SchemaIndex<'a>,
-        stack: &Stack<'a, '_>,
-    ) -> Result<Compiled<'a>, Error<'a>> {
-        let stack = stack.new_frame().with_enitity_type(name);
-        // Ensure that base entity type compiled if present.
-        let (base, compiled) = if let Some(base_type) = &schema_entity_type.base_type {
-            let compiled = Self::ensure_entity_type(base_type, schema_index, &stack)?;
-            (Some(base_type.into()), compiled)
-        } else {
-            (None, Compiled::default())
-        };
-        let stack = stack.new_frame().merge(compiled);
-
-        // Compile navigation and regular properties
-        let (compiled, properties) = Self::compile_properties(
-            &schema_entity_type.properties,
-            schema_index,
-            stack.new_frame(),
-        )?;
-
-        Ok(stack
-            .merge(compiled)
-            .merge(Compiled::new_entity_type(CompiledEntityType {
-                name,
-                base,
-                key: schema_entity_type.key.as_ref(),
-                properties,
-                odata: CompiledOData::new(MustHaveId::new(true), schema_entity_type),
-            }))
-            .done())
-    }
-
-    fn compile_properties<'a>(
-        props: &'a [Property],
-        schema_index: &SchemaIndex<'a>,
-        stack: Stack<'a, '_>,
-    ) -> Result<(Compiled<'a>, CompiledProperties<'a>), Error<'a>> {
-        props
-            .iter()
-            .try_fold(
-                (stack, CompiledProperties::default()),
-                |(stack, mut p), sp| {
-                    let stack = match &sp.attrs {
-                        PropertyAttrs::StructuralProperty(v) => {
-                            let compiled = Self::ensure_type(&v.ptype, schema_index, &stack)
-                                .map_err(Box::new)
-                                .map_err(|e| Error::Property(&sp.name, e))?;
-                            p.properties.push(CompiledProperty {
-                                name: &v.name,
-                                ptype: (&v.ptype).into(),
-                                odata: CompiledOData::new(MustHaveId::new(false), v),
-                                redfish: RedfishProperty::new(v),
-                            });
-                            stack.merge(compiled)
-                        }
-                        PropertyAttrs::NavigationProperty(v) => {
-                            let (ptype, compiled) = schema_index
-                                // We are searching for deepest available child in tre
-                                // hierarchy of types for singleton. So, we can parse most
-                                // recent protocol versions.
-                                .find_child_entity_type(v.ptype.qualified_type_name().into())
-                                .and_then(|(qtype, et)| {
-                                    if stack.contains_entity(qtype) {
-                                        // Aready compiled entity
-                                        Ok(Compiled::default())
-                                    } else {
-                                        Self::compile_entity_type(qtype, et, schema_index, &stack)
-                                            .map_err(Box::new)
-                                            .map_err(|e| Error::EntityType(qtype, e))
-                                    }
-                                    .map(|compiled| (qtype, compiled))
-                                })
-                                .map_err(Box::new)
-                                .map_err(|e| Error::Property(&sp.name, e))?;
-                            p.nav_properties.push(CompiledNavProperty {
-                                name: &v.name,
-                                ptype: match &v.ptype {
-                                    TypeName::One(_) => CompiledPropertyType::One(ptype),
-                                    TypeName::CollectionOf(_) => {
-                                        CompiledPropertyType::CollectionOf(ptype)
-                                    }
-                                },
-                                odata: CompiledOData::new(MustHaveId::new(false), v),
-                                redfish: RedfishProperty::new(v),
-                            });
-                            stack.merge(compiled)
-                        }
-                    };
-                    Ok((stack, p))
-                },
-            )
-            .map(|(stack, p)| (stack.done(), p))
-    }
-
-    fn is_simple_type(qtype: &QualifiedTypeName) -> bool {
-        qtype.inner().namespace.is_edm()
-    }
-
-    fn ensure_type<'a>(
-        typename: &'a TypeName,
-        schema_index: &SchemaIndex<'a>,
-        stack: &Stack<'a, '_>,
-    ) -> Result<Compiled<'a>, Error<'a>> {
-        let qtype = match typename {
-            TypeName::One(v) | TypeName::CollectionOf(v) => v,
-        };
-        if stack.contains_entity(qtype.into()) || Self::is_simple_type(qtype) {
-            Ok(Compiled::default())
-        } else {
-            Self::compile_type(qtype, schema_index, stack)
-        }
-    }
-
-    fn compile_type<'a>(
-        qtype: &'a QualifiedTypeName,
-        schema_index: &SchemaIndex<'a>,
-        stack: &Stack<'a, '_>,
-    ) -> Result<Compiled<'a>, Error<'a>> {
-        schema_index
-            .find_type(qtype)
-            .ok_or_else(|| Error::TypeNotFound(qtype.into()))
-            .and_then(|t| match t {
-                Type::TypeDefinition(td) => {
-                    let underlying_type = (&td.underlying_type).into();
-                    if Self::is_simple_type(&td.underlying_type) {
-                        Ok(Compiled::new_type_definition(CompiledTypeDefinition {
-                            name: qtype.into(),
-                            underlying_type,
-                        }))
-                    } else {
-                        Err(Error::TypeDefinitionOfNotPrimitiveType(underlying_type))
-                    }
-                }
-                Type::EnumType(et) => {
-                    let underlying_type = et.underlying_type.unwrap_or_default();
-                    Ok(Compiled::new_enum_type(CompiledEnumType {
+fn compile_type<'a>(
+    qtype: &'a QualifiedTypeName,
+    schema_index: &SchemaIndex<'a>,
+    stack: &Stack<'a, '_>,
+) -> Result<Compiled<'a>, Error<'a>> {
+    schema_index
+        .find_type(qtype)
+        .ok_or_else(|| Error::TypeNotFound(qtype.into()))
+        .and_then(|t| match t {
+            Type::TypeDefinition(td) => {
+                let underlying_type = (&td.underlying_type).into();
+                if is_simple_type(&td.underlying_type) {
+                    Ok(Compiled::new_type_definition(CompiledTypeDefinition {
                         name: qtype.into(),
                         underlying_type,
-                        members: et.members.iter().map(Into::into).collect(),
-                        odata: CompiledOData::new(MustHaveId::new(false), et),
                     }))
+                } else {
+                    Err(Error::TypeDefinitionOfNotPrimitiveType(underlying_type))
                 }
-                Type::ComplexType(ct) => {
-                    let name = qtype.into();
-                    // Ensure that base entity type compiled if present.
-                    let (base, compiled) = if let Some(base_type) = &ct.base_type {
-                        let compiled = Self::compile_type(base_type, schema_index, stack)?;
-                        (Some(base_type.into()), compiled)
-                    } else {
-                        (None, Compiled::default())
-                    };
+            }
+            Type::EnumType(et) => {
+                let underlying_type = et.underlying_type.unwrap_or_default();
+                Ok(Compiled::new_enum_type(CompiledEnumType {
+                    name: qtype.into(),
+                    underlying_type,
+                    members: et.members.iter().map(Into::into).collect(),
+                    odata: CompiledOData::new(MustHaveId::new(false), et),
+                }))
+            }
+            Type::ComplexType(ct) => {
+                let name = qtype.into();
+                // Ensure that base entity type compiled if present.
+                let (base, compiled) = if let Some(base_type) = &ct.base_type {
+                    let compiled = compile_type(base_type, schema_index, stack)?;
+                    (Some(base_type.into()), compiled)
+                } else {
+                    (None, Compiled::default())
+                };
 
-                    let stack = stack.new_frame().merge(compiled);
+                let stack = stack.new_frame().merge(compiled);
 
-                    let (compiled, properties) =
-                        Self::compile_properties(&ct.properties, schema_index, stack.new_frame())?;
+                let (compiled, properties) =
+                    CompiledProperties::compile(&ct.properties, schema_index, stack.new_frame())?;
 
-                    Ok(stack
-                        .merge(compiled)
-                        .merge(Compiled::new_complex_type(CompiledComplexType {
-                            name,
-                            base,
-                            properties,
-                            odata: CompiledOData::new(MustHaveId::new(false), ct),
-                        }))
-                        .done())
-                }
-            })
-            .map_err(Box::new)
-            .map_err(|e| Error::Type(qtype.into(), e))
-    }
-}
-
-pub trait PropertiesManipulation<'a> {
-    #[must_use]
-    fn map_properties<F>(self, f: F) -> Self
-    where
-        F: Fn(CompiledProperty<'a>) -> CompiledProperty<'a>;
-
-    #[must_use]
-    fn map_nav_properties<F>(self, f: F) -> Self
-    where
-        F: Fn(CompiledNavProperty<'a>) -> CompiledNavProperty<'a>;
-}
-
-pub trait MapType<'a> {
-    #[must_use]
-    fn map_type<F>(self, f: F) -> Self
-    where
-        F: Fn(QualifiedName<'a>) -> QualifiedName<'a>;
-}
-
-pub trait MapBase<'a> {
-    #[must_use]
-    fn map_base<F>(self, f: F) -> Self
-    where
-        F: FnOnce(QualifiedName<'a>) -> QualifiedName<'a>;
-}
-
-#[derive(Debug)]
-pub struct CompiledEntityType<'a> {
-    pub name: QualifiedName<'a>,
-    pub base: Option<QualifiedName<'a>>,
-    pub key: Option<&'a Key>,
-    pub properties: CompiledProperties<'a>,
-    pub odata: CompiledOData<'a>,
-}
-
-impl<'a> PropertiesManipulation<'a> for CompiledEntityType<'a> {
-    fn map_properties<F>(mut self, f: F) -> Self
-    where
-        F: Fn(CompiledProperty<'a>) -> CompiledProperty<'a>,
-    {
-        self.properties.properties = self.properties.properties.into_iter().map(f).collect();
-        self
-    }
-
-    fn map_nav_properties<F>(mut self, f: F) -> Self
-    where
-        F: Fn(CompiledNavProperty<'a>) -> CompiledNavProperty<'a>,
-    {
-        self.properties.nav_properties =
-            self.properties.nav_properties.into_iter().map(f).collect();
-        self
-    }
-}
-
-impl<'a> MapBase<'a> for CompiledEntityType<'a> {
-    fn map_base<F>(mut self, f: F) -> Self
-    where
-        F: FnOnce(QualifiedName<'a>) -> QualifiedName<'a>,
-    {
-        self.base = self.base.map(f);
-        self
-    }
-}
-
-#[derive(Debug)]
-pub struct CompiledComplexType<'a> {
-    pub name: QualifiedName<'a>,
-    pub base: Option<QualifiedName<'a>>,
-    pub properties: CompiledProperties<'a>,
-    pub odata: CompiledOData<'a>,
-}
-
-impl<'a> PropertiesManipulation<'a> for CompiledComplexType<'a> {
-    fn map_properties<F>(mut self, f: F) -> Self
-    where
-        F: Fn(CompiledProperty<'a>) -> CompiledProperty<'a>,
-    {
-        self.properties.properties = self.properties.properties.into_iter().map(f).collect();
-        self
-    }
-
-    fn map_nav_properties<F>(mut self, f: F) -> Self
-    where
-        F: Fn(CompiledNavProperty<'a>) -> CompiledNavProperty<'a>,
-    {
-        self.properties.nav_properties =
-            self.properties.nav_properties.into_iter().map(f).collect();
-        self
-    }
-}
-
-impl<'a> MapBase<'a> for CompiledComplexType<'a> {
-    fn map_base<F>(mut self, f: F) -> Self
-    where
-        F: FnOnce(QualifiedName<'a>) -> QualifiedName<'a>,
-    {
-        self.base = self.base.map(f);
-        self
-    }
-}
-
-#[derive(Debug)]
-pub struct CompiledSingleton<'a> {
-    pub name: &'a SimpleIdentifier,
-    pub stype: QualifiedName<'a>,
-}
-
-impl<'a> MapType<'a> for CompiledSingleton<'a> {
-    fn map_type<F>(mut self, f: F) -> Self
-    where
-        F: FnOnce(QualifiedName<'a>) -> QualifiedName<'a>,
-    {
-        self.stype = f(self.stype);
-        self
-    }
+                Ok(stack
+                    .merge(compiled)
+                    .merge(Compiled::new_complex_type(CompiledComplexType {
+                        name,
+                        base,
+                        properties,
+                        odata: CompiledOData::new(MustHaveId::new(false), ct),
+                    }))
+                    .done())
+            }
+        })
+        .map_err(Box::new)
+        .map_err(|e| Error::Type(qtype.into(), e))
 }
 
 #[cfg(test)]

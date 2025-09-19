@@ -27,12 +27,15 @@ use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use std::fmt::Display;
 
+/// Generate rust doc from description and long description.
+#[must_use]
 pub fn format_and_generate(name: impl Display, odata: &CompiledOData<'_>) -> TokenStream {
     format(name, odata)
         .map(|lines| generate(&lines))
         .unwrap_or_default()
 }
 
+/// Format long and short descriptions to multiple lines.
 #[must_use]
 pub fn format(name: impl Display, odata: &CompiledOData<'_>) -> Option<Vec<String>> {
     let maybe_descr = odata.description.as_ref().map(ToString::to_string);
@@ -54,6 +57,7 @@ pub fn format(name: impl Display, odata: &CompiledOData<'_>) -> Option<Vec<Strin
     }
 }
 
+/// Generate muliple lines in doc strings in `TokenStream`.
 #[must_use]
 pub fn generate(lines: &[impl ToString]) -> TokenStream {
     let mut ts = TokenStream::new();

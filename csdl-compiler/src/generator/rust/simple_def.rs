@@ -29,10 +29,6 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::TokenStreamExt as _;
 use quote::quote;
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::fmt::Result as FmtResult;
 
 /// Type definition that maps to simple type.
 #[derive(Debug)]
@@ -42,7 +38,8 @@ pub struct SimpleDef<'a> {
 }
 
 impl SimpleDef<'_> {
-    /// Generate rust code for the structure.
+    /// Generate rust code for types derived from simples type (type
+    /// definitions and enums).
     pub fn generate(self, tokens: &mut TokenStream, config: &Config) {
         let name = self.name;
         match self.attrs {
@@ -52,6 +49,7 @@ impl SimpleDef<'_> {
                     pub type #name = #underlying_type;
                 });
             }
+
             SimpleTypeAttrs::EnumType(et) => {
                 let mut members_content = TokenStream::new();
                 for m in et.members {
@@ -65,6 +63,7 @@ impl SimpleDef<'_> {
                         },
                     ]);
                 }
+
                 tokens.extend([
                     doc_format_and_generate(self.name, &et.odata),
                     quote! {
@@ -79,29 +78,20 @@ impl SimpleDef<'_> {
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub struct EnumMemberName<'a>(&'a SimpleIdentifier);
+struct EnumMemberName<'a>(&'a SimpleIdentifier);
 
 impl<'a> EnumMemberName<'a> {
     #[must_use]
-    pub const fn new(v: &'a SimpleIdentifier) -> Self {
+    const fn new(v: &'a SimpleIdentifier) -> Self {
         Self(v)
     }
 }
 
 impl ToTokens for EnumMemberName<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append(Ident::new(&self.to_string(), Span::call_site()));
-    }
-}
-
-impl Display for EnumMemberName<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        AsUpperCamelCase(self.0).fmt(f)
-    }
-}
-
-impl Debug for EnumMemberName<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        Display::fmt(self, f)
+        tokens.append(Ident::new(
+            &AsUpperCamelCase(self.0).to_string(),
+            Span::call_site(),
+        ));
     }
 }

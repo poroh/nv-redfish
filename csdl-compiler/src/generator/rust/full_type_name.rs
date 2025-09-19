@@ -25,12 +25,17 @@ use quote::TokenStreamExt as _;
 use quote::quote;
 
 /// Fully quailified type name for generation of the rust code.
+///
+/// Example:
+///
+/// `redfish::service_root::ServiceRoot`
 pub struct FullTypeName<'a, 'config> {
     type_name: QualifiedName<'a>,
     config: &'config Config,
 }
 
 impl<'a, 'config> FullTypeName<'a, 'config> {
+    /// Create new fully qualified type name.
     #[must_use]
     pub const fn new(type_name: QualifiedName<'a>, config: &'config Config) -> Self {
         Self { type_name, config }

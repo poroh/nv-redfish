@@ -34,7 +34,7 @@ use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
 
-/// Definition of Rust struct.
+/// Generation of Rust struct.
 #[derive(Debug)]
 pub struct StructDef<'a> {
     pub name: TypeName<'a>,
