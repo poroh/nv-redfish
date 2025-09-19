@@ -13,25 +13,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use clap::Parser;
-use csdl_compiler::commands::Commands;
-use csdl_compiler::commands::Error;
-use csdl_compiler::commands::process_command;
+/// Type for navigation property.
+pub mod nav_property;
+/// Type for `@odata.id` identifier.
+pub mod odata_id;
 
-/// Compiler CLI.
-#[derive(Parser, Debug)]
-#[command(name = "csdl-compiler")]
-#[command(about = "Redfish schema CSDL compiler", long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
+/// Reexport `ODataId` to make it available through crate root.
+pub type ODataId = odata_id::ODataId;
+/// Reexport `NavProperty` to make it available through crate root.
+pub type NavProperty<T> = nav_property::NavProperty<T>;
 
-fn main() -> Result<(), Error> {
-    let cli = Cli::parse();
-
-    let _ = process_command(&cli.command)?
-        .into_iter()
-        .map(|msg| println!("{msg}"));
-    Ok(())
+/// Entity type trait that is implemented by CSDL compiler for all
+/// generated entity types.
+pub trait EntityType {
+    /// Value of `@odata.id` field of the Entity.
+    fn id(&self) -> &ODataId;
 }

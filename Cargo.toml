@@ -1,8 +1,8 @@
-#
-
 [workspace]
 members = [
+   "lib",
    "csdl-compiler",
+   "examples/service-root-parser",
 ]
 
 [workspace.package]
@@ -16,11 +16,15 @@ categories = ["hardware-support"]
 documentation = "TBD"
 
 [workspace.dependencies]
-serde = { version = "1.0" }
-quick-xml = { version = "0.38" }
-tagged-types = { version = "^0.2.3" }
+clap = { version = "4.5" }
+clap_derive = { version = "4.5" }
 heck = { version = "0.5" }
-quote = { version = "1.0" }
+glob = { version = "0.3" }
 prettyplease = { version = "0.2" }
-syn = { version = "2.0" }
 proc-macro2 = { version = "1.0" }
+quick-xml = { version = "0.38" }
+quote = { version = "1.0" }
+serde = { version = "1.0" }
+serde_json = { version = "1.0" }
+syn = { version = "2.0" }
+tagged-types = { version = "^0.2.3" }

@@ -13,25 +13,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use clap::Parser;
 use csdl_compiler::commands::Commands;
+use csdl_compiler::commands::DEFAULT_ROOT;
 use csdl_compiler::commands::Error;
 use csdl_compiler::commands::process_command;
-
-/// Compiler CLI.
-#[derive(Parser, Debug)]
-#[command(name = "csdl-compiler")]
-#[command(about = "Redfish schema CSDL compiler", long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
+use glob::glob;
+use std::env::var;
+use std::path::PathBuf;
 
 fn main() -> Result<(), Error> {
-    let cli = Cli::parse();
+    let out_dir = PathBuf::from(var("OUT_DIR").unwrap());
+    let output = out_dir.join("redfish.rs");
 
-    let _ = process_command(&cli.command)?
-        .into_iter()
-        .map(|msg| println!("{msg}"));
+    let redfish_schemas = "../../schemas/redfish-csdl/*.xml";
+    let swordfish_schemas = "../../schemas/swordfish-csdl/*.xml";
+
+    let mut csdls = Vec::new();
+    csdls.extend(glob(redfish_schemas).unwrap().filter_map(Result::ok));
+    csdls.extend(glob(swordfish_schemas).unwrap().filter_map(Result::ok));
+
+    for f in &csdls {
+        println!("cargo:rerun-if-changed={}", f.display());
+    }
+
+    process_command(&Commands::Compile {
+        root: DEFAULT_ROOT.into(),
+        output,
+        csdls,
+    })?;
     Ok(())
 }

@@ -234,6 +234,8 @@ impl<'a> ModDef<'a> {
                     use serde::Deserialize;
                     #[allow(unused_imports)]
                     use #top::NavProperty;
+                    #[allow(unused_imports)]
+                    use #top::ODataId;
                 },
             ]);
             generate(&mut content);

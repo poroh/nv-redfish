@@ -68,6 +68,7 @@ impl SimpleDef<'_> {
                     doc_format_and_generate(self.name, &et.odata),
                     quote! {
                         #[derive(Deserialize, Debug)]
+                        #[allow(clippy::enum_variant_names)]
                         pub enum #name
                     },
                 ]);

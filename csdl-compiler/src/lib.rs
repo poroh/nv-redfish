@@ -39,6 +39,8 @@
 
 //#![deny(missing_docs)]
 
+/// Highlevel compiler commands.
+pub mod commands;
 /// Redfish schema compiler.
 pub mod compiler;
 /// Entity Data Model XML definitions.
@@ -54,8 +56,6 @@ pub mod redfish;
 
 use edmx::ValidateError;
 use std::io::Error as IoError;
-
-extern crate alloc;
 
 /// Errors defined by the CSDL compiler.
 #[derive(Debug)]

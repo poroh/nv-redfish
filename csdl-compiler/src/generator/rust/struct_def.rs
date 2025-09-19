@@ -86,6 +86,7 @@ impl<'a> StructDef<'a> {
             None,
         }
 
+        let top = &config.top_module_alias;
         let mut content = TokenStream::new();
         let odata_id = Ident::new("odata_id", Span::call_site());
         let impl_odata_type = if let Some(base) = self.base {
@@ -109,7 +110,7 @@ impl<'a> StructDef<'a> {
             // break deserialization.
             content.extend(quote! {
                 #[serde(rename="@odata.id")]
-                pub #odata_id: String,
+                pub #odata_id: ODataId,
             });
             ImplOdataType::Root
         } else {
@@ -136,11 +137,10 @@ impl<'a> StructDef<'a> {
 
         match impl_odata_type {
             ImplOdataType::Root => {
-                let top = &config.top_module_alias;
                 tokens.extend(quote! {
                     impl #top::EntityType for #name {
                         #[inline]
-                        fn id(&self) -> &String {
+                        fn id(&self) -> &ODataId {
                             &self.#odata_id
                         }
                     }
@@ -151,7 +151,7 @@ impl<'a> StructDef<'a> {
                 tokens.extend(quote! {
                     impl #top::EntityType for #name {
                         #[inline]
-                        fn id(&self) -> &String {
+                        fn id(&self) -> &ODataId {
                             self.base.id()
                         }
                     }

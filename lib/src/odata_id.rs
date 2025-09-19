@@ -13,25 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use clap::Parser;
-use csdl_compiler::commands::Commands;
-use csdl_compiler::commands::Error;
-use csdl_compiler::commands::process_command;
+use core::fmt::Display;
+use core::fmt::Formatter;
+use core::fmt::Result as FmtResult;
+use serde::Deserialize;
 
-/// Compiler CLI.
-#[derive(Parser, Debug)]
-#[command(name = "csdl-compiler")]
-#[command(about = "Redfish schema CSDL compiler", long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
+/// Type for `@odata.id` identifier.
+#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct ODataId(String);
 
-fn main() -> Result<(), Error> {
-    let cli = Cli::parse();
-
-    let _ = process_command(&cli.command)?
-        .into_iter()
-        .map(|msg| println!("{msg}"));
-    Ok(())
+impl Display for ODataId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        self.0.fmt(f)
+    }
 }
