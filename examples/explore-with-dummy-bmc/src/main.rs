@@ -39,11 +39,9 @@ impl MockBmc {
         .await
     }
 
-    fn get_mock_json_for_uri<T>(&self, uri: &str) -> String {
-        let type_name = std::any::type_name::<T>();
-        println!("TypeName: {type_name}");
-        match type_name {
-            name if name.contains("ServiceRoot") => {
+    fn get_mock_json_for_uri(&self, uri: &str) -> String {
+        match uri {
+            "/redfish/v1" => {
                 r#"{
                       "@odata.id": "/redfish/v1",
                       "Id": "RootService",
@@ -57,9 +55,9 @@ impl MockBmc {
                       }
                    }"#.to_string()
             },
-            name if name.contains("ChassisCollection") => {
+            "/redfish/v1/Chassis" => {
                 r#"{
-                      "@odata.id": "/redfish/v1",
+                      "@odata.id": "/redfish/v1/Chassis",
                       "Name": "Chassis Collection",
                       "Members": [
                           {
@@ -71,8 +69,8 @@ impl MockBmc {
                       ]
                 }"#.to_string()
             },
-            name if name.contains("Chassis") => {
-                let chassis_id = if uri.contains("/1") { "1" } else { "2" };
+            "/redfish/v1/Chassis/1" => {
+                let chassis_id = "1";
                 format!(r#"{{
                    "@odata.id": "/redfish/v1/Chassis/{chassis_id}",
                    "Id": "{chassis_id}",
@@ -87,9 +85,9 @@ impl MockBmc {
                    "Status": {{"State": "Enabled", "Health": "OK"}}
                 }}"#)
             },
-            name if name.contains("PcIeDeviceCollection") => {
+            "/redfish/v1/Chassis/1/PCIeDevices" => {
                 r#"{
-                      "@odata.id": "/redfish/v1",
+                      "@odata.id": "/redfish/v1/Chassis/1/PCIeDevices",
                       "Name": "Chassis Collection",
                       "Members": [
                           {
@@ -101,7 +99,7 @@ impl MockBmc {
                       ]
                 }"#.to_string()
             },
-            name if name.contains("PcIeDevice") => {
+            "/redfish/v1/Chassis/1/PCIeDevices/0-24" => {
                 r#"{
                      "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/PCIeDevices/0-24",
                      "Id": "0-24",
@@ -124,7 +122,37 @@ impl MockBmc {
                      }
                 }"#.to_string()
             },
-            name if name.contains("PcIeFunctionCollection") => {
+            "/redfish/v1/Chassis/1/PCIeDevices/0-25" => {
+                r##"{
+                    "@odata.context": "/redfish/v1/$metadata#PCIeDevice.PCIeDevice",
+                    "@odata.etag": "\"1754525527\"",
+                    "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/PCIeDevices/0-25",
+                    "@odata.type": "#PCIeDevice.v1_14_0.PCIeDevice",
+                    "AssetTag": null,
+                    "Description": "Sapphire Rapids SATA AHCI Controller",
+                    "DeviceType": "SingleFunction",
+                    "FirmwareVersion": "",
+                    "Id": "0-25",
+                    "Links": {
+                    },
+                    "Manufacturer": "Intel Corporation",
+                    "Model": null,
+                    "Name": "Sapphire Rapids SATA AHCI Controller",
+                    "PartNumber": null,
+                    "SKU": null,
+                    "SerialNumber": null,
+                    "Slot": {},
+                    "Status": {
+                        "State": "Enabled",
+                        "Health": "OK",
+                        "HealthRollup": "OK"
+                    },
+                    "PCIeFunctions": {
+                        "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/PCIeDevices/0-24/PCIeFunctions"
+                    }
+                }"##.to_string()
+            },
+            "/redfish/v1/Chassis/System.Embedded.1/PCIeDevices/0-24/PCIeFunctions" => {
                 r#"{
                     "@odata.id": "/redfish/v1/Chassis/System.Embedded.1/PCIeDevices/0-24/PCIeFunctions",
                     "Description": "Collection of PCIeFunctions",
@@ -137,7 +165,7 @@ impl MockBmc {
                     "Name": "PCIeFunction Collection"
                 }"#.to_string()
             },
-            name if name.contains("PcIeFunction") => {
+            "/redfish/v1/Chassis/System.Embedded.1/PCIeDevices/0-24/PCIeFunctions/0-24-0" => {
                 r#"
                 {
                     "@odata.context": "/redfish/v1/$metadata#PCIeFunction.PCIeFunction",
@@ -165,7 +193,7 @@ impl MockBmc {
                     "VendorId": "0x8086"
                 }"#.to_string()
             },
-            name if name.contains("ComputerSystemCollection") => {
+            "/redfish/v1/Systems" => {
                 r#"{
                     "@odata.context": "/redfish/v1/$metadata#ComputerSystemCollection.ComputerSystemCollection",
                     "@odata.id": "/redfish/v1/Systems",
@@ -179,7 +207,7 @@ impl MockBmc {
                     "Name": "Computer System Collection"
                 }"#.to_string()
             },
-            name if name.contains("ComputerSystem") => {
+            "/redfish/v1/Systems/System.Embedded.1" => {
                 r##"{
                     "@Redfish.Settings": {
                         "@odata.context": "/redfish/v1/$metadata#Settings.Settings",
@@ -421,7 +449,7 @@ impl Bmc for MockBmc {
     {
         println!("BMC GET {id}");
         // In real implementation: async HTTP GET request and JSON deserialization
-        let mock_json = self.get_mock_json_for_uri::<T>(&id.to_string());
+        let mock_json = self.get_mock_json_for_uri(&id.to_string());
         let result: T = serde_json::from_str(&mock_json).map_err(Error::ParseError)?;
         Ok(result)
     }
