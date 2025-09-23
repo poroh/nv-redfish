@@ -19,6 +19,7 @@ use crate::compiler::Compiled;
 use crate::compiler::CompiledProperty;
 use crate::compiler::MapType as _;
 use crate::compiler::PropertiesManipulation as _;
+use crate::optimizer::map_types_in_actions;
 use crate::optimizer::replace;
 
 pub fn prune<'a>(input: Compiled<'a>) -> Compiled<'a> {
@@ -47,5 +48,6 @@ pub fn prune<'a>(input: Compiled<'a>) -> Compiled<'a> {
             .map(|(name, v)| (name, v.map_properties(map_prop)))
             .collect(),
         root_singletons: input.root_singletons,
+        actions: map_types_in_actions(input.actions, |t| replace(&t, &replacements)),
     }
 }

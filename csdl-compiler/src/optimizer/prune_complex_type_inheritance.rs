@@ -29,6 +29,8 @@ use crate::compiler::CompiledProperty;
 use crate::compiler::MapType as _;
 use crate::compiler::PropertiesManipulation as _;
 use crate::compiler::QualifiedName;
+use crate::optimizer::map_types_in_actions;
+use crate::optimizer::replace;
 use std::collections::HashMap;
 
 pub fn prune_complex_type_inheritance<'a>(input: Compiled<'a>) -> Compiled<'a> {
@@ -74,7 +76,7 @@ pub fn prune_complex_type_inheritance<'a>(input: Compiled<'a>) -> Compiled<'a> {
         .into_iter()
         .partition(|(name, _)| replacements.contains_key(name));
 
-    let map_prop = |p: CompiledProperty<'a>| p.map_type(|t| super::replace(&t, &replacements));
+    let map_prop = |p: CompiledProperty<'a>| p.map_type(|t| replace(&t, &replacements));
     Compiled {
         complex_types: retain
             .into_iter()
@@ -110,5 +112,6 @@ pub fn prune_complex_type_inheritance<'a>(input: Compiled<'a>) -> Compiled<'a> {
             .collect(),
         root_singletons: input.root_singletons,
         simple_types: input.simple_types,
+        actions: map_types_in_actions(input.actions, |t| replace(&t, &replacements)),
     }
 }

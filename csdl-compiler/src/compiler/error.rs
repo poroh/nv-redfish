@@ -14,6 +14,8 @@
 // limitations under the License.
 
 use crate::compiler::QualifiedName;
+use crate::edmx::ActionName;
+use crate::edmx::ParameterName;
 use crate::edmx::PropertyName;
 use crate::edmx::attribute_values::Namespace;
 use crate::edmx::attribute_values::SimpleIdentifier;
@@ -25,6 +27,8 @@ use std::fmt::Result as FmtResult;
 #[derive(Debug)]
 pub enum Error<'a> {
     Unimplemented,
+    NotBoundAction,
+    NoBindingParameterForAction,
     EntityTypeNotFound(QualifiedName<'a>),
     EntityType(QualifiedName<'a>, Box<Error<'a>>),
     TypeNotFound(QualifiedName<'a>),
@@ -32,6 +36,9 @@ pub enum Error<'a> {
     TypeDefinition(QualifiedName<'a>, Box<Error<'a>>),
     Type(QualifiedName<'a>, Box<Error<'a>>),
     Property(&'a PropertyName, Box<Error<'a>>),
+    Action(&'a ActionName, Box<Error<'a>>),
+    ActionReturnType(Box<Error<'a>>),
+    ActionParameter(&'a ParameterName, Box<Error<'a>>),
     Singleton(&'a SimpleIdentifier, Box<Error<'a>>),
     Schema(&'a Namespace, Box<Error<'a>>),
 }
@@ -41,6 +48,12 @@ impl Display for Error<'_> {
         match self {
             Self::Unimplemented => writeln!(f, "unimplemented"),
             Self::EntityTypeNotFound(v) => writeln!(f, "entity type not found: {v}"),
+            Self::NotBoundAction => {
+                write!(f, "unbound action is not supported")
+            }
+            Self::NoBindingParameterForAction => {
+                write!(f, "no required binding parameter")
+            }
             Self::EntityType(name, err) => {
                 write!(f, "while compiling entity type: {name}\n{err}")
             }
@@ -56,6 +69,15 @@ impl Display for Error<'_> {
             }
             Self::Property(name, err) => {
                 write!(f, "while compiling property: {name}\n{err}")
+            }
+            Self::Action(name, err) => {
+                write!(f, "while compiling action: {name}\n{err}")
+            }
+            Self::ActionReturnType(err) => {
+                write!(f, "while compiling return type\n{err}")
+            }
+            Self::ActionParameter(name, err) => {
+                write!(f, "while compiling parameter: {name}\n{err}")
             }
             Self::Singleton(name, err) => write!(f, "while compiling singleton: {name}\n{err}"),
             Self::Schema(name, err) => write!(f, "while compiling schema: {name}\n{err}"),

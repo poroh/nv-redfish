@@ -27,7 +27,9 @@ mod remove_empty_complex_types;
 mod remove_empty_entity_types;
 
 use crate::compiler::Compiled;
+use crate::compiler::MapType as _;
 use crate::compiler::QualifiedName;
+use crate::compiler::compiled::CompiledActionsMap;
 use prune_complex_type_inheritance::prune_complex_type_inheritance;
 use prune_entity_type_inheritance::prune_entity_type_inheritance;
 use prune_namespaces::prune_namespaces;
@@ -53,4 +55,22 @@ type Replacements<'a> = HashMap<QualifiedName<'a>, QualifiedName<'a>>;
 
 fn replace<'a>(target: &QualifiedName<'a>, replacements: &Replacements<'a>) -> QualifiedName<'a> {
     *replacements.get(target).unwrap_or(target)
+}
+
+pub fn map_types_in_actions<'a, F>(actions: CompiledActionsMap<'a>, f: F) -> CompiledActionsMap<'a>
+where
+    F: Fn(QualifiedName<'a>) -> QualifiedName<'a>,
+{
+    actions
+        .into_iter()
+        .map(|(qname, actions)| {
+            (
+                f(qname),
+                actions
+                    .into_iter()
+                    .map(|(aname, compiled_action)| (aname, compiled_action.map_type(&f)))
+                    .collect(),
+            )
+        })
+        .collect()
 }

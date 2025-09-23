@@ -26,13 +26,15 @@ use crate::compiler::MapBase as _;
 use crate::compiler::MapType as _;
 use crate::compiler::PropertiesManipulation as _;
 use crate::compiler::QualifiedName;
+use crate::optimizer::map_types_in_actions;
+use crate::optimizer::replace;
 use std::collections::HashMap;
 
 type Replacements<'a> = HashMap<QualifiedName<'a>, QualifiedName<'a>>;
 
 pub fn remove_empty_complex_types<'a>(input: Compiled<'a>) -> Compiled<'a> {
     let ct_replacements = collect_ct_replacements(&input);
-    let map_prop = |p: CompiledProperty<'a>| p.map_type(|t| super::replace(&t, &ct_replacements));
+    let map_prop = |p: CompiledProperty<'a>| p.map_type(|t| replace(&t, &ct_replacements));
     Compiled {
         complex_types: input
             .complex_types
@@ -44,7 +46,7 @@ pub fn remove_empty_complex_types<'a>(input: Compiled<'a>) -> Compiled<'a> {
                     Some((
                         name,
                         v.map_properties(map_prop)
-                            .map_base(|base| super::replace(&base, &ct_replacements)),
+                            .map_base(|base| replace(&base, &ct_replacements)),
                     ))
                 }
             })
@@ -56,6 +58,7 @@ pub fn remove_empty_complex_types<'a>(input: Compiled<'a>) -> Compiled<'a> {
             .collect(),
         root_singletons: input.root_singletons,
         simple_types: input.simple_types,
+        actions: map_types_in_actions(input.actions, |t| replace(&t, &ct_replacements)),
     }
 }
 

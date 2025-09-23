@@ -64,6 +64,13 @@ impl<'a, 'stack> Stack<'a, 'stack> {
             || self.parent.is_some_and(|p| p.contains_entity(qtype))
     }
 
+    /// Check that complex type has been compiled.
+    #[must_use]
+    pub fn contains_complex_type(&self, qtype: QualifiedName<'a>) -> bool {
+        self.current.complex_types.contains_key(&qtype)
+            || self.parent.is_some_and(|p| p.contains_complex_type(qtype))
+    }
+
     /// Merge compiled data structure to the current stack frame.
     #[must_use]
     pub fn merge(self, c: Compiled<'a>) -> Self {

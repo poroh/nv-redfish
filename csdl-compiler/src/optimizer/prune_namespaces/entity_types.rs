@@ -20,6 +20,7 @@ use crate::compiler::CompiledNavProperty;
 use crate::compiler::MapBase as _;
 use crate::compiler::MapType as _;
 use crate::compiler::PropertiesManipulation as _;
+use crate::optimizer::map_types_in_actions;
 use crate::optimizer::replace;
 
 pub fn prune<'a>(input: Compiled<'a>) -> Compiled<'a> {
@@ -50,5 +51,6 @@ pub fn prune<'a>(input: Compiled<'a>) -> Compiled<'a> {
             .into_iter()
             .map(|s| s.map_type(|t| replace(&t, &replacements)))
             .collect(),
+        actions: map_types_in_actions(input.actions, |t| replace(&t, &replacements)),
     }
 }

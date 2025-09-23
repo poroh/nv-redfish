@@ -28,11 +28,12 @@ use crate::compiler::MapType as _;
 use crate::compiler::PropertiesManipulation as _;
 use crate::compiler::QualifiedName;
 use crate::optimizer::Replacements;
+use crate::optimizer::map_types_in_actions;
+use crate::optimizer::replace;
 
 pub fn remove_empty_entity_types<'a>(input: Compiled<'a>) -> Compiled<'a> {
     let et_replacements = collect_et_replacements(&input);
-    let map_nav_prop =
-        |p: CompiledNavProperty<'a>| p.map_type(|t| super::replace(&t, &et_replacements));
+    let map_nav_prop = |p: CompiledNavProperty<'a>| p.map_type(|t| replace(&t, &et_replacements));
     Compiled {
         entity_types: input
             .entity_types
@@ -44,7 +45,7 @@ pub fn remove_empty_entity_types<'a>(input: Compiled<'a>) -> Compiled<'a> {
                     Some((
                         name,
                         v.map_nav_properties(map_nav_prop)
-                            .map_base(|base| super::replace(&base, &et_replacements)),
+                            .map_base(|base| replace(&base, &et_replacements)),
                     ))
                 }
             })
@@ -57,9 +58,10 @@ pub fn remove_empty_entity_types<'a>(input: Compiled<'a>) -> Compiled<'a> {
         root_singletons: input
             .root_singletons
             .into_iter()
-            .map(|s| s.map_type(|t| super::replace(&t, &et_replacements)))
+            .map(|s| s.map_type(|t| replace(&t, &et_replacements)))
             .collect(),
         simple_types: input.simple_types,
+        actions: map_types_in_actions(input.actions, |t| replace(&t, &et_replacements)),
     }
 }
 

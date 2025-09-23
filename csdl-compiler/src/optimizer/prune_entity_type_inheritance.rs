@@ -29,6 +29,8 @@ use crate::compiler::CompiledProperties;
 use crate::compiler::MapType as _;
 use crate::compiler::PropertiesManipulation as _;
 use crate::compiler::QualifiedName;
+use crate::optimizer::map_types_in_actions;
+use crate::optimizer::replace;
 use std::collections::HashMap;
 
 pub fn prune_entity_type_inheritance<'a>(input: Compiled<'a>) -> Compiled<'a> {
@@ -77,8 +79,7 @@ pub fn prune_entity_type_inheritance<'a>(input: Compiled<'a>) -> Compiled<'a> {
         .into_iter()
         .partition(|(name, _)| replacements.contains_key(name));
 
-    let map_nav_prop =
-        |p: CompiledNavProperty<'a>| p.map_type(|t| super::replace(&t, &replacements));
+    let map_nav_prop = |p: CompiledNavProperty<'a>| p.map_type(|t| replace(&t, &replacements));
     Compiled {
         entity_types: retain
             .into_iter()
@@ -123,8 +124,9 @@ pub fn prune_entity_type_inheritance<'a>(input: Compiled<'a>) -> Compiled<'a> {
         root_singletons: input
             .root_singletons
             .into_iter()
-            .map(|s| s.map_type(|t| super::replace(&t, &replacements)))
+            .map(|s| s.map_type(|t| replace(&t, &replacements)))
             .collect(),
         simple_types: input.simple_types,
+        actions: map_types_in_actions(input.actions, |t| replace(&t, &replacements)),
     }
 }

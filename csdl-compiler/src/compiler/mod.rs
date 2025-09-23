@@ -58,8 +58,12 @@ pub mod compiled_complex_type;
 pub mod compiled_singleton;
 
 use crate::compiler::odata::MustHaveId;
+use crate::edmx::ActionName;
 use crate::edmx::Edmx;
+use crate::edmx::IsNullable;
+use crate::edmx::ParameterName;
 use crate::edmx::QualifiedTypeName;
+use crate::edmx::action::Action;
 use crate::edmx::attribute_values::SimpleIdentifier;
 use crate::edmx::attribute_values::TypeName;
 use crate::edmx::schema::Schema;
@@ -124,6 +128,20 @@ impl SchemaBundle {
     pub fn compile(&self, singletons: &[SimpleIdentifier]) -> Result<Compiled<'_>, Error> {
         let schema_index = SchemaIndex::build(&self.edmx_docs);
         let stack = Stack::default();
+        let stack = self.edmx_docs.iter().try_fold(stack, |stack, edmx| {
+            let cstack = stack.new_frame();
+            let compiled = edmx
+                .data_services
+                .schemas
+                .iter()
+                .try_fold(cstack, |stack, s| {
+                    Self::compile_schema(s, singletons, &schema_index, stack.new_frame())
+                        .map(|v| stack.merge(v))
+                })?
+                .done();
+            Ok(stack.merge(compiled))
+        })?;
+        // Compile actions for all extracted types
         self.edmx_docs
             .iter()
             .try_fold(stack, |stack, edmx| {
@@ -133,7 +151,7 @@ impl SchemaBundle {
                     .schemas
                     .iter()
                     .try_fold(cstack, |stack, s| {
-                        Self::compile_schema(s, singletons, &schema_index, stack.new_frame())
+                        Self::compile_schema_actions(s, &schema_index, stack.new_frame())
                             .map(|v| stack.merge(v))
                     })?
                     .done();
@@ -167,6 +185,99 @@ impl SchemaBundle {
                     .map(Stack::done)
             },
         )
+    }
+
+    fn compile_schema_actions<'a>(
+        s: &'a Schema,
+        schema_index: &SchemaIndex<'a>,
+        stack: Stack<'a, '_>,
+    ) -> Result<Compiled<'a>, Error<'a>> {
+        s.actions
+            .iter()
+            .try_fold(stack, |stack, action| {
+                let compiled = Self::compile_action(action, schema_index, &stack)
+                    .map_err(Box::new)
+                    .map_err(|e| Error::Action(&action.name, e))?;
+                Ok(stack.merge(compiled))
+            })
+            .map_err(Box::new)
+            .map_err(|e| Error::Schema(&s.namespace, e))
+            .map(Stack::done)
+    }
+
+    fn compile_action<'a>(
+        action: &'a Action,
+        schema_index: &SchemaIndex<'a>,
+        stack: &Stack<'a, '_>,
+    ) -> Result<Compiled<'a>, Error<'a>> {
+        if !action.is_bound.into_inner() {
+            return Err(Error::NotBoundAction);
+        }
+        let mut iter = action.parameters.iter();
+        let binding_param = iter.next().ok_or(Error::NoBindingParameterForAction)?;
+        let binding = binding_param.ptype.qualified_type_name().into();
+        // If action is bound to not compiled type, just ignore it. We
+        // will not have node to attach this action. Note: This may
+        // not be correct for common CSDL schema but Redfish always
+        // points to ComplexType (Actions).
+        if !stack.contains_complex_type(binding) {
+            return Ok(Compiled::default());
+        }
+        let stack = stack.new_frame();
+        // Compile ReturnType if present
+        let (compiled_rt, return_type) = action
+            .return_type
+            .as_ref()
+            .map_or_else(
+                || Ok((Compiled::default(), None)),
+                |rt| {
+                    ensure_type(&rt.rtype, schema_index, &stack)
+                        .map(|compiled| (compiled, Some((&rt.rtype).into())))
+                },
+            )
+            .map_err(Box::new)
+            .map_err(Error::ActionReturnType)?;
+        let stack = stack.merge(compiled_rt);
+        // Compile other parameters except first one
+        let (stack, parameters) =
+            iter.try_fold((stack, Vec::new()), |(cstack, mut params), p| {
+                // Sometime parameters refers to entity types. This is
+                // different from complex types / entity types where
+                // properties only points to complex / simple types
+                // and navigation poprerties points to entity type
+                // only. Example is AddResourceBlock in
+                // ComputerSystem schema.
+                let qtype_name = p.ptype.qualified_type_name();
+                let (compiled, ptype) = if is_simple_type(qtype_name) {
+                    Ok((
+                        Compiled::default(),
+                        CompiledParameterType::Type((&p.ptype).into()),
+                    ))
+                } else if schema_index.find_type(qtype_name).is_some() {
+                    ensure_type(&p.ptype, schema_index, &cstack)
+                        .map(|compiled| (compiled, CompiledParameterType::Type((&p.ptype).into())))
+                } else {
+                    CompiledEntityType::ensure(qtype_name, schema_index, &cstack).map(|compiled| {
+                        (compiled, CompiledParameterType::Entity((&p.ptype).into()))
+                    })
+                }
+                .map_err(Box::new)
+                .map_err(|e| Error::ActionParameter(&p.name, e))?;
+                params.push(CompiledParameter {
+                    name: &p.name,
+                    ptype,
+                    is_nullable: p.nullable.unwrap_or(IsNullable::new(true)),
+                });
+                Ok((cstack.merge(compiled), params))
+            })?;
+        Ok(stack
+            .merge(Compiled::new_action(CompiledAction {
+                binding,
+                name: &action.name,
+                return_type,
+                parameters,
+            }))
+            .done())
     }
 }
 
@@ -246,6 +357,85 @@ fn compile_type<'a>(
         })
         .map_err(Box::new)
         .map_err(|e| Error::Type(qtype.into(), e))
+}
+
+/// Compiled parameter of the action.
+#[derive(Debug)]
+pub struct CompiledParameter<'a> {
+    /// Name of the parameter.
+    pub name: &'a ParameterName,
+    /// Type of the parameter. Can be either entity reference or some
+    /// specific type.
+    pub ptype: CompiledParameterType<'a>,
+    /// Flag that parameter is nullable.
+    pub is_nullable: IsNullable,
+}
+
+/// Type of the parameter. Note we reuse `CompiledPropertyType`, it
+/// maybe not exact and may be change in future.
+#[derive(Debug)]
+pub enum CompiledParameterType<'a> {
+    Entity(CompiledPropertyType<'a>),
+    Type(CompiledPropertyType<'a>),
+}
+
+impl<'a> CompiledParameterType<'a> {
+    fn map<F>(self, f: F) -> Self
+    where
+        F: Fn(QualifiedName<'a>) -> QualifiedName<'a>,
+    {
+        match self {
+            Self::Entity(v) => Self::Entity(v.map(f)),
+            Self::Type(v) => Self::Type(v.map(f)),
+        }
+    }
+}
+
+impl<'a> MapType<'a> for CompiledParameter<'a> {
+    fn map_type<F>(self, f: F) -> Self
+    where
+        F: Fn(QualifiedName<'a>) -> QualifiedName<'a>,
+    {
+        Self {
+            name: self.name,
+            ptype: self.ptype.map(f),
+            is_nullable: self.is_nullable,
+        }
+    }
+}
+
+/// Compuled parameter of the action.
+#[derive(Debug)]
+pub struct CompiledAction<'a> {
+    /// Bound type.
+    pub binding: QualifiedName<'a>,
+    /// Name of the parameter.
+    pub name: &'a ActionName,
+    /// Type of the return value. Note we reuse
+    /// `CompiledPropertyType`, it maybe not exact and may be change
+    /// in future.
+    pub return_type: Option<CompiledPropertyType<'a>>,
+    /// Type of the parameter. Note we reuse `CompiledPropertyType`, it
+    /// maybe not exact and may be change in future.
+    pub parameters: Vec<CompiledParameter<'a>>,
+}
+
+impl<'a> MapType<'a> for CompiledAction<'a> {
+    fn map_type<F>(self, f: F) -> Self
+    where
+        F: Fn(QualifiedName<'a>) -> QualifiedName<'a>,
+    {
+        Self {
+            name: self.name,
+            binding: f(self.binding),
+            return_type: self.return_type.map(|rt| rt.map(&f)),
+            parameters: self
+                .parameters
+                .into_iter()
+                .map(|p| p.map_type(&f))
+                .collect(),
+        }
+    }
 }
 
 #[cfg(test)]

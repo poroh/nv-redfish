@@ -49,6 +49,7 @@ pub enum DeActionItem {
 #[derive(Debug)]
 pub struct Action {
     pub name: ActionName,
+    pub is_bound: IsBound,
     pub annotations: Vec<Annotation>,
     pub parameters: Vec<Parameter>,
     pub return_type: Option<ReturnType>,
@@ -79,6 +80,7 @@ impl DeAction {
         let return_type = return_types.pop();
         Ok(Action {
             name: self.name,
+            is_bound: self.is_bound.unwrap_or(IsBound::new(false)),
             return_type,
             parameters,
             annotations,

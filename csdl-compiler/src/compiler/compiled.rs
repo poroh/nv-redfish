@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::compiler::CompiledAction;
 use crate::compiler::CompiledComplexType;
 use crate::compiler::CompiledEntityType;
 use crate::compiler::CompiledEnumType;
@@ -21,7 +22,11 @@ use crate::compiler::CompiledTypeDefinition;
 use crate::compiler::QualifiedName;
 use crate::compiler::SimpleType;
 use crate::compiler::SimpleTypeAttrs;
+use crate::edmx::ActionName;
 use std::collections::HashMap;
+
+pub type CompiledActionsMap<'a> =
+    HashMap<QualifiedName<'a>, HashMap<&'a ActionName, CompiledAction<'a>>>;
 
 /// Compiled data from schema.
 #[derive(Default, Debug)]
@@ -29,6 +34,7 @@ pub struct Compiled<'a> {
     pub complex_types: HashMap<QualifiedName<'a>, CompiledComplexType<'a>>,
     pub entity_types: HashMap<QualifiedName<'a>, CompiledEntityType<'a>>,
     pub simple_types: HashMap<QualifiedName<'a>, SimpleType<'a>>,
+    pub actions: CompiledActionsMap<'a>,
     pub root_singletons: Vec<CompiledSingleton<'a>>,
 }
 
@@ -99,6 +105,18 @@ impl<'a> Compiled<'a> {
         }
     }
 
+    /// Creates compiled data structure that contains only one enum
+    /// type.
+    #[must_use]
+    pub fn new_action(v: CompiledAction<'a>) -> Self {
+        Self {
+            actions: vec![(v.binding, vec![(v.name, v)].into_iter().collect())]
+                .into_iter()
+                .collect(),
+            ..Default::default()
+        }
+    }
+
     /// Merge two compiled data structures.
     #[must_use]
     pub fn merge(mut self, other: Self) -> Self {
@@ -106,6 +124,21 @@ impl<'a> Compiled<'a> {
         self.simple_types.extend(other.simple_types);
         self.entity_types.extend(other.entity_types);
         self.root_singletons.extend(other.root_singletons);
+        self.actions =
+            other
+                .actions
+                .into_iter()
+                .fold(self.actions, |mut selfactions, (qname, actions)| {
+                    let new_actions = match selfactions.remove(&qname) {
+                        None => actions,
+                        Some(mut v) => {
+                            v.extend(actions);
+                            v
+                        }
+                    };
+                    selfactions.insert(qname, new_actions);
+                    selfactions
+                });
         self
     }
 }
