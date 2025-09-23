@@ -13,45 +13,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Prune entity types namespaces.
+//! Prune simple types namespaces.
 
 use crate::compiler::Compiled;
-use crate::compiler::CompiledNavProperty;
-use crate::compiler::MapBase as _;
+use crate::compiler::CompiledProperty;
 use crate::compiler::MapType as _;
 use crate::compiler::PropertiesManipulation as _;
 use crate::optimizer::map_types_in_actions;
 use crate::optimizer::replace;
 
 pub fn prune<'a>(input: Compiled<'a>) -> Compiled<'a> {
-    let replacements = super::prune_namepaces_replacements(|| input.entity_types.keys().copied());
-    let map_nav_prop = |p: CompiledNavProperty<'a>| p.map_type(|t| replace(&t, &replacements));
+    let replacements = super::prune_namepaces_replacements(|| input.enum_types.keys().copied());
+    let map_prop = |p: CompiledProperty<'a>| p.map_type(|t| replace(&t, &replacements));
     Compiled {
-        entity_types: input
-            .entity_types
+        enum_types: input
+            .enum_types
             .into_iter()
-            .map(|(name, mut ct)| {
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|(name, mut t)| {
                 let new_name = *replacements.get(&name).map_or(&name, |v| v);
-                ct.name = new_name;
-                (
-                    new_name,
-                    ct.map_nav_properties(map_nav_prop)
-                        .map_base(|base| replace(&base, &replacements)),
-                )
+                t.name = new_name;
+                (new_name, t)
             })
             .collect(),
+        type_definitions: input.type_definitions,
         complex_types: input
             .complex_types
             .into_iter()
-            .map(|(name, v)| (name, v.map_nav_properties(map_nav_prop)))
+            .map(|(name, v)| (name, v.map_properties(map_prop)))
             .collect(),
-        root_singletons: input
-            .root_singletons
+        entity_types: input
+            .entity_types
             .into_iter()
-            .map(|s| s.map_type(|t| replace(&t, &replacements)))
+            .map(|(name, v)| (name, v.map_properties(map_prop)))
             .collect(),
+        root_singletons: input.root_singletons,
         actions: map_types_in_actions(input.actions, |t| replace(&t, &replacements)),
-        enum_types: input.enum_types,
-        type_definitions: input.type_definitions,
     }
 }

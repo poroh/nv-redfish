@@ -27,7 +27,6 @@ pub fn prune<'a>(input: Compiled<'a>) -> Compiled<'a> {
     let replacements = super::prune_namepaces_replacements(|| input.complex_types.keys().copied());
     let map_prop = |p: CompiledProperty<'a>| p.map_type(|t| replace(&t, &replacements));
     Compiled {
-        simple_types: input.simple_types,
         complex_types: input
             .complex_types
             .into_iter()
@@ -48,5 +47,7 @@ pub fn prune<'a>(input: Compiled<'a>) -> Compiled<'a> {
             .collect(),
         root_singletons: input.root_singletons,
         actions: map_types_in_actions(input.actions, |t| replace(&t, &replacements)),
+        enum_types: input.enum_types,
+        type_definitions: input.type_definitions,
     }
 }

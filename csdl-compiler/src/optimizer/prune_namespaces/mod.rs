@@ -27,7 +27,8 @@
 
 mod complex_types;
 mod entity_types;
-mod simple_types;
+mod enum_types;
+mod type_definitions;
 
 use crate::compiler::Compiled;
 use crate::compiler::CompiledNamespace;
@@ -39,7 +40,8 @@ use std::collections::HashMap;
 #[must_use]
 pub fn prune_namespaces(input: Compiled<'_>) -> Compiled<'_> {
     [
-        simple_types::prune,
+        enum_types::prune,
+        type_definitions::prune,
         complex_types::prune,
         entity_types::prune,
     ]

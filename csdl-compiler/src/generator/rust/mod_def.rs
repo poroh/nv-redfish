@@ -17,13 +17,15 @@ use crate::compiler::CompiledComplexType;
 use crate::compiler::CompiledEntityType;
 use crate::compiler::CompiledOData;
 use crate::compiler::CompiledProperties;
+use crate::compiler::EnumType;
 use crate::compiler::QualifiedName;
-use crate::compiler::SimpleType;
+use crate::compiler::TypeDefinition;
 use crate::generator::rust::Config;
+use crate::generator::rust::EnumDef;
 use crate::generator::rust::Error;
 use crate::generator::rust::ModName;
-use crate::generator::rust::SimpleDef;
 use crate::generator::rust::StructDef;
+use crate::generator::rust::TypeDef;
 use crate::generator::rust::TypeName;
 use proc_macro2::Delimiter;
 use proc_macro2::Group;
@@ -41,7 +43,8 @@ use std::iter::repeat_n;
 #[derive(Default, Debug)]
 pub struct ModDef<'a> {
     name: Option<ModName<'a>>,
-    simples: HashMap<TypeName<'a>, SimpleDef<'a>>,
+    typedefs: HashMap<TypeName<'a>, TypeDef<'a>>,
+    enums: HashMap<TypeName<'a>, EnumDef<'a>>,
     structs: HashMap<TypeName<'a>, StructDef<'a>>,
     sub_mods: HashMap<ModName<'a>, ModDef<'a>>,
     depth: usize,
@@ -54,7 +57,8 @@ impl<'a> ModDef<'a> {
             name: Some(name),
             structs: HashMap::new(),
             sub_mods: HashMap::new(),
-            simples: HashMap::new(),
+            enums: HashMap::new(),
+            typedefs: HashMap::new(),
             depth,
         }
     }
@@ -98,40 +102,77 @@ impl<'a> ModDef<'a> {
         }
     }
 
-    /// Add simple type to the module.
+    /// Add enum type to the module.
     ///
     /// # Errors
     ///
     /// TODO
-    pub fn add_simple_type(self, ct: SimpleType<'a>) -> Result<Self, Error<'a>> {
-        self.inner_add_simple_type(ct, 0)
+    pub fn add_enum_type(self, t: EnumType<'a>) -> Result<Self, Error<'a>> {
+        self.inner_add_enum_type(t, 0)
     }
 
-    fn inner_add_simple_type(
-        mut self,
-        st: SimpleType<'a>,
-        depth: usize,
-    ) -> Result<Self, Error<'a>> {
-        if let Some(id) = st.name.namespace.get_id(depth) {
+    fn inner_add_enum_type(mut self, t: EnumType<'a>, depth: usize) -> Result<Self, Error<'a>> {
+        if let Some(id) = t.name.namespace.get_id(depth) {
             let mod_name = ModName::new(id);
             self.sub_mods
                 .remove(&mod_name)
                 .unwrap_or_else(|| ModDef::new(mod_name, depth))
-                .inner_add_simple_type(st, depth + 1)
+                .inner_add_enum_type(t, depth + 1)
                 .map(|submod| {
                     self.sub_mods.insert(mod_name, submod);
                     self
                 })
         } else {
-            let name = st.name;
-            let type_name = TypeName::new(st.name.name);
-            let attrs = st.attrs;
-            match self.simples.entry(type_name) {
+            let name = t.name;
+            let type_name = TypeName::new(t.name.name);
+            match self.enums.entry(type_name) {
                 Entry::Occupied(_) => Err(Error::NameConflict),
                 Entry::Vacant(v) => {
-                    v.insert(SimpleDef {
+                    v.insert(EnumDef {
                         name: type_name,
-                        attrs,
+                        compiled: t,
+                    });
+                    Ok(self)
+                }
+            }
+            .map_err(Box::new)
+            .map_err(|e| Error::CreateSimplType(name, e))
+        }
+    }
+
+    /// Add type definition to the module.
+    ///
+    /// # Errors
+    ///
+    ///
+    pub fn add_type_definition(self, t: TypeDefinition<'a>) -> Result<Self, Error<'a>> {
+        self.inner_add_type_definition(t, 0)
+    }
+
+    fn inner_add_type_definition(
+        mut self,
+        t: TypeDefinition<'a>,
+        depth: usize,
+    ) -> Result<Self, Error<'a>> {
+        if let Some(id) = t.name.namespace.get_id(depth) {
+            let mod_name = ModName::new(id);
+            self.sub_mods
+                .remove(&mod_name)
+                .unwrap_or_else(|| ModDef::new(mod_name, depth))
+                .inner_add_type_definition(t, depth + 1)
+                .map(|submod| {
+                    self.sub_mods.insert(mod_name, submod);
+                    self
+                })
+        } else {
+            let name = t.name;
+            let type_name = TypeName::new(t.name.name);
+            match self.typedefs.entry(type_name) {
+                Entry::Occupied(_) => Err(Error::NameConflict),
+                Entry::Vacant(v) => {
+                    v.insert(TypeDef {
+                        name: type_name,
+                        compiled: t,
                     });
                     Ok(self)
                 }
@@ -201,8 +242,11 @@ impl<'a> ModDef<'a> {
 
     /// Generate Rust code.
     pub fn generate(self, tokens: &mut TokenStream, config: &Config) {
-        let mut simples = self.simples.into_values().collect::<Vec<_>>();
-        simples.sort_by_key(|v| v.name);
+        let mut typedefs = self.typedefs.into_values().collect::<Vec<_>>();
+        typedefs.sort_by_key(|v| v.name);
+
+        let mut enums = self.enums.into_values().collect::<Vec<_>>();
+        enums.sort_by_key(|v| v.name);
 
         let mut sub_mods = self.sub_mods.into_values().collect::<Vec<_>>();
         sub_mods.sort_by_key(|v| v.name);
@@ -211,8 +255,12 @@ impl<'a> ModDef<'a> {
         structs.sort_by_key(|v| v.name);
 
         let generate = |ts: &mut TokenStream| {
-            for s in simples {
-                s.generate(ts, config);
+            for t in typedefs {
+                t.generate(ts, config);
+            }
+
+            for t in enums {
+                t.generate(ts, config);
             }
 
             for s in structs {

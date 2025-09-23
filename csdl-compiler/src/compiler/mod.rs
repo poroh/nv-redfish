@@ -45,8 +45,11 @@ pub mod compile_traits;
 /// Compiled properties of `ComplexType` or `EntityType`
 pub mod compiled_properties;
 
-/// Simple type (type definition or enum)
-pub mod simple_type;
+/// Compiled enum type
+pub mod enum_type;
+
+/// Compiled type definition
+pub mod type_definition;
 
 /// Compiled entity type
 pub mod compiled_entity_type;
@@ -89,14 +92,10 @@ pub type CompiledProperty<'a> = compiled_properties::CompiledProperty<'a>;
 pub type CompiledNavProperty<'a> = compiled_properties::CompiledNavProperty<'a>;
 /// Reexport `CompiledPropertyType` to the level of the compiler.
 pub type CompiledPropertyType<'a> = compiled_properties::CompiledPropertyType<'a>;
-/// Reexport `SimpleType` to the level of the compiler.
-pub type SimpleType<'a> = simple_type::SimpleType<'a>;
-/// Reexport `SimpleTypeAttrs` to the level of the compiler.
-pub type SimpleTypeAttrs<'a> = simple_type::SimpleTypeAttrs<'a>;
-/// Reexport `CompiledTypeDefinition` to the level of the compiler.
-pub type CompiledTypeDefinition<'a> = simple_type::CompiledTypeDefinition<'a>;
-/// Reexport `CompiledEnumType` to the level of the compiler.
-pub type CompiledEnumType<'a> = simple_type::CompiledEnumType<'a>;
+/// Reexport `EnumType` to the level of the compiler.
+pub type EnumType<'a> = enum_type::EnumType<'a>;
+/// Reexport `TypeDefinition` to the level of the compiler.
+pub type TypeDefinition<'a> = type_definition::TypeDefinition<'a>;
 /// Reexport `CompiledEntityType` to the level of the compiler.
 pub type CompiledEntityType<'a> = compiled_entity_type::CompiledEntityType<'a>;
 /// Reexport `CompiledComplexType` to the level of the compiler.
@@ -312,7 +311,7 @@ fn compile_type<'a>(
             Type::TypeDefinition(td) => {
                 let underlying_type = (&td.underlying_type).into();
                 if is_simple_type(&td.underlying_type) {
-                    Ok(Compiled::new_type_definition(CompiledTypeDefinition {
+                    Ok(Compiled::new_type_definition(TypeDefinition {
                         name: qtype.into(),
                         underlying_type,
                     }))
@@ -322,7 +321,7 @@ fn compile_type<'a>(
             }
             Type::EnumType(et) => {
                 let underlying_type = et.underlying_type.unwrap_or_default();
-                Ok(Compiled::new_enum_type(CompiledEnumType {
+                Ok(Compiled::new_enum_type(EnumType {
                     name: qtype.into(),
                     underlying_type,
                     members: et.members.iter().map(Into::into).collect(),

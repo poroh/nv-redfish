@@ -15,7 +15,6 @@
 
 use csdl_compiler::compiler::CompiledPropertyType;
 use csdl_compiler::compiler::SchemaBundle;
-use csdl_compiler::compiler::SimpleTypeAttrs;
 use csdl_compiler::edmx::Edmx;
 use csdl_compiler::edmx::ValidateError;
 use csdl_compiler::edmx::attribute_values::Error as AttributeValuesError;
@@ -61,13 +60,16 @@ fn main() -> Result<(), Error> {
         .map_err(|_| Error::Compile("compilation error".into()))?;
     let compiled = optimize(compiled);
 
-    println!("Simple types:");
-    for t in compiled.simple_types.values() {
+    println!("Enum types:");
+    for t in compiled.enum_types.values() {
         print!("  {}: ", t.name);
-        match &t.attrs {
-            SimpleTypeAttrs::EnumType(v) => println!("Enum ({:?})", v.underlying_type),
-            SimpleTypeAttrs::TypeDefinition(v) => println!("Typedef ({})", v.underlying_type),
-        }
+        println!("Enum ({t:?})");
+    }
+    println!();
+    println!("Type definitions:");
+    for t in compiled.type_definitions.values() {
+        print!("  {}: ", t.name);
+        println!("Typedef ({t:?})");
     }
     println!();
     println!("Complex types:");
@@ -132,7 +134,8 @@ fn main() -> Result<(), Error> {
     println!("Statistics:");
     println!(" complex types:   {}", compiled.complex_types.len());
     println!(" entity types:    {}", compiled.entity_types.len());
-    println!(" simple types:    {}", compiled.simple_types.len());
+    println!(" enum types:      {}", compiled.enum_types.len());
+    println!(" type defs:       {}", compiled.type_definitions.len());
     println!(" root singletons: {}", compiled.root_singletons.len());
     Ok(())
 }

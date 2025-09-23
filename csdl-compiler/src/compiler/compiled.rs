@@ -16,12 +16,10 @@
 use crate::compiler::CompiledAction;
 use crate::compiler::CompiledComplexType;
 use crate::compiler::CompiledEntityType;
-use crate::compiler::CompiledEnumType;
 use crate::compiler::CompiledSingleton;
-use crate::compiler::CompiledTypeDefinition;
+use crate::compiler::EnumType;
 use crate::compiler::QualifiedName;
-use crate::compiler::SimpleType;
-use crate::compiler::SimpleTypeAttrs;
+use crate::compiler::TypeDefinition;
 use crate::edmx::ActionName;
 use std::collections::HashMap;
 
@@ -33,7 +31,8 @@ pub type CompiledActionsMap<'a> =
 pub struct Compiled<'a> {
     pub complex_types: HashMap<QualifiedName<'a>, CompiledComplexType<'a>>,
     pub entity_types: HashMap<QualifiedName<'a>, CompiledEntityType<'a>>,
-    pub simple_types: HashMap<QualifiedName<'a>, SimpleType<'a>>,
+    pub type_definitions: HashMap<QualifiedName<'a>, TypeDefinition<'a>>,
+    pub enum_types: HashMap<QualifiedName<'a>, EnumType<'a>>,
     pub actions: CompiledActionsMap<'a>,
     pub root_singletons: Vec<CompiledSingleton<'a>>,
 }
@@ -72,17 +71,9 @@ impl<'a> Compiled<'a> {
     /// Creates compiled data structure that contains only one type
     /// definition.
     #[must_use]
-    pub fn new_type_definition(v: CompiledTypeDefinition<'a>) -> Self {
+    pub fn new_type_definition(v: TypeDefinition<'a>) -> Self {
         Self {
-            simple_types: vec![(
-                v.name,
-                SimpleType {
-                    name: v.name,
-                    attrs: SimpleTypeAttrs::TypeDefinition(v),
-                },
-            )]
-            .into_iter()
-            .collect(),
+            type_definitions: vec![(v.name, v)].into_iter().collect(),
             ..Default::default()
         }
     }
@@ -90,17 +81,9 @@ impl<'a> Compiled<'a> {
     /// Creates compiled data structure that contains only one enum
     /// type.
     #[must_use]
-    pub fn new_enum_type(v: CompiledEnumType<'a>) -> Self {
+    pub fn new_enum_type(v: EnumType<'a>) -> Self {
         Self {
-            simple_types: vec![(
-                v.name,
-                SimpleType {
-                    name: v.name,
-                    attrs: SimpleTypeAttrs::EnumType(v),
-                },
-            )]
-            .into_iter()
-            .collect(),
+            enum_types: vec![(v.name, v)].into_iter().collect(),
             ..Default::default()
         }
     }
@@ -121,7 +104,8 @@ impl<'a> Compiled<'a> {
     #[must_use]
     pub fn merge(mut self, other: Self) -> Self {
         self.complex_types.extend(other.complex_types);
-        self.simple_types.extend(other.simple_types);
+        self.type_definitions.extend(other.type_definitions);
+        self.enum_types.extend(other.enum_types);
         self.entity_types.extend(other.entity_types);
         self.root_singletons.extend(other.root_singletons);
         self.actions =

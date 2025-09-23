@@ -13,10 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::compiler::SimpleTypeAttrs;
+use crate::compiler::EnumType;
 use crate::edmx::attribute_values::SimpleIdentifier;
 use crate::generator::rust::Config;
-use crate::generator::rust::FullTypeName;
 use crate::generator::rust::TypeName;
 use crate::generator::rust::doc::format_and_generate as doc_format_and_generate;
 use heck::AsUpperCamelCase;
@@ -32,49 +31,37 @@ use quote::quote;
 
 /// Type definition that maps to simple type.
 #[derive(Debug)]
-pub struct SimpleDef<'a> {
+pub struct EnumDef<'a> {
     pub name: TypeName<'a>,
-    pub attrs: SimpleTypeAttrs<'a>,
+    pub compiled: EnumType<'a>,
 }
 
-impl SimpleDef<'_> {
-    /// Generate rust code for types derived from simples type (type
-    /// definitions and enums).
-    pub fn generate(self, tokens: &mut TokenStream, config: &Config) {
+impl EnumDef<'_> {
+    /// Generate rust code for types derived from enums.
+    pub fn generate(self, tokens: &mut TokenStream, _config: &Config) {
         let name = self.name;
-        match self.attrs {
-            SimpleTypeAttrs::TypeDefinition(td) => {
-                let underlying_type = FullTypeName::new(td.underlying_type, config);
-                tokens.extend(quote! {
-                    pub type #name = #underlying_type;
-                });
-            }
-
-            SimpleTypeAttrs::EnumType(et) => {
-                let mut members_content = TokenStream::new();
-                for m in et.members {
-                    let rename = Literal::string(m.name.inner().inner());
-                    let member_name = EnumMemberName::new(m.name.inner());
-                    members_content.extend([
-                        doc_format_and_generate(m.name, &m.odata),
-                        quote! {
-                            #[serde(rename=#rename)]
-                            #member_name,
-                        },
-                    ]);
-                }
-
-                tokens.extend([
-                    doc_format_and_generate(self.name, &et.odata),
-                    quote! {
-                        #[derive(Deserialize, Debug)]
-                        #[allow(clippy::enum_variant_names)]
-                        pub enum #name
-                    },
-                ]);
-                tokens.append(Group::new(Delimiter::Brace, members_content));
-            }
+        let mut members_content = TokenStream::new();
+        for m in self.compiled.members {
+            let rename = Literal::string(m.name.inner().inner());
+            let member_name = EnumMemberName::new(m.name.inner());
+            members_content.extend([
+                doc_format_and_generate(m.name, &m.odata),
+                quote! {
+                    #[serde(rename=#rename)]
+                    #member_name,
+                },
+            ]);
         }
+
+        tokens.extend([
+            doc_format_and_generate(self.name, &self.compiled.odata),
+            quote! {
+                #[derive(Deserialize, Debug)]
+                #[allow(clippy::enum_variant_names)]
+                pub enum #name
+            },
+        ]);
+        tokens.append(Group::new(Delimiter::Brace, members_content));
     }
 }
 
