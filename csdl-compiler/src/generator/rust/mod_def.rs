@@ -329,7 +329,7 @@ impl<'a> ModDef<'a> {
                     #[allow(unused_imports)]
                     use serde::{Serialize, Deserialize};
                     #[allow(unused_imports)]
-                    use #top::{NavProperty, ODataId};
+                    use #top::{NavProperty, ODataId, ODataETag};
                 },
             ]);
             generate(&mut content);

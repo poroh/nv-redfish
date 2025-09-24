@@ -16,6 +16,12 @@ default = ["reqwest"]
 reqwest = ["dep:reqwest"]
 
 [dependencies]
-serde = { workspace = true, featues = [ "derive" ] }
-url = { workspace = true }
+http = { workspace = true }
 reqwest = { workspace = true, optional = true, features = ["json"] }
+serde = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+tokio-test = { workspace = true }
+wiremock = { workspace = true }

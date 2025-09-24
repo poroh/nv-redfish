@@ -76,8 +76,8 @@ impl<T: EntityType> NavProperty<T> {
     }
 }
 
-impl<T: EntityType + Sized + for<'a> Deserialize<'a>> NavProperty<T> {
-    /// Expand property
+impl<T: EntityType + Sized + for<'a> Deserialize<'a> + 'static + Send + Sync> NavProperty<T> {
+    /// Get property
     pub async fn get<B: Bmc>(&self, bmc: &B) -> Result<Arc<T>, B::Error> {
         match self {
             Self::Expanded(v) => Ok(v.0.clone()),

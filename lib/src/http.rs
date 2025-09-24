@@ -14,10 +14,14 @@
 // limitations under the License.
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{future::Future, sync::Arc};
+use std::{
+    collections::HashMap,
+    future::Future,
+    sync::{Arc, RwLock},
+};
 use url::Url;
 
-use crate::{bmc::BmcCredentials, Bmc, EntityType, Expandable, ODataId};
+use crate::{bmc::BmcCredentials, Bmc, EntityType, Expandable, ODataETag, ODataId};
 
 /// Builder for Redfish `$expand` query parameters according to DSP0266 specification.
 ///
@@ -278,16 +282,19 @@ impl ExpandQuery {
 use std::time::Duration;
 
 pub trait HttpClient: Send + Sync {
-    type Error;
+    type Error: Send;
 
+    /// Perform an HTTP GET request with optional conditional headers.
     fn get<T>(
         &self,
         url: Url,
         credentials: &BmcCredentials,
+        etag: Option<ODataETag>,
     ) -> impl Future<Output = Result<T, Self::Error>> + Send
     where
         T: DeserializeOwned;
 
+    /// Perform an HTTP POST request.
     fn post<B, T>(
         &self,
         url: Url,
@@ -299,11 +306,80 @@ pub trait HttpClient: Send + Sync {
         T: DeserializeOwned + Send;
 }
 
+/// ETag-based cache for Redfish resources
+///
+/// This cache stores resources along with their ETags and uses HTTP conditional
+/// requests with If-None-Match headers to validate cache entries.
 #[derive(Debug)]
-pub enum BmcHttpError {
-    Generic(String),
-    JsonError(String),
-    HttpStatus { code: u16, message: String },
+struct ResourceCache {
+    /// Cache storage mapping resource IDs to their cached data  
+    entries: RwLock<HashMap<ODataId, Box<dyn std::any::Any + Send + Sync>>>,
+    /// ETag storage for conditional requests
+    etags: RwLock<HashMap<ODataId, ODataETag>>,
+}
+
+impl ResourceCache {
+    fn new() -> Self {
+        Self {
+            entries: RwLock::new(HashMap::new()),
+            etags: RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// Get cached resource - always returns the cached version if present
+    /// Validation should be done via conditional HTTP request
+    fn get<T: EntityType + 'static>(&self, id: &ODataId) -> Option<Arc<T>> {
+        let entries = self.entries.read().ok()?;
+        if let Some(entry_any) = entries.get(id) {
+            if let Some(resource) = entry_any.downcast_ref::<Arc<T>>() {
+                return Some(Arc::clone(resource));
+            }
+        }
+        None
+    }
+
+    /// Store resource in cache with ETag
+    fn put<T: EntityType + 'static + Send + Sync>(
+        &self,
+        id: &ODataId,
+        resource: Arc<T>,
+        etag: Option<ODataETag>,
+    ) {
+        if let Some(etag_value) = etag {
+            if let Ok(mut etags) = self.etags.write() {
+                etags.insert(id.clone(), etag_value);
+            }
+
+            if let Ok(mut entries) = self.entries.write() {
+                entries.insert(id.clone(), Box::new(resource));
+            }
+        }
+    }
+
+    /// Get stored ETag for conditional request (If-None-Match header)
+    fn get_etag(&self, id: &ODataId) -> Option<ODataETag> {
+        self.etags.read().ok()?.get(id).cloned()
+    }
+
+    /// Invalidate cache entry - removes both resource and ETag
+    fn invalidate(&self, id: &ODataId) {
+        if let Ok(mut entries) = self.entries.write() {
+            entries.remove(id);
+        }
+        if let Ok(mut etags) = self.etags.write() {
+            etags.remove(id);
+        }
+    }
+
+    /// Clear all cache entries
+    fn clear(&self) {
+        if let Ok(mut entries) = self.entries.write() {
+            entries.clear();
+        }
+        if let Ok(mut etags) = self.etags.write() {
+            etags.clear();
+        }
+    }
 }
 
 /// HTTP-based BMC implementation that wraps an [`HttpClient`].
@@ -337,10 +413,11 @@ pub struct HttpBmc<C: HttpClient> {
     client: C,
     redfish_endpoint: Url,
     credentials: BmcCredentials,
+    cache: ResourceCache,
 }
 
 impl<C: HttpClient> HttpBmc<C> {
-    /// Create a new HTTP-based BMC client.
+    /// Create a new HTTP-based BMC client with ETag-based caching.
     ///
     /// # Arguments
     ///
@@ -369,23 +446,73 @@ impl<C: HttpClient> HttpBmc<C> {
             client,
             redfish_endpoint,
             credentials,
+            cache: ResourceCache::new(),
         }
+    }
+
+    /// Clear all cached resources
+    ///
+    /// This forces all subsequent requests to fetch fresh data from the BMC.
+    pub fn clear_cache(&self) {
+        self.cache.clear();
+    }
+
+    /// Invalidate a specific cached resource
+    ///
+    /// This forces the next request for this resource to fetch fresh data.
+    pub fn invalidate_cache(&self, id: &ODataId) {
+        self.cache.invalidate(id);
     }
 }
 
-impl<C: HttpClient> Bmc for HttpBmc<C> {
+/// Trait for errors that can indicate whether they represent a cached response
+/// and provide a way to create cache-related errors.
+pub trait CacheableError {
+    /// Returns true if this error indicates the resource should be served from cache.
+    /// Typically true for HTTP 304 Not Modified responses.
+    fn is_cached(&self) -> bool;
+
+    /// Create an error for when cached data is requested but not available.
+    fn cache_miss() -> Self;
+}
+
+impl<C: HttpClient> Bmc for HttpBmc<C>
+where
+    C::Error: CacheableError,
+{
     type Error = C::Error;
 
-    async fn get<T: EntityType + Sized + for<'a> Deserialize<'a>>(
+    async fn get<
+        T: EntityType + Sized + for<'a> Deserialize<'a> + 'static + Send + Sync,
+    >(
         &self,
         id: &ODataId,
     ) -> Result<Arc<T>, Self::Error> {
         let mut endpoint_url = self.redfish_endpoint.clone();
         endpoint_url.set_path(&id.to_string());
-        self.client
-            .get::<T>(endpoint_url, &self.credentials)
+
+        let etag = self.cache.get_etag(id);
+
+        match self
+            .client
+            .get::<T>(endpoint_url, &self.credentials, etag)
             .await
-            .map(Arc::new)
+        {
+            Ok(response) => {
+                let entity = Arc::new(response);
+                self.cache.put(id, Arc::clone(&entity), entity.etag().clone());
+                Ok(entity)
+            }
+            Err(e) => {
+                if e.is_cached() {
+                    self.cache.get::<T>(id).ok_or_else(|| {
+                        C::Error::cache_miss()
+                    })
+                } else {
+                    Err(e)
+                }
+            }
+        }
     }
 
     async fn expand<T: Expandable>(
@@ -398,9 +525,65 @@ impl<C: HttpClient> Bmc for HttpBmc<C> {
         endpoint_url.set_query(Some(&query.to_query_string()));
 
         self.client
-            .get::<T>(endpoint_url, &self.credentials)
+            .get::<T>(endpoint_url, &self.credentials, None)
             .await
             .map(Arc::new)
+    }
+}
+
+#[cfg(feature = "reqwest")]
+#[derive(Debug)]
+pub enum BmcReqwestError {
+    ReqwestError(reqwest::Error),
+    InvalidResponse(Box<reqwest::Response>),
+    CacheMiss,
+}
+
+#[cfg(feature = "reqwest")]
+impl From<reqwest::Error> for BmcReqwestError {
+    fn from(value: reqwest::Error) -> Self {
+        BmcReqwestError::ReqwestError(value)
+    }
+}
+
+#[cfg(feature = "reqwest")]
+impl CacheableError for BmcReqwestError {
+    fn is_cached(&self) -> bool {
+        match self {
+            BmcReqwestError::InvalidResponse(response) => {
+                response.status() == reqwest::StatusCode::NOT_MODIFIED
+            }
+            _ => false,
+        }
+    }
+
+    fn cache_miss() -> Self {
+        BmcReqwestError::CacheMiss
+    }
+}
+
+#[cfg(feature = "reqwest")]
+impl std::fmt::Display for BmcReqwestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BmcReqwestError::ReqwestError(e) => write!(f, "HTTP client error: {}", e),
+            BmcReqwestError::InvalidResponse(response) => {
+                write!(f, "Invalid HTTP response: {}", response.status())
+            }
+            BmcReqwestError::CacheMiss => {
+                write!(f, "Resource not found in cache")
+            }
+        }
+    }
+}
+
+#[cfg(feature = "reqwest")]
+impl std::error::Error for BmcReqwestError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            BmcReqwestError::ReqwestError(e) => Some(e),
+            _ => None,
+        }
     }
 }
 
@@ -587,31 +770,39 @@ impl ReqwestClient {
 
 #[cfg(feature = "reqwest")]
 impl HttpClient for ReqwestClient {
-    type Error = BmcHttpError;
+    type Error = BmcReqwestError;
 
-    async fn get<T>(&self, url: Url, credentials: &BmcCredentials) -> Result<T, Self::Error>
+    async fn get<T>(
+        &self,
+        url: Url,
+        credentials: &BmcCredentials,
+        etag: Option<ODataETag>,
+    ) -> Result<T, Self::Error>
     where
         T: DeserializeOwned,
     {
-        let response = self
+        let mut request = self
             .client
             .get(url)
-            .basic_auth(&credentials.username, Some(credentials.password()))
-            .send()
-            .await
-            .map_err(|e| BmcHttpError::Generic(e.to_string()))?;
+            .basic_auth(&credentials.username, Some(credentials.password()));
 
-        if !response.status().is_success() {
-            return Err(BmcHttpError::HttpStatus {
-                code: response.status().as_u16(),
-                message: response.text().await.unwrap_or_default(),
-            });
+        if let Some(etag) = etag {
+            request = request.header("If-None-Match", etag.to_string());
         }
 
-        response
+        let response = request.send().await?;
+        let status = response.status();
+
+        if !status.is_success() {
+            return Err(BmcReqwestError::InvalidResponse(Box::new(response)));
+        }
+
+        let data = response
             .json()
             .await
-            .map_err(|e| BmcHttpError::JsonError(e.to_string()))
+            .map_err(BmcReqwestError::ReqwestError)?;
+
+        Ok(data)
     }
 
     async fn post<B, T>(
@@ -630,20 +821,13 @@ impl HttpClient for ReqwestClient {
             .basic_auth(&credentials.username, Some(credentials.password()))
             .json(body)
             .send()
-            .await
-            .map_err(|e| BmcHttpError::Generic(e.to_string()))?;
+            .await?;
 
         if !response.status().is_success() {
-            return Err(BmcHttpError::HttpStatus {
-                code: response.status().as_u16(),
-                message: response.text().await.unwrap_or_default(),
-            });
+            return Err(BmcReqwestError::InvalidResponse(Box::new(response)));
         }
 
-        response
-            .json()
-            .await
-            .map_err(|e| BmcHttpError::JsonError(e.to_string()))
+        response.json().await.map_err(BmcReqwestError::ReqwestError)
     }
 }
 
@@ -691,5 +875,24 @@ mod tests {
     fn test_expand_with_levels() {
         let query = ExpandQuery::all().levels(3);
         assert_eq!(query.to_query_string(), "$expand=*($levels=3)");
+    }
+
+    #[cfg(feature = "reqwest")]
+    #[test]
+    fn test_cacheable_error_trait() {
+        let mock_response = reqwest::Response::from(
+            http::Response::builder()
+                .status(304)
+                .body("")
+                .unwrap()
+        );
+        let error = BmcReqwestError::InvalidResponse(Box::new(mock_response));
+        assert!(error.is_cached());
+
+        let cache_miss = BmcReqwestError::CacheMiss;
+        assert!(!cache_miss.is_cached());
+
+        let created_miss = BmcReqwestError::cache_miss();
+        assert!(matches!(created_miss, BmcReqwestError::CacheMiss));
     }
 }

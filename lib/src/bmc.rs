@@ -37,7 +37,7 @@ pub trait Bmc {
         query: ExpandQuery,
     ) -> impl Future<Output = Result<Arc<T>, Self::Error>> + Send;
 
-    fn get<T: EntityType + Sized + for<'a> Deserialize<'a>>(
+    fn get<T: EntityType + Sized + for<'a> Deserialize<'a> + 'static + Send + Sync>(
         &self,
         id: &ODataId,
     ) -> impl Future<Output = Result<Arc<T>, Self::Error>> + Send;

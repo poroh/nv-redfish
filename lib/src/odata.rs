@@ -20,7 +20,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 /// Type for `@odata.id` identifier.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct ODataId(String);
 
@@ -31,7 +31,31 @@ impl ODataId {
     }
 }
 
+
+impl From<String> for ODataId {
+    fn from(s: String) -> Self {
+        ODataId(s)
+    }
+}
+
 impl Display for ODataId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        self.0.fmt(f)
+    }
+}
+
+/// Type for `@odata.etag` identifier.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct ODataETag(String);
+
+impl From<String> for ODataETag {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl Display for ODataETag {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         self.0.fmt(f)
     }

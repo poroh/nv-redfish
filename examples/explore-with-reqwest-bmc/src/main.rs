@@ -13,10 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![recursion_limit = "256"]
+
 use nv_redfish::Expandable;
 use nv_redfish::ODataId;
 use nv_redfish::bmc::BmcCredentials;
-use nv_redfish::http::BmcHttpError;
+use nv_redfish::http::BmcReqwestError;
 use nv_redfish::http::ExpandQuery;
 use nv_redfish::http::HttpBmc;
 use nv_redfish::http::ReqwestClient;
@@ -24,9 +26,9 @@ use nv_redfish::http::ReqwestClientParams;
 use url::Url;
 
 #[tokio::main]
-async fn main() -> Result<(), BmcHttpError> {
+async fn main() -> Result<(), BmcReqwestError> {
     let client = ReqwestClient::with_params(ReqwestClientParams::new().accept_invalid_certs(true))
-        .map_err(|e| BmcHttpError::Generic(e.to_string()))?;
+        .map_err(BmcReqwestError::ReqwestError)?;
 
     let creds = BmcCredentials::new("username".into(), "password".into());
     let bmc = HttpBmc::new(client, Url::parse("https://192.168.2.2").unwrap(), creds);
@@ -55,6 +57,7 @@ async fn main() -> Result<(), BmcHttpError> {
         .get(&bmc)
         .await?
         .members;
+
     for device in all_devices {
         if let Some(nav_prop) = &device.get(&bmc).await?.pc_ie_functions {
             let function_handles = nav_prop.get(&bmc).await?;
@@ -86,6 +89,12 @@ async fn main() -> Result<(), BmcHttpError> {
             .get(&bmc)
             .await?
     );
+
+    let ac = &service_root.account_service.as_ref().expect("no account service").get(&bmc).await?;
+    println!("{ac:?}");
+
+    // Should use cache here
+    let _ = &service_root.account_service.as_ref().expect("no account service").get(&bmc).await?;
 
     Ok(())
 }

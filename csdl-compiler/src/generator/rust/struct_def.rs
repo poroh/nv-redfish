@@ -92,6 +92,7 @@ impl<'a> StructDef<'a> {
         let top = &config.top_module_alias;
         let mut content = TokenStream::new();
         let odata_id = Ident::new("odata_id", Span::call_site());
+        let odata_etag = Ident::new("odata_etag", Span::call_site());
         let impl_odata_type = if let Some(base) = self.base {
             let base_pname = StructFieldName::new_property(&config.base_type_prop_name);
             let typename = FullTypeName::new(base, config);
@@ -114,6 +115,8 @@ impl<'a> StructDef<'a> {
             content.extend(quote! {
                 #[serde(rename="@odata.id")]
                 pub #odata_id: ODataId,
+                #[serde(rename="@odata.etag")]
+                pub #odata_etag: Option<ODataETag>,
             });
             ImplOdataType::Root
         } else {
@@ -156,6 +159,10 @@ impl<'a> StructDef<'a> {
                         fn id(&self) -> &ODataId {
                             &self.#odata_id
                         }
+                        #[inline]
+                        fn etag(&self) -> &Option<ODataETag> {
+                            &self.#odata_etag
+                        }
                     }
                     impl #top::Expandable for #name {}
                 });
@@ -167,6 +174,10 @@ impl<'a> StructDef<'a> {
                         #[inline]
                         fn id(&self) -> &ODataId {
                             self.base.id()
+                        }
+                        #[inline]
+                        fn etag(&self) -> &Option<ODataETag> {
+                            self.base.etag()
                         }
                     }
                     impl #top::Expandable for #name {}

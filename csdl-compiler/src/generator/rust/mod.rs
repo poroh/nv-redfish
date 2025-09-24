@@ -163,6 +163,7 @@ impl RustGenerator<'_> {
             type NavProperty<T> = nv_redfish::NavProperty<T>;
             type Action<T> = nv_redfish::Action<T>;
             type ODataId = nv_redfish::ODataId;
+            type ODataETag = nv_redfish::ODataETag;
 
             pub mod edm {
                 //! This module is hardcoded in compiler. If you want

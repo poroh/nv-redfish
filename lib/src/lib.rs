@@ -22,7 +22,7 @@ pub mod http;
 /// Type for navigation property.
 pub mod nav_property;
 /// Type for `@odata.id` identifier.
-pub mod odata_id;
+pub mod odata;
 
 use serde::Deserialize;
 use std::{future::Future, sync::Arc};
@@ -32,7 +32,9 @@ pub use bmc::Bmc;
 
 use crate::http::ExpandQuery;
 /// Reexport `ODataId` to make it available through crate root.
-pub type ODataId = odata_id::ODataId;
+pub type ODataId = odata::ODataId;
+/// Reexport `ODataETag` to make it available through crate root.
+pub type ODataETag = odata::ODataETag;
 /// Reexport `NavProperty` to make it available through crate root.
 pub type NavProperty<T> = nav_property::NavProperty<T>;
 /// Reexport `Action` to make it available through crate root.
@@ -43,6 +45,9 @@ pub type Action<T> = action::Action<T>;
 pub trait EntityType {
     /// Value of `@odata.id` field of the Entity.
     fn id(&self) -> &ODataId;
+
+    /// Value of `@odata.etag` field of the Entity.
+    fn etag(&self) -> &Option<ODataETag>;
 }
 
 pub trait Expandable: EntityType + Sized + for<'a> Deserialize<'a> {
