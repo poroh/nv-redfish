@@ -18,10 +18,6 @@ use crate::compiler::ActionsMap;
 use crate::compiler::ComplexType;
 use crate::compiler::EntityType;
 use crate::compiler::EnumType;
-use crate::compiler::OData;
-use crate::compiler::Parameter;
-use crate::compiler::Properties;
-use crate::compiler::QualifiedName;
 use crate::compiler::TypeDefinition;
 use crate::generator::rust::Config;
 use crate::generator::rust::EnumDef;
@@ -101,17 +97,19 @@ impl<'a> ModDef<'a> {
                 })
         } else {
             let struct_name = TypeName::new_qualified(ct.name.name);
-            self.add_struct_def(
-                struct_name,
-                ct.base,
-                ct.properties,
-                Vec::new(),
-                ct.odata,
-                actions,
-                config,
-            )
-            .map_err(Box::new)
-            .map_err(|e| Error::CreateStruct(struct_name, e))
+            let builder = StructDef::builder(struct_name, ct.odata);
+            let builder = if let Some(base) = ct.base {
+                builder.with_base(base)
+            } else {
+                builder
+            };
+            let struct_def = builder
+                .with_properties(ct.properties)
+                .with_actions(actions)
+                .build(config)?;
+            self.add_struct_def(struct_def)
+                .map_err(Box::new)
+                .map_err(|e| Error::CreateStruct(struct_name, e))
         }
     }
 
@@ -224,17 +222,16 @@ impl<'a> ModDef<'a> {
                 })
         } else {
             let struct_name = TypeName::new_qualified(t.name.name);
-            self.add_struct_def(
-                struct_name,
-                t.base,
-                t.properties,
-                Vec::new(),
-                t.odata,
-                ActionsMap::default(),
-                config,
-            )
-            .map_err(Box::new)
-            .map_err(|e| Error::CreateStruct(struct_name, e))
+            let builder = StructDef::builder(struct_name, t.odata);
+            let builder = if let Some(base) = t.base {
+                builder.with_base(base)
+            } else {
+                builder
+            };
+            let struct_def = builder.with_properties(t.properties).build(config)?;
+            self.add_struct_def(struct_def)
+                .map_err(Box::new)
+                .map_err(|e| Error::CreateStruct(struct_name, e))
         }
     }
 
@@ -267,44 +264,22 @@ impl<'a> ModDef<'a> {
                 })
         } else {
             let struct_name = TypeName::new_action(t.binding_name, t.name);
-            self.add_struct_def(
-                struct_name,
-                None,
-                Properties::default(),
-                t.parameters.clone(),
-                t.odata,
-                HashMap::new(),
-                config,
-            )
-            .map_err(Box::new)
-            .map_err(|e| Error::CreateStruct(struct_name, e))
+            let struct_def = StructDef::builder(struct_name, t.odata)
+                .with_parameters(t.parameters.clone())
+                .build(config)?;
+
+            self.add_struct_def(struct_def)
+                .map_err(Box::new)
+                .map_err(|e| Error::CreateStruct(struct_name, e))
         }
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn add_struct_def(
-        mut self,
-        struct_name: TypeName<'a>,
-        base: Option<QualifiedName<'a>>,
-        properties: Properties<'a>,
-        parameters: Vec<Parameter<'a>>,
-        odata: OData<'a>,
-        actions: ActionsMap<'a>,
-        config: &Config,
-    ) -> Result<Self, Error<'a>> {
-        match self.structs.entry(struct_name) {
+    fn add_struct_def(mut self, st: StructDef<'a>) -> Result<Self, Error<'a>> {
+        match self.structs.entry(st.name) {
             Entry::Occupied(_) => Err(Error::NameConflict),
             Entry::Vacant(v) => {
-                StructDef::new(
-                    struct_name,
-                    base,
-                    properties,
-                    parameters,
-                    odata,
-                    actions,
-                    config,
-                )
-                .map(|st| v.insert(st))?;
+                v.insert(st);
                 Ok(self)
             }
         }
