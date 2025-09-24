@@ -71,6 +71,22 @@ impl<'a, 'stack> Stack<'a, 'stack> {
             || self.parent.is_some_and(|p| p.contains_complex_type(qtype))
     }
 
+    /// Check that type definition has been compiled.
+    #[must_use]
+    pub fn contains_type_definition(&self, qtype: QualifiedName<'a>) -> bool {
+        self.current.type_definitions.contains_key(&qtype)
+            || self
+                .parent
+                .is_some_and(|p| p.contains_type_definition(qtype))
+    }
+
+    /// Check that enum type has been compiled.
+    #[must_use]
+    pub fn contains_enum_type(&self, qtype: QualifiedName<'a>) -> bool {
+        self.current.enum_types.contains_key(&qtype)
+            || self.parent.is_some_and(|p| p.contains_enum_type(qtype))
+    }
+
     /// Merge compiled data structure to the current stack frame.
     #[must_use]
     pub fn merge(self, c: Compiled<'a>) -> Self {

@@ -60,4 +60,10 @@ impl<'a> OData<'a> {
     pub fn permissions_is_write_only(&self) -> bool {
         self.permissions.is_some_and(|v| v == Permissions::Write)
     }
+
+    /// Property can be written.
+    #[must_use]
+    pub fn permissions_is_write(&self) -> bool {
+        self.permissions.is_none_or(|v| v != Permissions::Read)
+    }
 }

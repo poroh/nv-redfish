@@ -82,7 +82,7 @@ fn main() -> Result<(), Error> {
         if !t.properties.is_empty() {
             println!("    properties:");
             for p in &t.properties.properties {
-                match p.ptype {
+                match p.ptype.1 {
                     PropertyType::One(t) => println!("      {}: {}", p.name, t),
                     PropertyType::CollectionOf(t) => println!("      {}: {}[]", p.name, t),
                 }
@@ -109,7 +109,7 @@ fn main() -> Result<(), Error> {
         if !t.properties.is_empty() {
             println!("    properties:");
             for p in &t.properties.properties {
-                match p.ptype {
+                match p.ptype.1 {
                     PropertyType::One(t) => println!("      {}: {}", p.name, t),
                     PropertyType::CollectionOf(t) => println!("      {}: {}[]", p.name, t),
                 }

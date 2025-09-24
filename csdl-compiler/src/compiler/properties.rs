@@ -22,6 +22,7 @@ use crate::compiler::OData;
 use crate::compiler::QualifiedName;
 use crate::compiler::SchemaIndex;
 use crate::compiler::Stack;
+use crate::compiler::TypeClass;
 use crate::compiler::ensure_type;
 use crate::compiler::redfish::RedfishProperty;
 use crate::edmx::PropertyName;
@@ -54,12 +55,12 @@ impl<'a> Properties<'a> {
             .try_fold((stack, Properties::default()), |(stack, mut p), sp| {
                 let stack = match &sp.attrs {
                     PropertyAttrs::StructuralProperty(v) => {
-                        let compiled = ensure_type(&v.ptype, schema_index, &stack)
+                        let (compiled, typeclass) = ensure_type(&v.ptype, schema_index, &stack)
                             .map_err(Box::new)
                             .map_err(|e| Error::Property(&sp.name, e))?;
                         p.properties.push(Property {
                             name: &v.name,
-                            ptype: (&v.ptype).into(),
+                            ptype: (typeclass, (&v.ptype).into()),
                             odata: OData::new(MustHaveId::new(false), v),
                             redfish: RedfishProperty::new(v),
                         });
@@ -154,7 +155,7 @@ impl<'a> From<&'a TypeName> for PropertyType<'a> {
 #[derive(Debug)]
 pub struct Property<'a> {
     pub name: &'a PropertyName,
-    pub ptype: PropertyType<'a>,
+    pub ptype: (TypeClass, PropertyType<'a>),
     pub odata: OData<'a>,
     pub redfish: RedfishProperty,
 }
@@ -164,7 +165,7 @@ impl<'a> MapType<'a> for Property<'a> {
     where
         F: FnOnce(QualifiedName<'a>) -> QualifiedName<'a>,
     {
-        self.ptype = self.ptype.map(f);
+        self.ptype = (self.ptype.0, self.ptype.1.map(f));
         self
     }
 }

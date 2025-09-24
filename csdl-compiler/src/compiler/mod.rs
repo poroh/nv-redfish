@@ -114,6 +114,15 @@ pub use traits::MapType;
 /// Reexport `PropertiesManipulation` to the level of the compiler.
 pub use traits::PropertiesManipulation;
 
+/// Type class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TypeClass {
+    SimpleType,
+    EnumType,
+    TypeDefinition,
+    ComplexType,
+}
+
 /// Collection of EDMX documents that are compiled together to produce
 /// code.
 #[derive(Default)]
@@ -235,7 +244,7 @@ impl SchemaBundle {
                 || Ok((Compiled::default(), None)),
                 |rt| {
                     ensure_type(&rt.rtype, schema_index, &stack)
-                        .map(|compiled| (compiled, Some((&rt.rtype).into())))
+                        .map(|(compiled, _)| (compiled, Some((&rt.rtype).into())))
                 },
             )
             .map_err(Box::new)
@@ -252,10 +261,23 @@ impl SchemaBundle {
                 // ComputerSystem schema.
                 let qtype_name = p.ptype.qualified_type_name();
                 let (compiled, ptype) = if is_simple_type(qtype_name) {
-                    Ok((Compiled::default(), ParameterType::Type((&p.ptype).into())))
+                    Ok((
+                        Compiled::default(),
+                        ParameterType::Type {
+                            class: TypeClass::SimpleType,
+                            ptype: (&p.ptype).into(),
+                        },
+                    ))
                 } else if schema_index.find_type(qtype_name).is_some() {
-                    ensure_type(&p.ptype, schema_index, &cstack)
-                        .map(|compiled| (compiled, ParameterType::Type((&p.ptype).into())))
+                    ensure_type(&p.ptype, schema_index, &cstack).map(|(compiled, class)| {
+                        (
+                            compiled,
+                            ParameterType::Type {
+                                class,
+                                ptype: (&p.ptype).into(),
+                            },
+                        )
+                    })
                 } else {
                     EntityType::ensure(qtype_name, schema_index, &cstack)
                         .map(|compiled| (compiled, ParameterType::Entity((&p.ptype).into())))
@@ -291,12 +313,18 @@ fn ensure_type<'a>(
     typename: &'a TypeName,
     schema_index: &SchemaIndex<'a>,
     stack: &Stack<'a, '_>,
-) -> Result<Compiled<'a>, Error<'a>> {
+) -> Result<(Compiled<'a>, TypeClass), Error<'a>> {
     let qtype = match typename {
         TypeName::One(v) | TypeName::CollectionOf(v) => v,
     };
-    if stack.contains_entity(qtype.into()) || is_simple_type(qtype) {
-        Ok(Compiled::default())
+    if is_simple_type(qtype) {
+        Ok((Compiled::default(), TypeClass::SimpleType))
+    } else if stack.contains_complex_type(qtype.into()) {
+        Ok((Compiled::default(), TypeClass::ComplexType))
+    } else if stack.contains_type_definition(qtype.into()) {
+        Ok((Compiled::default(), TypeClass::TypeDefinition))
+    } else if stack.contains_enum_type(qtype.into()) {
+        Ok((Compiled::default(), TypeClass::EnumType))
     } else {
         compile_type(qtype, schema_index, stack)
     }
@@ -306,7 +334,7 @@ fn compile_type<'a>(
     qtype: &'a QualifiedTypeName,
     schema_index: &SchemaIndex<'a>,
     stack: &Stack<'a, '_>,
-) -> Result<Compiled<'a>, Error<'a>> {
+) -> Result<(Compiled<'a>, TypeClass), Error<'a>> {
     schema_index
         .find_type(qtype)
         .ok_or_else(|| Error::TypeNotFound(qtype.into()))
@@ -314,28 +342,34 @@ fn compile_type<'a>(
             Type::TypeDefinition(td) => {
                 let underlying_type = (&td.underlying_type).into();
                 if is_simple_type(&td.underlying_type) {
-                    Ok(Compiled::new_type_definition(TypeDefinition {
-                        name: qtype.into(),
-                        underlying_type,
-                    }))
+                    Ok((
+                        Compiled::new_type_definition(TypeDefinition {
+                            name: qtype.into(),
+                            underlying_type,
+                        }),
+                        TypeClass::TypeDefinition,
+                    ))
                 } else {
                     Err(Error::TypeDefinitionOfNotPrimitiveType(underlying_type))
                 }
             }
             Type::EnumType(et) => {
                 let underlying_type = et.underlying_type.unwrap_or_default();
-                Ok(Compiled::new_enum_type(EnumType {
-                    name: qtype.into(),
-                    underlying_type,
-                    members: et.members.iter().map(Into::into).collect(),
-                    odata: OData::new(MustHaveId::new(false), et),
-                }))
+                Ok((
+                    Compiled::new_enum_type(EnumType {
+                        name: qtype.into(),
+                        underlying_type,
+                        members: et.members.iter().map(Into::into).collect(),
+                        odata: OData::new(MustHaveId::new(false), et),
+                    }),
+                    TypeClass::EnumType,
+                ))
             }
             Type::ComplexType(ct) => {
                 let name = qtype.into();
                 // Ensure that base entity type compiled if present.
                 let (base, compiled) = if let Some(base_type) = &ct.base_type {
-                    let compiled = compile_type(base_type, schema_index, stack)?;
+                    let (compiled, _) = compile_type(base_type, schema_index, stack)?;
                     (Some(base_type.into()), compiled)
                 } else {
                     (None, Compiled::default())
@@ -346,15 +380,18 @@ fn compile_type<'a>(
                 let (compiled, properties) =
                     Properties::compile(&ct.properties, schema_index, stack.new_frame())?;
 
-                Ok(stack
-                    .merge(compiled)
-                    .merge(Compiled::new_complex_type(ComplexType {
-                        name,
-                        base,
-                        properties,
-                        odata: OData::new(MustHaveId::new(false), ct),
-                    }))
-                    .done())
+                Ok((
+                    stack
+                        .merge(compiled)
+                        .merge(Compiled::new_complex_type(ComplexType {
+                            name,
+                            base,
+                            properties,
+                            odata: OData::new(MustHaveId::new(false), ct),
+                        }))
+                        .done(),
+                    TypeClass::ComplexType,
+                ))
             }
         })
         .map_err(Box::new)
@@ -380,7 +417,10 @@ pub struct Parameter<'a> {
 #[derive(Debug, Clone, Copy)]
 pub enum ParameterType<'a> {
     Entity(PropertyType<'a>),
-    Type(PropertyType<'a>),
+    Type {
+        class: TypeClass,
+        ptype: PropertyType<'a>,
+    },
 }
 
 impl<'a> ParameterType<'a> {
@@ -390,7 +430,10 @@ impl<'a> ParameterType<'a> {
     {
         match self {
             Self::Entity(v) => Self::Entity(v.map(f)),
-            Self::Type(v) => Self::Type(v.map(f)),
+            Self::Type { class, ptype } => Self::Type {
+                class,
+                ptype: ptype.map(f),
+            },
         }
     }
 }

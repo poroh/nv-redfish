@@ -23,6 +23,7 @@ use crate::compiler::Properties;
 use crate::compiler::Property;
 use crate::compiler::PropertyType;
 use crate::compiler::QualifiedName;
+use crate::compiler::TypeClass;
 use crate::generator::rust::ActionName;
 use crate::generator::rust::Config;
 use crate::generator::rust::Error;
@@ -34,11 +35,21 @@ use proc_macro2::Delimiter;
 use proc_macro2::Group;
 use proc_macro2::Ident;
 use proc_macro2::Literal;
+use proc_macro2::Punct;
+use proc_macro2::Spacing;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
+use quote::ToTokens as _;
 use quote::TokenStreamExt as _;
 use quote::quote;
+
+#[derive(Debug)]
+pub enum GenerateType {
+    Read,
+    Update,
+    Action,
+}
 
 /// Generation of Rust struct.
 #[derive(Debug)]
@@ -49,6 +60,7 @@ pub struct StructDef<'a> {
     parameters: Vec<Parameter<'a>>,
     actions: ActionsMap<'a>,
     odata: OData<'a>,
+    generate: Vec<GenerateType>,
 }
 
 impl<'a> StructDef<'a> {
@@ -60,7 +72,13 @@ impl<'a> StructDef<'a> {
 
     /// Generate rust code for the structure.
     pub fn generate(self, tokens: &mut TokenStream, config: &Config) {
-        self.generate_read(tokens, config);
+        for t in &self.generate {
+            match t {
+                GenerateType::Read => self.generate_read(tokens, config),
+                GenerateType::Update => self.generate_update(tokens, config),
+                GenerateType::Action => self.generate_action(tokens, config),
+            }
+        }
     }
 
     /// Generate rust code for the structure.
@@ -120,18 +138,14 @@ impl<'a> StructDef<'a> {
             Self::generate_action_property(&mut content, a, config);
         }
 
-        for p in &self.parameters {
-            Self::generate_parameter(&mut content, p, config);
-        }
-
         let name = self.name;
-        tokens.extend(doc_format_and_generate(self.name, &self.odata));
-
-        tokens.extend(quote! {
-            #[derive(Deserialize, Debug)]
-            pub struct #name
-        });
-
+        tokens.extend([
+            doc_format_and_generate(self.name, &self.odata),
+            quote! {
+                #[derive(Deserialize, Debug)]
+                pub struct #name
+            },
+        ]);
         tokens.append(TokenTree::Group(Group::new(Delimiter::Brace, content)));
 
         match impl_odata_type {
@@ -162,9 +176,72 @@ impl<'a> StructDef<'a> {
         }
     }
 
+    /// Generate rust code for the update structure.
+    pub fn generate_update(&self, tokens: &mut TokenStream, config: &Config) {
+        let mut content = TokenStream::new();
+        for p in &self.properties.properties {
+            if !p.odata.permissions_is_write() {
+                continue;
+            }
+            let rename = Literal::string(p.name.inner().inner());
+            let name = StructFieldName::new_property(p.name);
+            let (class, ptype @ (PropertyType::One(v) | PropertyType::CollectionOf(v))) = &p.ptype;
+            let container = if matches!(ptype, PropertyType::One(_)) {
+                Ident::new("Option", Span::call_site())
+            } else {
+                Ident::new("Vec", Span::call_site())
+            };
+            content.extend([
+                quote! {
+                    #[serde(rename=#rename)]
+                    pub #name: #container
+                },
+                TokenTree::Punct(Punct::new('<', Spacing::Joint)).into(),
+            ]);
+            if *class == TypeClass::ComplexType {
+                FullTypeName::new(*v, config)
+                    .for_update()
+                    .to_tokens(&mut content);
+            } else {
+                FullTypeName::new(*v, config).to_tokens(&mut content);
+            }
+            content.extend([
+                TokenTree::Punct(Punct::new('>', Spacing::Joint)),
+                TokenTree::Punct(Punct::new(',', Spacing::Alone)),
+            ]);
+        }
+        let comment = format!(" Update struct corresponding to `{}`", self.name);
+        let name = self.name.for_update();
+        tokens.extend([quote! {
+            #[doc = #comment]
+            #[derive(Serialize, Debug)]
+            pub struct #name
+        }]);
+
+        tokens.append(TokenTree::Group(Group::new(Delimiter::Brace, content)));
+    }
+
+    /// Generate Action struct.
+    pub fn generate_action(&self, tokens: &mut TokenStream, config: &Config) {
+        let mut content = TokenStream::new();
+        for p in &self.parameters {
+            Self::generate_action_parameter(&mut content, p, config);
+        }
+
+        let name = self.name;
+        tokens.extend([
+            doc_format_and_generate(self.name, &self.odata),
+            quote! {
+                #[derive(Serialize, Debug)]
+                pub struct #name
+            },
+        ]);
+        tokens.append(TokenTree::Group(Group::new(Delimiter::Brace, content)));
+    }
+
     fn generate_property(content: &mut TokenStream, p: &Property<'_>, config: &Config) {
         content.extend(doc_format_and_generate(p.name, &p.odata));
-        match p.ptype {
+        match p.ptype.1 {
             PropertyType::One(v) => {
                 let rename = Literal::string(p.name.inner().inner());
                 let name = StructFieldName::new_property(p.name);
@@ -218,22 +295,36 @@ impl<'a> StructDef<'a> {
         }
     }
 
-    fn generate_parameter(content: &mut TokenStream, p: &Parameter<'_>, config: &Config) {
+    fn generate_action_parameter(content: &mut TokenStream, p: &Parameter<'_>, config: &Config) {
         content.extend(doc_format_and_generate(p.name, &p.odata));
         match p.ptype {
-            ParameterType::Type(PropertyType::One(v)) => {
+            ParameterType::Type {
+                ptype: ptype @ (PropertyType::One(v) | PropertyType::CollectionOf(v)),
+                class,
+            } => {
                 let rename = Literal::string(p.name.inner().inner());
                 let name = StructFieldName::new_parameter(p.name);
-                let ptype = FullTypeName::new(v, config);
-                content.extend(quote! { #[serde(rename=#rename)] });
-                content.extend(quote! { pub #name: Option<#ptype>, });
-            }
-            ParameterType::Type(PropertyType::CollectionOf(v)) => {
-                let rename = Literal::string(p.name.inner().inner());
-                let name = StructFieldName::new_parameter(p.name);
-                let ptype = FullTypeName::new(v, config);
-                content.extend(quote! { #[serde(rename=#rename, default)] });
-                content.extend(quote! { pub #name: Vec<#ptype>, });
+                let container = if matches!(ptype, PropertyType::One(_)) {
+                    Ident::new("Option", Span::call_site())
+                } else {
+                    Ident::new("Vec", Span::call_site())
+                };
+                content.extend([
+                    quote! {
+                        #[serde(rename=#rename)]
+                        pub #name: #container
+                    },
+                    TokenTree::Punct(Punct::new('<', Spacing::Joint)).into(),
+                ]);
+                if class == TypeClass::ComplexType {
+                    FullTypeName::new(v, config).for_update().to_tokens(content);
+                } else {
+                    FullTypeName::new(v, config).to_tokens(content);
+                }
+                content.extend([
+                    TokenTree::Punct(Punct::new('>', Spacing::Joint)),
+                    TokenTree::Punct(Punct::new(',', Spacing::Alone)),
+                ]);
             }
             ParameterType::Entity(PropertyType::One(_)) => {
                 let top = &config.top_module_alias;
@@ -258,7 +349,7 @@ impl<'a> StructDef<'a> {
         let name = ActionName::new(a.name);
         let typename = TypeName::new_action(a.binding_name, a.name);
         content.extend(quote! { #[serde(rename=#rename)] });
-        content.extend(quote! { pub #name: #top::Action<#typename>, });
+        content.extend(quote! { pub #name: Option<#top::Action<#typename>>, });
     }
 }
 
@@ -275,6 +366,7 @@ impl<'a> StructDefBuilder<'a> {
             parameters: Vec::default(),
             actions: ActionsMap::default(),
             odata,
+            generate: vec![GenerateType::Read],
         })
     }
 
@@ -303,6 +395,13 @@ impl<'a> StructDefBuilder<'a> {
     #[must_use]
     pub fn with_parameters(mut self, parameters: Vec<Parameter<'a>>) -> Self {
         self.0.parameters = parameters;
+        self
+    }
+
+    /// Setup generation types for the struct.
+    #[must_use]
+    pub fn with_generate_type(mut self, generate: Vec<GenerateType>) -> Self {
+        self.0.generate = generate;
         self
     }
 

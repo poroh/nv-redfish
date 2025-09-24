@@ -41,6 +41,7 @@ impl<'a> TypeName<'a> {
     pub const fn new_qualified(v: &'a SimpleIdentifier) -> Self {
         Self::Qualified(v)
     }
+
     #[must_use]
     pub const fn new_action(
         binding_name: &'a ParameterName,
@@ -50,6 +51,11 @@ impl<'a> TypeName<'a> {
             binding_name,
             action_name,
         }
+    }
+
+    #[must_use]
+    pub const fn for_update(&self) -> TypeNameForUpdate<'a> {
+        TypeNameForUpdate(*self)
     }
 }
 
@@ -76,5 +82,19 @@ impl Display for TypeName<'_> {
 impl Debug for TypeName<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         Display::fmt(self, f)
+    }
+}
+
+pub struct TypeNameForUpdate<'a>(TypeName<'a>);
+
+impl Display for TypeNameForUpdate<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{}Update", self.0)
+    }
+}
+
+impl ToTokens for TypeNameForUpdate<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.append(Ident::new(&self.to_string(), Span::call_site()));
     }
 }

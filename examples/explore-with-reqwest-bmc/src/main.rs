@@ -13,14 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use nv_redfish::Expandable;
+use nv_redfish::ODataId;
 use nv_redfish::bmc::BmcCredentials;
 use nv_redfish::http::BmcHttpError;
 use nv_redfish::http::ExpandQuery;
 use nv_redfish::http::HttpBmc;
 use nv_redfish::http::ReqwestClient;
 use nv_redfish::http::ReqwestClientParams;
-use nv_redfish::Expandable;
-use nv_redfish::ODataId;
 use url::Url;
 
 #[tokio::main]
@@ -63,7 +63,9 @@ async fn main() -> Result<(), BmcHttpError> {
             }
 
             println!("{function_handles:?}"); // unpolulated members
-            let function_handles = function_handles.expand(&bmc, ExpandQuery::default()).await?;
+            let function_handles = function_handles
+                .expand(&bmc, ExpandQuery::default())
+                .await?;
             println!("{function_handles:?}"); // memberrs populated
         }
     }
@@ -78,7 +80,7 @@ async fn main() -> Result<(), BmcHttpError> {
     println!(
         "{:?}",
         systems
-            .into_iter()
+            .iter()
             .next()
             .expect("at least one system")
             .get(&bmc)

@@ -29,6 +29,7 @@ use quote::quote;
 /// Example:
 ///
 /// `redfish::service_root::ServiceRoot`
+#[derive(Clone, Copy)]
 pub struct FullTypeName<'a, 'config> {
     type_name: QualifiedName<'a>,
     config: &'config Config,
@@ -40,10 +41,13 @@ impl<'a, 'config> FullTypeName<'a, 'config> {
     pub const fn new(type_name: QualifiedName<'a>, config: &'config Config) -> Self {
         Self { type_name, config }
     }
-}
 
-impl ToTokens for FullTypeName<'_, '_> {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
+    #[must_use]
+    pub const fn for_update(&self) -> FullTypeNameForUpdate<'a, 'config> {
+        FullTypeNameForUpdate(*self)
+    }
+
+    fn namespace_to_tokens(&self, tokens: &mut TokenStream) {
         let top = &self.config.top_module_alias;
         tokens.extend(quote! { #top });
         for depth in 0..self.type_name.namespace.len() {
@@ -54,9 +58,27 @@ impl ToTokens for FullTypeName<'_, '_> {
                 tokens.extend(quote! { #name });
             }
         }
+    }
+}
+
+impl ToTokens for FullTypeName<'_, '_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.namespace_to_tokens(tokens);
+        tokens.append(Punct::new(':', Spacing::Joint));
+        tokens.append(Punct::new(':', Spacing::Joint));
         let name = TypeName::new_qualified(self.type_name.name);
+        tokens.extend(quote! { #name });
+    }
+}
+
+pub struct FullTypeNameForUpdate<'a, 'config>(FullTypeName<'a, 'config>);
+
+impl ToTokens for FullTypeNameForUpdate<'_, '_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.namespace_to_tokens(tokens);
         tokens.append(Punct::new(':', Spacing::Joint));
         tokens.append(Punct::new(':', Spacing::Joint));
+        let name = TypeName::new_qualified(self.0.type_name.name).for_update();
         tokens.extend(quote! { #name });
     }
 }

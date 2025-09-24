@@ -26,6 +26,7 @@ use crate::generator::rust::ModName;
 use crate::generator::rust::StructDef;
 use crate::generator::rust::TypeDef;
 use crate::generator::rust::TypeName;
+use crate::generator::rust::struct_def::GenerateType;
 use proc_macro2::Delimiter;
 use proc_macro2::Group;
 use proc_macro2::Ident;
@@ -106,6 +107,7 @@ impl<'a> ModDef<'a> {
             let struct_def = builder
                 .with_properties(ct.properties)
                 .with_actions(actions)
+                .with_generate_type(vec![GenerateType::Read, GenerateType::Update])
                 .build(config)?;
             self.add_struct_def(struct_def)
                 .map_err(Box::new)
@@ -266,6 +268,7 @@ impl<'a> ModDef<'a> {
             let struct_name = TypeName::new_action(t.binding_name, t.name);
             let struct_def = StructDef::builder(struct_name, t.odata)
                 .with_parameters(t.parameters.clone())
+                .with_generate_type(vec![GenerateType::Action])
                 .build(config)?;
 
             self.add_struct_def(struct_def)

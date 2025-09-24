@@ -15,10 +15,10 @@
 
 use std::sync::Arc;
 
-use nv_redfish::http::ExpandQuery;
 use nv_redfish::Bmc;
 use nv_redfish::Expandable;
 use nv_redfish::ODataId;
+use nv_redfish::http::ExpandQuery;
 use redfish_std::redfish::service_root::ServiceRoot;
 
 #[derive(Debug)]
@@ -452,7 +452,7 @@ impl Bmc for MockBmc {
     {
         todo!("unimplimented")
     }
-    
+
     async fn get<T: nv_redfish::EntityType + Sized + for<'a> serde::Deserialize<'a>>(
         &self,
         id: &ODataId,
@@ -463,7 +463,6 @@ impl Bmc for MockBmc {
         let result: T = serde_json::from_str(&mock_json).map_err(Error::ParseError)?;
         Ok(Arc::new(result))
     }
-
 }
 
 #[tokio::main]
@@ -472,16 +471,23 @@ async fn main() -> Result<(), Error> {
 
     let service_root = bmc.get_service_root().await?;
 
-    let chassis_members = &service_root.chassis.as_ref().unwrap().get(&bmc).await?.members;
-
-    let chassis = chassis_members
-        .iter()
-        .next()
+    let chassis_members = &service_root
+        .chassis
+        .as_ref()
         .unwrap()
         .get(&bmc)
-        .await?;
+        .await?
+        .members;
 
-    let all_devices = &chassis.pc_ie_devices.as_ref().unwrap().get(&bmc).await?.members;
+    let chassis = chassis_members.iter().next().unwrap().get(&bmc).await?;
+
+    let all_devices = &chassis
+        .pc_ie_devices
+        .as_ref()
+        .unwrap()
+        .get(&bmc)
+        .await?
+        .members;
     for device in all_devices {
         let function_handles = &device
             .get(&bmc)
@@ -497,11 +503,14 @@ async fn main() -> Result<(), Error> {
         }
     }
 
-    let systems = &service_root.systems.as_ref().unwrap().get(&bmc).await?.members;
-    println!(
-        "{:?}",
-        systems.into_iter().next().unwrap().get(&bmc).await?
-    );
+    let systems = &service_root
+        .systems
+        .as_ref()
+        .unwrap()
+        .get(&bmc)
+        .await?
+        .members;
+    println!("{:?}", systems.iter().next().unwrap().get(&bmc).await?);
 
     Ok(())
 }
