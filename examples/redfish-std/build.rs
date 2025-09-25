@@ -29,11 +29,21 @@ fn main() -> Result<(), Error> {
     let swordfish_schemas = "../../schemas/swordfish-csdl/*.xml";
 
     let mut csdls = Vec::new();
-    csdls.extend(glob(redfish_schemas).unwrap().filter_map(Result::ok));
-    csdls.extend(glob(swordfish_schemas).unwrap().filter_map(Result::ok));
+    csdls.extend(
+        glob(redfish_schemas)
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|p| p.display().to_string()),
+    );
+    csdls.extend(
+        glob(swordfish_schemas)
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|p| p.display().to_string()),
+    );
 
     for f in &csdls {
-        println!("cargo:rerun-if-changed={}", f.display());
+        println!("cargo:rerun-if-changed={f}");
     }
 
     process_command(&Commands::Compile {

@@ -122,9 +122,13 @@ pub enum TypeClass {
 pub struct SchemaBundle {
     /// Parsed and validated Edmx documents.
     pub edmx_docs: Vec<Edmx>,
+    /// If set then it defines number pf document that should be used
+    /// in root set (for `compile_all`)
+    pub root_set_threshold: Option<usize>,
 }
 
 /// Set of types that need to be compiled.
+#[derive(Debug)]
 pub struct RootSet<'a> {
     entity_types: Vec<QualifiedName<'a>>,
     complex_types: Vec<QualifiedName<'a>>,
@@ -133,12 +137,27 @@ pub struct RootSet<'a> {
 impl SchemaBundle {
     /// Compile multiple schema, resolving all type dependencies.
     ///
+    /// Root compiling set is defined by specified singletons.
+    ///
     /// # Errors
     ///
     /// Returns compile error if any type cannot be resolved.
     pub fn compile(&self, singletons: &[SimpleIdentifier]) -> Result<Compiled<'_>, Error> {
         let schema_index = SchemaIndex::build(&self.edmx_docs);
         let root_set = self.root_set_from_singletons(&schema_index, singletons)?;
+        self.compile_root_set(&root_set, &schema_index)
+    }
+
+    /// Compile multiple schema, resolving all type dependencies.
+    ///
+    /// Root compiling set is all entity and complex types.
+    ///
+    /// # Errors
+    ///
+    /// Returns compile error if any type cannot be resolved.
+    pub fn compile_all(&self) -> Result<Compiled<'_>, Error> {
+        let schema_index = SchemaIndex::build(&self.edmx_docs);
+        let root_set = self.root_set_all();
         self.compile_root_set(&root_set, &schema_index)
     }
 
@@ -184,6 +203,53 @@ impl SchemaBundle {
             entity_types,
             complex_types: Vec::new(),
         })
+    }
+
+    fn root_set_all(&self) -> RootSet {
+        let entity_types = self
+            .edmx_docs
+            .iter()
+            .take(self.root_set_threshold.unwrap_or(self.edmx_docs.len()))
+            .flat_map(|edmx| {
+                edmx.data_services
+                    .schemas
+                    .iter()
+                    .flat_map(|s| {
+                        s.entity_types
+                            .values()
+                            .map(|t| QualifiedName::new(&s.namespace, t.name.inner()))
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        let complex_types = self
+            .edmx_docs
+            .iter()
+            .take(self.root_set_threshold.unwrap_or(self.edmx_docs.len()))
+            .flat_map(|edmx| {
+                edmx.data_services
+                    .schemas
+                    .iter()
+                    .flat_map(|s| {
+                        s.types
+                            .values()
+                            .filter_map(|t| {
+                                if let Type::ComplexType(t) = t {
+                                    Some(QualifiedName::new(&s.namespace, t.name.inner()))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        RootSet {
+            entity_types,
+            complex_types,
+        }
     }
 
     fn compile_root_set<'a>(
@@ -551,6 +617,7 @@ mod test {
            </edmx:Edmx>"#;
         let bundle = SchemaBundle {
             edmx_docs: vec![Edmx::parse(schema).unwrap()],
+            root_set_threshold: None,
         };
         let compiled = bundle.compile(&["Service".parse().unwrap()]).unwrap();
         let qtypename: QualifiedTypeName = "ServiceRoot.ServiceRoot".parse().unwrap();

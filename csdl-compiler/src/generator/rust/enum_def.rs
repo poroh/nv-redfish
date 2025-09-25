@@ -77,9 +77,9 @@ impl<'a> EnumMemberName<'a> {
 
 impl ToTokens for EnumMemberName<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append(Ident::new(
-            &AsUpperCamelCase(self.0).to_string(),
-            Span::call_site(),
-        ));
+        match AsUpperCamelCase(self.0).to_string().as_str() {
+            "Self" => tokens.append(Ident::new("Self_", Span::call_site())),
+            v => tokens.append(Ident::new(v, Span::call_site())),
+        }
     }
 }
