@@ -55,11 +55,6 @@ pub fn remove_empty_entity_types<'a>(input: Compiled<'a>) -> Compiled<'a> {
             .into_iter()
             .map(|(name, v)| (name, v.map_nav_properties(map_nav_prop)))
             .collect(),
-        root_singletons: input
-            .root_singletons
-            .into_iter()
-            .map(|s| s.map_type(|t| replace(&t, &et_replacements)))
-            .collect(),
         enum_types: input.enum_types,
         type_definitions: input.type_definitions,
         actions: map_types_in_actions(input.actions, |t| replace(&t, &et_replacements)),

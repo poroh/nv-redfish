@@ -126,16 +126,11 @@ fn main() -> Result<(), Error> {
         }
     }
     println!();
-    println!("Singletons:");
-    for s in &compiled.root_singletons {
-        println!("  {} of {}", s.name, s.stype);
-    }
     println!();
     println!("Statistics:");
     println!(" complex types:   {}", compiled.complex_types.len());
     println!(" entity types:    {}", compiled.entity_types.len());
     println!(" enum types:      {}", compiled.enum_types.len());
     println!(" type defs:       {}", compiled.type_definitions.len());
-    println!(" root singletons: {}", compiled.root_singletons.len());
     Ok(())
 }

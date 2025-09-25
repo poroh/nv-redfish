@@ -57,12 +57,7 @@ impl<'a> Singleton<'a> {
             })
             .map_err(Box::new)
             .map_err(|e| Error::Singleton(&singleton.name, e))
-            .map(|(qtype, compiled)| {
-                compiled.merge(Compiled::new_singleton(Singleton {
-                    name: &singleton.name,
-                    stype: qtype,
-                }))
-            })
+            .map(|(_, compiled)| compiled)
     }
 }
 

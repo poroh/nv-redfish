@@ -530,8 +530,9 @@ mod test {
             edmx_docs: vec![Edmx::parse(schema).unwrap()],
         };
         let compiled = bundle.compile(&["Service".parse().unwrap()]).unwrap();
-        assert_eq!(compiled.root_singletons.len(), 1);
-        let mut cur_type = &compiled.root_singletons.first().unwrap().stype;
+        let qtypename: QualifiedTypeName = "ServiceRoot.ServiceRoot".parse().unwrap();
+        let root_type: QualifiedName<'_> = (&qtypename).into();
+        let mut cur_type = &root_type;
         loop {
             let et = compiled.entity_types.get(cur_type).unwrap();
             cur_type = if let Some(t) = &et.base { t } else { break };

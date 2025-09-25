@@ -18,7 +18,6 @@ use crate::compiler::ComplexType;
 use crate::compiler::EntityType;
 use crate::compiler::EnumType;
 use crate::compiler::QualifiedName;
-use crate::compiler::Singleton;
 use crate::compiler::TypeDefinition;
 use crate::edmx::ActionName;
 use std::collections::HashMap;
@@ -34,7 +33,6 @@ pub struct Compiled<'a> {
     pub type_definitions: HashMap<QualifiedName<'a>, TypeDefinition<'a>>,
     pub enum_types: HashMap<QualifiedName<'a>, EnumType<'a>>,
     pub actions: TypeActions<'a>,
-    pub root_singletons: Vec<Singleton<'a>>,
 }
 
 impl<'a> Compiled<'a> {
@@ -54,16 +52,6 @@ impl<'a> Compiled<'a> {
     pub fn new_complex_type(v: ComplexType<'a>) -> Self {
         Self {
             complex_types: vec![(v.name, v)].into_iter().collect(),
-            ..Default::default()
-        }
-    }
-
-    /// Creates compiled data structure that contains only one compiled
-    /// singleton.
-    #[must_use]
-    pub fn new_singleton(v: Singleton<'a>) -> Self {
-        Self {
-            root_singletons: vec![v],
             ..Default::default()
         }
     }
@@ -107,7 +95,6 @@ impl<'a> Compiled<'a> {
         self.type_definitions.extend(other.type_definitions);
         self.enum_types.extend(other.enum_types);
         self.entity_types.extend(other.entity_types);
-        self.root_singletons.extend(other.root_singletons);
         self.actions =
             other
                 .actions
