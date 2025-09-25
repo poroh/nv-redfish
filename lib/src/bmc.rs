@@ -16,8 +16,10 @@
 //! BMC trait definition
 
 use serde::Deserialize;
+use serde::Serialize;
 
 use crate::http::ExpandQuery;
+use crate::Action;
 use crate::EntityType;
 use crate::Expandable;
 use crate::ODataId;
@@ -41,6 +43,12 @@ pub trait Bmc {
         &self,
         id: &ODataId,
     ) -> impl Future<Output = Result<Arc<T>, Self::Error>> + Send;
+
+    fn action<T: Send + Sync + Serialize, R: Send + Sync + Sized + for<'a> Deserialize<'a>>(
+        &self,
+        action: &Action<T, R>,
+        params: &T,
+    ) -> impl Future<Output = Result<R, Self::Error>> + Send;
 }
 
 #[derive(Clone)]

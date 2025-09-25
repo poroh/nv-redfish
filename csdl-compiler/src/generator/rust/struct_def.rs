@@ -24,13 +24,13 @@ use crate::compiler::Property;
 use crate::compiler::PropertyType;
 use crate::compiler::QualifiedName;
 use crate::compiler::TypeClass;
+use crate::generator::rust::doc::format_and_generate as doc_format_and_generate;
 use crate::generator::rust::ActionName;
 use crate::generator::rust::Config;
 use crate::generator::rust::Error;
 use crate::generator::rust::FullTypeName;
 use crate::generator::rust::StructFieldName;
 use crate::generator::rust::TypeName;
-use crate::generator::rust::doc::format_and_generate as doc_format_and_generate;
 use proc_macro2::Delimiter;
 use proc_macro2::Group;
 use proc_macro2::Ident;
@@ -40,9 +40,9 @@ use proc_macro2::Spacing;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
+use quote::quote;
 use quote::ToTokens as _;
 use quote::TokenStreamExt as _;
-use quote::quote;
 
 #[derive(Debug)]
 pub enum GenerateType {
@@ -387,7 +387,7 @@ impl<'a> StructDef<'a> {
                 FullTypeName::new(v, config).to_tokens(&mut typename);
                 ret_type.extend(quote! { Vec<#typename> });
             }
-            None => ret_type.extend(quote! { () }),
+            None => ret_type.extend(quote! { #top::Empty }),
         }
         content.extend(quote! { #[serde(rename=#rename)] });
         content.extend(quote! { pub #name: Option<#top::Action<#typename, #ret_type>>, });
@@ -407,7 +407,7 @@ impl<'a> StructDef<'a> {
                 FullTypeName::new(v, config).to_tokens(&mut typename);
                 ret_type.extend(quote! { Vec<#typename> });
             }
-            None => ret_type.extend(quote! { () }),
+            None => ret_type.extend(quote! { #top::Empty }),
         }
         if a.parameters.len() <= config.action_fn_max_param_number_threshold {
             let mut arglist = TokenStream::new();
@@ -453,13 +453,15 @@ impl<'a> StructDef<'a> {
             content.extend([
                 doc_format_and_generate(a.name, &a.odata),
                 quote! {
-                    pub async fn #name<B: #top::Bmc>(&self, bmc: &B #arglist) -> Result<#ret_type, #top::Error> {
+                    pub async fn #name<B: #top::Bmc>(&self, bmc: &B #arglist) -> Result<#ret_type, B::Error>
+                    where B::Error: #top::ActionError,
+                    {
                         if let Some(a) = &self.#name  {
                             a.run(bmc, &#typename{
                                 #params
                             }).await
                         } else {
-                            Err(#top::Error::ActionIsNotSupported)
+                            Err(B::Error::not_supported())
                         }
                     }
                 },
@@ -468,11 +470,13 @@ impl<'a> StructDef<'a> {
             content.extend([
                 doc_format_and_generate(a.name, &a.odata),
                 quote! {
-                    pub async fn #name<B: #top::Bmc>(&self, bmc: &B, t: &#typename) -> Result<#ret_type, #top::Error> {
+                    pub async fn #name<B: #top::Bmc>(&self, bmc: &B, t: &#typename) -> Result<#ret_type, B::Error> 
+                    where B::Error: #top::ActionError,
+                    {
                         if let Some(a) = &self.#name  {
                             a.run(bmc, t).await
                         } else {
-                            Err(#top::Error::ActionIsNotSupported)
+                            Err(B::Error::not_supported())
                         }
                     }
                 },

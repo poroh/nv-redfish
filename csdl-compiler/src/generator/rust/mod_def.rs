@@ -330,6 +330,8 @@ impl<'a> ModDef<'a> {
                     use serde::{Serialize, Deserialize};
                     #[allow(unused_imports)]
                     use #top::{NavProperty, ODataId, ODataETag};
+                    #[allow(unused_imports)]
+                    use #top::ActionError;
                 },
             ]);
             generate(&mut content);

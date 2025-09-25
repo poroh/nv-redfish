@@ -24,11 +24,13 @@ pub mod nav_property;
 /// Type for `@odata.id` identifier.
 pub mod odata;
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::{future::Future, sync::Arc};
 
 /// Reexport `Bmc` trait to make it available through crate root.
 pub use bmc::Bmc;
+/// Reexport `ActionError` trait to make it available through crate root.
+pub use action::ActionError;
 
 use crate::http::ExpandQuery;
 /// Reexport `ODataId` to make it available through crate root.
@@ -39,10 +41,6 @@ pub type ODataETag = odata::ODataETag;
 pub type NavProperty<T> = nav_property::NavProperty<T>;
 /// Reexport `Action` to make it available through crate root.
 pub type Action<T, R> = action::Action<T, R>;
-
-pub enum Error {
-    ActionIsNotSupported,
-}
 
 /// Entity type trait that is implemented by CSDL compiler for all
 /// generated entity types.
@@ -62,5 +60,20 @@ pub trait Expandable: EntityType + Sized + for<'a> Deserialize<'a> {
         query: ExpandQuery,
     ) -> impl Future<Output = Result<Arc<Self>, B::Error>> + Send {
         bmc.expand::<Self>(self.id(), query)
+    }
+}
+
+/// Empty struct, denotes unit return type, used for Redfish responses which are expected to
+/// not return any json data
+#[derive(Debug)]
+pub struct Empty {}
+
+impl<'de> Deserialize<'de> for Empty
+{
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Empty{})
     }
 }

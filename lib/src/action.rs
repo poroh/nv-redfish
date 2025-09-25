@@ -14,11 +14,11 @@
 // limitations under the License.
 
 use crate::Bmc;
-use crate::Error;
 use core::fmt::Display;
 use core::fmt::Formatter;
 use core::fmt::Result as FmtResult;
 use serde::Deserialize;
+use serde::Serialize;
 use std::marker::PhantomData;
 
 /// Type for `target` field of Action.
@@ -43,9 +43,14 @@ pub struct Action<T, R> {
     pub _marker_retval: PhantomData<R>,
 }
 
-impl<T, R> Action<T, R> {
+pub trait ActionError {
+    /// Create an error when action is not supported
+    fn not_supported() -> Self;
+}
+
+impl<T: Send + Sync + Serialize, R: Send + Sync + Sized + for<'a> Deserialize<'a>> Action<T, R> {
     /// Run specific action with parameters passed as argument.
-    pub async fn run<B: Bmc>(&self, _bmc: &B, _params: &T) -> Result<R, Error> {
-        Err(Error::ActionIsNotSupported)
+    pub async fn run<B: Bmc>(&self, bmc: &B, params: &T) -> Result<R, B::Error> {
+        bmc.action::<T,R>(self, params).await
     }
 }

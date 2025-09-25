@@ -526,6 +526,17 @@ where
             .await
             .map(Arc::new)
     }
+    
+    async fn action<T: Sync + Send + Serialize, R: Sync + Send + Sized + for<'a> Deserialize<'a>>(
+        &self,
+        action: &crate::Action<T, R>,
+        params: &T,
+    ) -> Result<R, Self::Error> {
+        let mut endpoint_url = self.redfish_endpoint.clone();
+        endpoint_url.set_path(&action.target.to_string());
+        
+        self.client.post(endpoint_url, params, &self.credentials).await
+    }
 }
 
 #[cfg(feature = "reqwest")]

@@ -465,6 +465,15 @@ impl Bmc for MockBmc {
         let result: T = serde_json::from_str(&mock_json).map_err(Error::ParseError)?;
         Ok(Arc::new(result))
     }
+    
+    async fn action<T: Send + Sync + serde::Serialize, R: Send + Sync + Sized + for<'a> serde::Deserialize<'a>>(
+        &self,
+        _action: &nv_redfish::Action<T, R>,
+        _params: &T,
+    ) -> Result<R, Self::Error> {
+        todo!()
+    }
+
 }
 
 #[tokio::main]

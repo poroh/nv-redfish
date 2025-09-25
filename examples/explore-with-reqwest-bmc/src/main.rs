@@ -15,14 +15,14 @@
 
 #![recursion_limit = "256"]
 
-use nv_redfish::Expandable;
-use nv_redfish::ODataId;
 use nv_redfish::bmc::BmcCredentials;
 use nv_redfish::http::BmcReqwestError;
 use nv_redfish::http::ExpandQuery;
 use nv_redfish::http::HttpBmc;
 use nv_redfish::http::ReqwestClient;
 use nv_redfish::http::ReqwestClientParams;
+use nv_redfish::Expandable;
+use nv_redfish::ODataId;
 use url::Url;
 
 #[tokio::main]
@@ -73,28 +73,58 @@ async fn main() -> Result<(), BmcReqwestError> {
         }
     }
 
-    let systems = &service_root
+    let system = &service_root
         .systems
         .as_ref()
         .expect("no systems")
         .get(&bmc)
         .await?
-        .members;
-    println!(
-        "{:?}",
-        systems
-            .iter()
-            .next()
-            .expect("at least one system")
-            .get(&bmc)
-            .await?
-    );
+        .members
+        .iter()
+        .next()
+        .expect("at least one system")
+        .get(&bmc)
+        .await?;
 
-    let ac = &service_root.account_service.as_ref().expect("no account service").get(&bmc).await?;
+    println!("{system:?}");
+
+    let ac = &service_root
+        .account_service
+        .as_ref()
+        .expect("no account service")
+        .get(&bmc)
+        .await?;
     println!("{ac:?}");
 
     // Should use cache here
-    let _ = &service_root.account_service.as_ref().expect("no account service").get(&bmc).await?;
+    let _ = &service_root
+        .account_service
+        .as_ref()
+        .expect("no account service")
+        .get(&bmc)
+        .await?;
+
+    system
+        .bios
+        .as_ref()
+        .expect("no bios")
+        .get(&bmc)
+        .await?
+        .actions
+        .as_ref()
+        .expect("no actions")
+        .change_password
+        .as_ref()
+        .expect("no reset action")
+        .run(
+            &bmc,
+            &redfish_std::redfish::bios::BiosChangePasswordAction {
+                password_name: Some("admin".into()),
+                old_password: Some("admin1".into()),
+                new_password: Some("admin2".into()),
+            },
+        )
+        .await?;
 
     Ok(())
 }
