@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![recursion_limit = "256"]
-
 use std::sync::Arc;
 
 use nv_redfish::Bmc;
@@ -465,15 +463,17 @@ impl Bmc for MockBmc {
         let result: T = serde_json::from_str(&mock_json).map_err(Error::ParseError)?;
         Ok(Arc::new(result))
     }
-    
-    async fn action<T: Send + Sync + serde::Serialize, R: Send + Sync + Sized + for<'a> serde::Deserialize<'a>>(
+
+    async fn action<
+        T: Send + Sync + serde::Serialize,
+        R: Send + Sync + Sized + for<'a> serde::Deserialize<'a>,
+    >(
         &self,
         _action: &nv_redfish::Action<T, R>,
         _params: &T,
     ) -> Result<R, Self::Error> {
         todo!()
     }
-
 }
 
 #[tokio::main]

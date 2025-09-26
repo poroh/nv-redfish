@@ -51,6 +51,6 @@ pub trait ActionError {
 impl<T: Send + Sync + Serialize, R: Send + Sync + Sized + for<'a> Deserialize<'a>> Action<T, R> {
     /// Run specific action with parameters passed as argument.
     pub async fn run<B: Bmc>(&self, bmc: &B, params: &T) -> Result<R, B::Error> {
-        bmc.action::<T,R>(self, params).await
+        bmc.action::<T, R>(self, params).await
     }
 }

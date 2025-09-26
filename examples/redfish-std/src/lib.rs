@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![recursion_limit = "256"]
 pub mod redfish {
     include!(concat!(env!("OUT_DIR"), "/redfish.rs"));
 }
