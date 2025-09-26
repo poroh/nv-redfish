@@ -15,7 +15,7 @@
 
 use serde::Deserialize;
 
-use crate::ValidateError;
+use crate::edmx::ValidateError;
 use crate::edmx::include::Include;
 use crate::edmx::include_annotations::IncludeAnnotations;
 

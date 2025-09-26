@@ -45,6 +45,8 @@ pub mod commands;
 pub mod compiler;
 /// Entity Data Model XML definitions.
 pub mod edmx;
+/// Errors of compiler.
+pub mod error;
 /// Redfish code generator.
 pub mod generator;
 /// OData-related functions.
@@ -54,23 +56,14 @@ pub mod optimizer;
 /// Redfish-related functions.
 pub mod redfish;
 
-use edmx::ValidateError;
-use std::io::Error as IoError;
-
-/// Errors defined by the CSDL compiler.
-#[derive(Debug)]
-pub enum Error {
-    /// Edmx document validation error.
-    Validate(ValidateError),
-    /// File read error.
-    FileRead(IoError),
-}
+#[doc(inline)]
+pub use error::Error;
 
 #[cfg(test)]
 mod test {
-    use super::Error;
     use super::edmx::Edmx;
     use super::edmx::attribute_values::SimpleIdentifier;
+    use crate::Error;
     use std::fs;
     use std::path::Path;
 
@@ -86,7 +79,7 @@ mod test {
              <edmx:Reference Uri="http://example.com/2.xml"></edmx:Reference>
              <edmx:DataServices></edmx:DataServices>
            </edmx:Edmx>"#;
-        let edmx: Edmx = Edmx::parse(&data).map_err(Error::Validate)?;
+        let edmx: Edmx = Edmx::parse(&data).map_err(|err| Error::Edmx("local".into(), err))?;
         assert!(edmx.data_services.schemas.is_empty());
         Ok(())
     }
@@ -104,7 +97,7 @@ mod test {
              </edmx:DataServices>
            </edmx:Edmx>"#;
         let computed: SimpleIdentifier = "Computed".parse().unwrap();
-        let edmx: Edmx = Edmx::parse(&data).map_err(Error::Validate)?;
+        let edmx: Edmx = Edmx::parse(&data).map_err(|err| Error::Edmx("local".into(), err))?;
         assert_eq!(edmx.data_services.schemas.len(), 1);
         assert_eq!(edmx.data_services.schemas[0].terms.len(), 1);
         assert!(edmx.data_services.schemas[0].terms.get(&computed).is_some());
@@ -118,20 +111,20 @@ mod test {
     #[ignore]
     #[test]
     fn test_read_odata() -> Result<(), Error> {
-        let data = fs::read_to_string(crate_root().join("test-data/edmx/odata-4.0.xml"))
-            .map_err(Error::FileRead)?;
-        let _edmx: Edmx = Edmx::parse(&data).map_err(Error::Validate)?;
+        let fname = crate_root().join("test-data/edmx/odata-4.0.xml");
+        let fname_string = fname.display().to_string();
+        let data = fs::read_to_string(fname).map_err(|err| Error::Io(fname_string.clone(), err))?;
+        let _edmx: Edmx = Edmx::parse(&data).map_err(|err| Error::Edmx(fname_string, err))?;
         Ok(())
     }
 
     #[ignore]
     #[test]
     fn test_read_redfish() -> Result<(), Error> {
-        let data = fs::read_to_string(
-            crate_root().join("test-data/redfish-schema/CoolantConnector_v1.xml"),
-        )
-        .map_err(Error::FileRead)?;
-        let edmx: Edmx = Edmx::parse(&data).map_err(Error::Validate)?;
+        let fname = crate_root().join("test-data/redfish-schema/CoolantConnector_v1.xml");
+        let fname_string = fname.display().to_string();
+        let data = fs::read_to_string(fname).map_err(|err| Error::Io(fname_string.clone(), err))?;
+        let edmx: Edmx = Edmx::parse(&data).map_err(|err| Error::Edmx(fname_string, err))?;
         assert_eq!(edmx.data_services.schemas.len(), 6);
         assert_eq!(edmx.data_services.schemas.get(1).unwrap().types.len(), 4);
         assert_eq!(

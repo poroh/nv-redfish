@@ -54,14 +54,21 @@ pub mod annotation;
 /// 17 Attribute Values
 pub mod attribute_values;
 
+/// Validation errors.
+pub mod validate_error;
+
 use annotation::Annotation;
 use attribute_values::Namespace;
 use attribute_values::QualifiedName;
 use attribute_values::SimpleIdentifier;
 use attribute_values::TypeName;
-use quick_xml::DeError;
 use serde::Deserialize;
 use tagged_types::TaggedType;
+
+#[doc(inline)]
+pub use edmx_root::Edmx;
+#[doc(inline)]
+pub use validate_error::ValidateError;
 
 /// Qualified type name is type name rogether with the namespace.
 pub type QualifiedTypeName = TaggedType<QualifiedName, QualifiedTypeNameTag>;
@@ -127,37 +134,6 @@ pub type IsBound = TaggedType<bool, IsBoundTag>;
 #[transparent(Debug, Deserialize)]
 #[capability(inner_access)]
 pub enum IsBoundTag {}
-
-/// EDMX compilation errors.
-#[derive(Debug)]
-pub enum ValidateError {
-    /// XML deserialization error.
-    XmlDeserialize(DeError),
-    /// Invalid number of `DataServices`.
-    WrongDataServicesNumber,
-    /// In the `EntityType` too many keys.
-    TooManyKeys,
-    /// In the `NavigationProperty` too many `OnDelete` items.
-    TooManyOnDelete,
-    /// In the `Action` too many `ReturnType` items.
-    TooManyReturnTypes,
-    /// Not supported more than one entity container in Schema.
-    /// This is the case for Redfish. Keep it this way for parser.
-    ManyContainersNotSupported,
-    /// Schema validation error.
-    Schema(Namespace, Box<ValidateError>),
-    /// `ComplexType` validation error.
-    ComplexType(LocalTypeName, Box<ValidateError>),
-    /// `EntityType` validation error.
-    EntityType(LocalTypeName, Box<ValidateError>),
-    /// `NavigationProperty` validation error.
-    NavigationProperty(PropertyName, Box<ValidateError>),
-    /// `Action` validation error.
-    Action(ActionName, Box<ValidateError>),
-}
-
-/// Reexport of Edmx type to root.
-pub type Edmx = edmx_root::Edmx;
 
 /// 11.1 Element edm:TypeDefinition
 #[derive(Debug, Deserialize)]

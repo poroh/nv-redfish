@@ -13,12 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ValidateError;
 use crate::edmx::EntityContainer;
 use crate::edmx::Namespace;
 use crate::edmx::SimpleIdentifier;
 use crate::edmx::Term;
 use crate::edmx::TypeDefinition;
+use crate::edmx::ValidateError;
 use crate::edmx::action::Action;
 use crate::edmx::action::DeAction;
 use crate::edmx::annotation::Annotation;

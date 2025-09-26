@@ -35,6 +35,7 @@ use std::str::FromStr;
 pub struct Context<'a> {
     pub schema_index: SchemaIndex<'a>,
     pub config: Config,
+    pub root_set_entities: HashSet<QualifiedName<'a>>,
 }
 
 /// Configuration of the compilation

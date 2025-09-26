@@ -13,12 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ValidateError;
 use crate::edmx::ActionName;
 use crate::edmx::Annotation;
 use crate::edmx::IsBound;
 use crate::edmx::Parameter;
 use crate::edmx::ReturnType;
+use crate::edmx::ValidateError;
 use serde::Deserialize;
 
 /// 12.1 Element edm:Action

@@ -162,11 +162,13 @@ impl SchemaBundle {
         singletons: &[SimpleIdentifier],
         config: Config,
     ) -> Result<Compiled<'_>, Error<'_>> {
+        let schema_index = SchemaIndex::build(&self.edmx_docs);
+        let root_set = self.root_set_from_singletons(&schema_index, singletons)?;
         let ctx = Context {
-            schema_index: SchemaIndex::build(&self.edmx_docs),
+            schema_index,
             config,
+            root_set_entities: root_set.entity_types.iter().copied().collect(),
         };
-        let root_set = self.root_set_from_singletons(&ctx, singletons)?;
         self.compile_root_set(&root_set, &ctx)
     }
 
@@ -182,13 +184,14 @@ impl SchemaBundle {
         let ctx = Context {
             schema_index: SchemaIndex::build(&self.edmx_docs),
             config,
+            root_set_entities: root_set.entity_types.iter().copied().collect(),
         };
         self.compile_root_set(&root_set, &ctx)
     }
 
     fn root_set_from_singletons<'a>(
         &'a self,
-        ctx: &Context<'a>,
+        schema_index: &SchemaIndex<'a>,
         singletons: &[SimpleIdentifier],
     ) -> Result<RootSet<'a>, Error<'a>> {
         // Go through: all signletons located in
@@ -211,7 +214,7 @@ impl SchemaBundle {
                                 .filter_map(|singleton| {
                                     if singletons.contains(&singleton.name) {
                                         Some(
-                                            ctx.schema_index
+                                            schema_index
                                                 .find_child_entity_type((&singleton.stype).into())
                                                 .map(|(qname, _)| qname),
                                         )

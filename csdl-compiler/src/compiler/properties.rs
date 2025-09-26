@@ -109,7 +109,7 @@ impl<'a> Properties<'a> {
         stack: &Stack<'a, '_>,
     ) -> Result<Compiled<'a>, Error<'a>> {
         let qname = v.ptype.qualified_type_name().into();
-        if ctx.config.entity_type_filter.matches(&qname) {
+        if ctx.root_set_entities.contains(&qname) || ctx.config.entity_type_filter.matches(&qname) {
             let (ptype, compiled) = ctx
                 .schema_index
                 // We are searching for deepest available child in tre

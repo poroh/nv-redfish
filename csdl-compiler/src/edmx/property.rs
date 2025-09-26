@@ -13,9 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ValidateError;
 use crate::edmx::IsNullable;
 use crate::edmx::PropertyName;
+use crate::edmx::ValidateError;
 use crate::edmx::annotation::Annotation;
 use crate::edmx::attribute_values::TypeName;
 use serde::Deserialize;

@@ -13,36 +13,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::Error;
 use crate::compiler::Config as CompilerConfig;
 use crate::compiler::EntityTypeFilter;
 use crate::compiler::EntityTypeFilterPattern;
 use crate::compiler::SchemaBundle;
 use crate::edmx::Edmx;
-use crate::edmx::ValidateError;
-use crate::edmx::attribute_values::Error as AttributeValuesError;
 use crate::generator::rust::Config as GeneratorConfig;
 use crate::generator::rust::RustGenerator;
 use crate::optimizer::optimize;
 use clap::Subcommand;
 use std::fs::File;
 use std::fs::write;
-use std::io::Error as IoError;
 use std::io::Read as _;
 use std::path::PathBuf;
 
 pub const DEFAULT_ROOT: &str = "Service";
-
-#[derive(Debug)]
-pub enum Error {
-    ParameterNeeded,
-    Io(String, IoError),
-    Edmx(String, ValidateError),
-    Compile(Vec<String>),
-    WrongRootService(AttributeValuesError),
-    Generate(Vec<String>),
-    ParseGenerated(syn::Error),
-    WriteOutput(PathBuf, IoError),
-}
 
 /// Compiler highlevel commands.
 #[derive(Subcommand, Debug)]
@@ -61,6 +47,15 @@ pub enum Commands {
         /// File that contains geneated code.
         #[arg(short, long, default_value = "redfish.rs")]
         output: PathBuf,
+        /// Defines patterns of entity types that should be compiled
+        /// if referenced via navigation property. If this list is
+        /// empty then all entity types will be compiled.
+        ///
+        /// Pattern is wildcard of qualified name.
+        /// Examples:
+        /// `ServiceRoot.*.*` - any entity type in any version of the service root
+        /// `SomeNamespace.*.Entity1|Entity2` - `EntityType1` or `EntityType2` from any versions of namespace `SomeNamespace`.
+        /// `*.*.Entity1|Entity2` - `EntityType1` or `EntityType2` from any versions of any namespaces.
         #[arg(short = 'p', long = "pattern")]
         entity_type_patterns: Vec<EntityTypeFilterPattern>,
     },
@@ -73,6 +68,17 @@ pub enum Commands {
         /// File that contains geneated code.
         #[arg(short, long, default_value = "redfish.rs")]
         output: PathBuf,
+        /// Defines patterns of entity types that should be compiled
+        /// if referenced via navigation property. If this list is
+        /// empty then all entity types will be compiled.
+        ///
+        /// Pattern is wildcard of qualified name.
+        /// Examples:
+        /// `ServiceRoot.*.*` - any entity type in any version of the service root
+        /// `SomeNamespace.*.Entity1|Entity2` - `EntityType1` or `EntityType2` from any versions of namespace `SomeNamespace`.
+        /// `*.*.Entity1|Entity2` - `EntityType1` or `EntityType2` from any versions of any namespaces.
+        #[arg(short = 'p', long = "pattern")]
+        entity_type_patterns: Vec<EntityTypeFilterPattern>,
     },
 }
 
@@ -92,7 +98,7 @@ pub fn process_command(command: &Commands) -> Result<Vec<String>, Error> {
         } => {
             let root_service = root.parse().map_err(Error::WrongRootService)?;
             if csdls.is_empty() {
-                return Err(Error::ParameterNeeded);
+                return Err(Error::AtLeastOneCSDLFileNeeded);
             }
             let schema_bundle = read_csdls(csdls)?;
             let compiled = schema_bundle
@@ -102,22 +108,10 @@ pub fn process_command(command: &Commands) -> Result<Vec<String>, Error> {
                         entity_type_filter: EntityTypeFilter::new(entity_type_patterns.clone()),
                     },
                 )
-                .map_err(|e| {
-                    format!("{e}")
-                        .split('\n')
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                })
-                .map_err(Error::Compile)?;
+                .map_err(Error::compile_error)?;
             let compiled = optimize(compiled);
             let generator = RustGenerator::new(compiled, GeneratorConfig::default())
-                .map_err(|e| {
-                    format!("{e}")
-                        .split('\n')
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                })
-                .map_err(Error::Generate)?;
+                .map_err(Error::generate_error)?;
 
             let result = generator.generate().to_string();
             let syntax_tree = syn::parse_file(&result).map_err(Error::ParseGenerated)?;
@@ -126,30 +120,23 @@ pub fn process_command(command: &Commands) -> Result<Vec<String>, Error> {
             display_output.push(format!("{} file has been written", output.display()));
             Ok(display_output)
         }
-        Commands::CompileOem { csdls, output } => {
+        Commands::CompileOem {
+            csdls,
+            output,
+            entity_type_patterns,
+        } => {
             if csdls.is_empty() {
-                return Err(Error::ParameterNeeded);
+                return Err(Error::AtLeastOneCSDLFileNeeded);
             }
             let schema_bundle = read_csdls(csdls)?;
             let compiled = schema_bundle
-                .compile_all(CompilerConfig::default())
-                .map_err(|e| {
-                    format!("{e}")
-                        .split('\n')
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
+                .compile_all(CompilerConfig {
+                    entity_type_filter: EntityTypeFilter::new(entity_type_patterns.clone()),
                 })
-                .map_err(Error::Compile)?;
+                .map_err(Error::compile_error)?;
             let compiled = optimize(compiled);
             let generator = RustGenerator::new(compiled, GeneratorConfig::default())
-                .map_err(|e| {
-                    format!("{e}")
-                        .split('\n')
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                })
-                .map_err(Error::Generate)?;
-
+                .map_err(Error::generate_error)?;
             let result = generator.generate().to_string();
             let syntax_tree = syn::parse_file(&result).map_err(Error::ParseGenerated)?;
             write(output, prettyplease::unparse(&syntax_tree))
