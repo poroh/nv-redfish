@@ -252,48 +252,4 @@ mod cache_integration_tests {
         let error = result.unwrap_err();
         assert!(matches!(error, BmcReqwestError::CacheMiss));
     }
-
-    #[tokio::test]
-    async fn test_cache_invalidation() {
-        let mock_server = MockServer::start().await;
-        let resource_path = "/redfish/v1/test/invalidation";
-        let etag_value = "W/\"invalidate123\"";
-
-        let test_resource = TestResource {
-            id: create_odata_id(resource_path),
-            etag: Some(create_odata_etag(etag_value)),
-            name: "Invalidation Test".to_string(),
-            value: 999,
-        };
-
-        Mock::given(method("GET"))
-            .and(path(resource_path))
-            .respond_with(
-                ResponseTemplate::new(200)
-                    .set_body_json(&test_resource)
-                    .insert_header("etag", etag_value),
-            )
-            .expect(2)
-            .mount(&mock_server)
-            .await;
-
-        let client = ReqwestClient::new().unwrap();
-        let credentials = BmcCredentials::new("root".to_string(), "password".to_string());
-        let bmc = HttpBmc::new(client, Url::parse(&mock_server.uri()).unwrap(), credentials);
-
-        let resource_id = create_odata_id(resource_path);
-
-        let result1 = bmc.get::<TestResource>(&resource_id).await;
-        assert!(result1.is_ok());
-
-        bmc.invalidate_cache(&resource_id);
-
-        let result2 = bmc.get::<TestResource>(&resource_id).await;
-        assert!(result2.is_ok());
-
-        let retrieved1 = result1.unwrap();
-        let retrieved2 = result2.unwrap();
-        assert_eq!(retrieved1.name, retrieved2.name);
-        assert!(!Arc::ptr_eq(&retrieved1, &retrieved2));
-    }
 }

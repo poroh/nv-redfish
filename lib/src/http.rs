@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::HashMap,
     future::Future,
@@ -21,7 +21,9 @@ use std::{
 };
 use url::Url;
 
-use crate::{Bmc, EntityType, Expandable, ODataETag, ODataId, bmc::BmcCredentials};
+use crate::{
+    bmc::BmcCredentials, cache::TypeErasedCarCache, Bmc, EntityType, Expandable, ODataETag, ODataId,
+};
 
 /// Builder for Redfish `$expand` query parameters according to DSP0266 specification.
 ///
@@ -306,82 +308,6 @@ pub trait HttpClient: Send + Sync {
         T: DeserializeOwned + Send;
 }
 
-/// ETag-based cache for Redfish resources
-///
-/// This cache stores resources along with their ETags and uses HTTP conditional
-/// requests with If-None-Match headers to validate cache entries.
-#[derive(Debug)]
-struct ResourceCache {
-    /// Cache storage mapping resource IDs to their cached data  
-    entries: RwLock<HashMap<ODataId, Box<dyn std::any::Any + Send + Sync>>>,
-    /// ETag storage for conditional requests
-    etags: RwLock<HashMap<ODataId, ODataETag>>,
-}
-
-impl ResourceCache {
-    fn new() -> Self {
-        Self {
-            entries: RwLock::new(HashMap::new()),
-            etags: RwLock::new(HashMap::new()),
-        }
-    }
-
-    /// Get cached resource - always returns the cached version if present
-    /// Validation should be done via conditional HTTP request
-    fn get<T: EntityType + 'static>(&self, id: &ODataId) -> Option<Arc<T>> {
-        let entries = self.entries.read().ok()?;
-        if let Some(entry_any) = entries.get(id) {
-            if let Some(resource) = entry_any.downcast_ref::<Arc<T>>() {
-                return Some(Arc::clone(resource));
-            }
-        }
-        None
-    }
-
-    /// Store resource in cache with ETag
-    fn put<T: EntityType + 'static + Send + Sync>(
-        &self,
-        id: &ODataId,
-        resource: Arc<T>,
-        etag: Option<ODataETag>,
-    ) {
-        if let Some(etag_value) = etag {
-            if let Ok(mut etags) = self.etags.write() {
-                etags.insert(id.clone(), etag_value);
-            }
-
-            if let Ok(mut entries) = self.entries.write() {
-                entries.insert(id.clone(), Box::new(resource));
-            }
-        }
-    }
-
-    /// Get stored ETag for conditional request (If-None-Match header)
-    fn get_etag(&self, id: &ODataId) -> Option<ODataETag> {
-        self.etags.read().ok()?.get(id).cloned()
-    }
-
-    /// Invalidate cache entry - removes both resource and ETag
-    fn invalidate(&self, id: &ODataId) {
-        if let Ok(mut entries) = self.entries.write() {
-            entries.remove(id);
-        }
-        if let Ok(mut etags) = self.etags.write() {
-            etags.remove(id);
-        }
-    }
-
-    /// Clear all cache entries
-    fn clear(&self) {
-        if let Ok(mut entries) = self.entries.write() {
-            entries.clear();
-        }
-        if let Ok(mut etags) = self.etags.write() {
-            etags.clear();
-        }
-    }
-}
-
 /// HTTP-based BMC implementation that wraps an [`HttpClient`].
 ///
 /// This struct combines an HTTP client with BMC endpoint information and credentials
@@ -413,10 +339,14 @@ pub struct HttpBmc<C: HttpClient> {
     client: C,
     redfish_endpoint: Url,
     credentials: BmcCredentials,
-    cache: ResourceCache,
+    cache: RwLock<TypeErasedCarCache<ODataId>>,
+    etags: RwLock<HashMap<ODataId, ODataETag>>,
 }
 
-impl<C: HttpClient> HttpBmc<C> {
+impl<C: HttpClient> HttpBmc<C>
+where
+    C::Error: CacheableError,
+{
     /// Create a new HTTP-based BMC client with ETag-based caching.
     ///
     /// # Arguments
@@ -446,22 +376,9 @@ impl<C: HttpClient> HttpBmc<C> {
             client,
             redfish_endpoint,
             credentials,
-            cache: ResourceCache::new(),
+            cache: RwLock::new(TypeErasedCarCache::new(1000)),
+            etags: RwLock::new(HashMap::new()),
         }
-    }
-
-    /// Clear all cached resources
-    ///
-    /// This forces all subsequent requests to fetch fresh data from the BMC.
-    pub fn clear_cache(&self) {
-        self.cache.clear();
-    }
-
-    /// Invalidate a specific cached resource
-    ///
-    /// This forces the next request for this resource to fetch fresh data.
-    pub fn invalidate_cache(&self, id: &ODataId) {
-        self.cache.invalidate(id);
     }
 }
 
@@ -474,6 +391,9 @@ pub trait CacheableError {
 
     /// Create an error for when cached data is requested but not available.
     fn cache_miss() -> Self;
+
+    /// Cache error
+    fn cache_error(reason: String) -> Self;
 }
 
 impl<C: HttpClient> Bmc for HttpBmc<C>
@@ -482,14 +402,20 @@ where
 {
     type Error = C::Error;
 
-    async fn get<T: EntityType + Sized + for<'a> Deserialize<'a> + 'static + Send + Sync>(
+    async fn get<T: EntityType + Sized + for<'de> Deserialize<'de> + 'static + Send + Sync>(
         &self,
         id: &ODataId,
     ) -> Result<Arc<T>, Self::Error> {
         let mut endpoint_url = self.redfish_endpoint.clone();
         endpoint_url.set_path(&id.to_string());
 
-        let etag = self.cache.get_etag(id);
+        let etag: Option<ODataETag> = {
+            let etags = self
+                .etags
+                .read()
+                .map_err(|e| C::Error::cache_error(e.to_string()))?;
+            etags.get(id).cloned()
+        };
 
         match self
             .client
@@ -498,13 +424,33 @@ where
         {
             Ok(response) => {
                 let entity = Arc::new(response);
-                self.cache
-                    .put(id, Arc::clone(&entity), entity.etag().clone());
+                if let Some(etag) = entity.etag() {
+                    let mut cache = self
+                        .cache
+                        .write()
+                        .map_err(|e| C::Error::cache_error(e.to_string()))?;
+
+                    let mut etags = self
+                        .etags
+                        .write()
+                        .map_err(|e| C::Error::cache_error(e.to_string()))?;
+                    if let Some(ret) = cache.put_typed(id.clone(), Arc::clone(&entity)) {
+                        etags.remove(ret.id());
+                    }
+                    etags.insert(id.clone(), etag.clone());
+                }
                 Ok(entity)
             }
             Err(e) => {
                 if e.is_cached() {
-                    self.cache.get::<T>(id).ok_or_else(C::Error::cache_miss)
+                    let mut cache = self
+                        .cache
+                        .write()
+                        .map_err(|e| C::Error::cache_error(e.to_string()))?;
+                    cache
+                        .get_typed::<Arc<T>>(id)
+                        .cloned()
+                        .ok_or_else(C::Error::cache_miss)
                 } else {
                     Err(e)
                 }
@@ -526,16 +472,21 @@ where
             .await
             .map(Arc::new)
     }
-    
-    async fn action<T: Sync + Send + Serialize, R: Sync + Send + Sized + for<'a> Deserialize<'a>>(
+
+    async fn action<
+        T: Sync + Send + Serialize,
+        R: Sync + Send + Sized + for<'de> Deserialize<'de>,
+    >(
         &self,
         action: &crate::Action<T, R>,
         params: &T,
     ) -> Result<R, Self::Error> {
         let mut endpoint_url = self.redfish_endpoint.clone();
         endpoint_url.set_path(&action.target.to_string());
-        
-        self.client.post(endpoint_url, params, &self.credentials).await
+
+        self.client
+            .post(endpoint_url, params, &self.credentials)
+            .await
     }
 }
 
@@ -545,6 +496,7 @@ pub enum BmcReqwestError {
     ReqwestError(reqwest::Error),
     InvalidResponse(Box<reqwest::Response>),
     CacheMiss,
+    CacheError(String),
 }
 
 #[cfg(feature = "reqwest")]
@@ -568,6 +520,10 @@ impl CacheableError for BmcReqwestError {
     fn cache_miss() -> Self {
         BmcReqwestError::CacheMiss
     }
+
+    fn cache_error(reason: String) -> Self {
+        BmcReqwestError::CacheError(reason)
+    }
 }
 
 #[cfg(feature = "reqwest")]
@@ -578,9 +534,8 @@ impl std::fmt::Display for BmcReqwestError {
             BmcReqwestError::InvalidResponse(response) => {
                 write!(f, "Invalid HTTP response: {}", response.status())
             }
-            BmcReqwestError::CacheMiss => {
-                write!(f, "Resource not found in cache")
-            }
+            BmcReqwestError::CacheMiss => write!(f, "Resource not found in cache"),
+            BmcReqwestError::CacheError(r) => write!(f, "Error occurred in cache {r}"),
         }
     }
 }
@@ -888,8 +843,12 @@ mod tests {
     #[cfg(feature = "reqwest")]
     #[test]
     fn test_cacheable_error_trait() {
-        let mock_response =
-            reqwest::Response::from(http::Response::builder().status(304).body("").unwrap());
+        let mock_response = reqwest::Response::from(
+            http::Response::builder()
+                .status(304)
+                .body("")
+                .expect("Valid empty body"),
+        );
         let error = BmcReqwestError::InvalidResponse(Box::new(mock_response));
         assert!(error.is_cached());
 

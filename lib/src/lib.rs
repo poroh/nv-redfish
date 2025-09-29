@@ -17,6 +17,8 @@
 pub mod action;
 /// Type for `@odata.id` identifier.
 pub mod bmc;
+/// Adaptive cache implementation using Clock-CAR algorithm
+pub mod cache;
 /// HTTP client abstractions and Redfish expand query support
 pub mod http;
 /// Type for navigation property.
