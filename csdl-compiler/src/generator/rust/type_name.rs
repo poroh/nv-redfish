@@ -13,9 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::edmx::attribute_values::SimpleIdentifier;
+use crate::compiler::TypeClass;
 use crate::edmx::ActionName as EdmxActionName;
 use crate::edmx::ParameterName;
+use crate::edmx::attribute_values::SimpleIdentifier;
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -53,8 +54,8 @@ impl<'a> TypeName<'a> {
     }
 
     #[must_use]
-    pub const fn for_update(&self) -> TypeNameForUpdate<'a> {
-        TypeNameForUpdate(*self)
+    pub const fn for_update(&self, type_class: Option<TypeClass>) -> TypeNameForUpdate<'a> {
+        TypeNameForUpdate(*self, type_class)
     }
 
     #[must_use]
@@ -90,11 +91,15 @@ impl Debug for TypeName<'_> {
     }
 }
 
-pub struct TypeNameForUpdate<'a>(TypeName<'a>);
+pub struct TypeNameForUpdate<'a>(TypeName<'a>, Option<TypeClass>);
 
 impl Display for TypeNameForUpdate<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}Update", self.0)
+        if self.1.is_none_or(|v| v == TypeClass::ComplexType) {
+            write!(f, "{}Update", self.0)
+        } else {
+            Display::fmt(&self.0, f)
+        }
     }
 }
 

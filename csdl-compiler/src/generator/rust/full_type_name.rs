@@ -14,15 +14,16 @@
 // limitations under the License.
 
 use crate::compiler::QualifiedName;
+use crate::compiler::TypeClass;
 use crate::generator::rust::Config;
 use crate::generator::rust::ModName;
 use crate::generator::rust::TypeName;
 use proc_macro2::Punct;
 use proc_macro2::Spacing;
 use proc_macro2::TokenStream;
-use quote::quote;
 use quote::ToTokens;
 use quote::TokenStreamExt as _;
+use quote::quote;
 
 /// Fully quailified type name for generation of the rust code.
 ///
@@ -43,8 +44,11 @@ impl<'a, 'config> FullTypeName<'a, 'config> {
     }
 
     #[must_use]
-    pub const fn for_update(&self) -> FullTypeNameForUpdate<'a, 'config> {
-        FullTypeNameForUpdate(*self)
+    pub const fn for_update(
+        &self,
+        type_class: Option<TypeClass>,
+    ) -> FullTypeNameForUpdate<'a, 'config> {
+        FullTypeNameForUpdate(*self, type_class)
     }
 
     #[must_use]
@@ -76,14 +80,14 @@ impl ToTokens for FullTypeName<'_, '_> {
     }
 }
 
-pub struct FullTypeNameForUpdate<'a, 'config>(FullTypeName<'a, 'config>);
+pub struct FullTypeNameForUpdate<'a, 'config>(FullTypeName<'a, 'config>, Option<TypeClass>);
 
 impl ToTokens for FullTypeNameForUpdate<'_, '_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.0.namespace_to_tokens(tokens);
         tokens.append(Punct::new(':', Spacing::Joint));
         tokens.append(Punct::new(':', Spacing::Joint));
-        let name = TypeName::new_qualified(self.0.type_name.name).for_update();
+        let name = TypeName::new_qualified(self.0.type_name.name).for_update(self.1);
         tokens.extend(quote! { #name });
     }
 }
