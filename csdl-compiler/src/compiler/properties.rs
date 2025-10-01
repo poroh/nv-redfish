@@ -185,10 +185,35 @@ impl TypeInfo {
     }
     /// Complex type info.
     #[must_use]
-    pub const fn complex_type(ct: &ComplexType) -> Self {
+    pub fn complex_type(ct: &ComplexType) -> Self {
         Self {
             class: TypeClass::ComplexType,
-            permissions: ct.odata.permissions,
+            permissions: ct.odata.permissions.or_else(|| {
+                // We can also say that complex type is read only if
+                // it doesn't contain properties or all properties are
+                // marked as ReadOnly.
+                //
+                // Note that for all properties with complex type we
+                // also have type info and we also can use it as
+                // read-only indicator. But it may require careful
+                // handling in optimizer (it will be not enough just
+                // go through all complex type and collect new type
+                // info because type info depends on other type infos
+                // recursively).
+                if ct.properties.is_empty()
+                    || ct.properties.properties.iter().all(|p| {
+                        p.odata.permissions.is_some_and(|v| v == Permissions::Read)
+                            || *p
+                                .ptype
+                                .map(|v| v.0.permissions.is_some_and(|v| v == Permissions::Read))
+                                .inner()
+                    })
+                {
+                    Some(Permissions::Read)
+                } else {
+                    None
+                }
+            }),
         }
     }
 }

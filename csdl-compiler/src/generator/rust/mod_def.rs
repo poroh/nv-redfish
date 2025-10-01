@@ -20,6 +20,7 @@ use crate::compiler::EntityType;
 use crate::compiler::EnumType;
 use crate::compiler::IsCreatable;
 use crate::compiler::TypeDefinition;
+use crate::compiler::TypeInfo;
 use crate::generator::rust::Config;
 use crate::generator::rust::EnumDef;
 use crate::generator::rust::Error;
@@ -106,7 +107,12 @@ impl<'a> ModDef<'a> {
             } else {
                 builder
             };
-            let builder = if ct.odata.permissions.is_none_or(|v| v != Permissions::Read) {
+            // If complex type cannot be used for updates then skip
+            // generation of Update structures.
+            let builder = if TypeInfo::complex_type(&ct)
+                .permissions
+                .is_none_or(|v| v != Permissions::Read)
+            {
                 builder.with_generate_type(vec![GenerateType::Read, GenerateType::Update])
             } else {
                 builder.with_generate_type(vec![GenerateType::Read])

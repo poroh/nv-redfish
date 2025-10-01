@@ -29,6 +29,7 @@ use crate::compiler::Properties;
 use crate::compiler::PropertiesManipulation as _;
 use crate::compiler::Property;
 use crate::compiler::QualifiedName;
+use crate::compiler::TypeInfo;
 use crate::optimizer::map_types_in_actions;
 use crate::optimizer::replace;
 use std::collections::HashMap;
@@ -76,33 +77,58 @@ pub fn prune_complex_type_inheritance<'a>(input: Compiled<'a>) -> Compiled<'a> {
         .into_iter()
         .partition(|(name, _)| replacements.contains_key(name));
 
-    let map_prop = |p: Property<'a>| p.map_type(|t| replace(&t, &replacements));
-    Compiled {
-        complex_types: retain
-            .into_iter()
-            // Pass all properties from single child parents to child.
-            .map(|(name, v)| {
-                let mut base = v.base;
-                let mut properties = vec![v.properties];
-                while let Some(next_base) = base {
-                    if let Some(parent) = remove.remove(&next_base) {
-                        properties.push(parent.properties);
-                        base = parent.base;
-                    } else {
-                        break;
-                    }
+    // Remaining complex types
+    let complex_types = retain
+        .into_iter()
+        // Pass all properties from single child parents to child.
+        .map(|(name, v)| {
+            let mut base = v.base;
+            let mut properties = vec![v.properties];
+            while let Some(next_base) = base {
+                if let Some(parent) = remove.remove(&next_base) {
+                    properties.push(parent.properties);
+                    base = parent.base;
+                } else {
+                    break;
                 }
-                (
-                    name,
-                    ComplexType {
-                        name: v.name,
-                        base,
-                        properties: Properties::rev_join(properties),
-                        odata: v.odata,
-                    },
-                )
-            })
-            // Replace all names that can refer to parent classes
+            }
+            (
+                name,
+                ComplexType {
+                    name: v.name,
+                    base,
+                    properties: Properties::rev_join(properties),
+                    odata: v.odata,
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    // Collect new type info for all properties that points to
+    // specific types:
+    let complex_types_type_info = complex_types
+        .iter()
+        .map(|(name, v)| (*name, TypeInfo::complex_type(v)))
+        .collect::<HashMap<_, _>>();
+    // NOTE: that this optimization can cause potential inconsistency
+    // in type info because type info has recursive behavior for
+    // permissions (permissions of ComplexType depends on permissions
+    // of it's properties, and further properties may be complex types
+    // and depends of permissions of properties of layer
+    // below). Therefore, potentialy this optmization will not mark
+    // propety with proper permissions if more than one step needed to
+    // propagate permissions.
+    let map_prop = |p: Property<'a>| {
+        // Replace type:
+        let mut p = p.map_type(|t| replace(&t, &replacements));
+        // Replace type info.
+        if let Some(typeinfo) = complex_types_type_info.get(&p.ptype.name()) {
+            p.ptype = p.ptype.map(|(_, name)| (*typeinfo, name));
+        }
+        p
+    };
+    Compiled {
+        complex_types: complex_types
+            .into_iter()
             .map(|(name, v)| (name, v.map_properties(map_prop)))
             .collect(),
         entity_types: input

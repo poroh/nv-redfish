@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
 use nv_redfish::ActionError;
 use nv_redfish::Bmc;
 use nv_redfish::Expandable;
@@ -27,6 +25,7 @@ use redfish_std::redfish::resource::ResetType;
 use redfish_std::redfish::service_root::ServiceRoot;
 use serde::Deserialize;
 use serde::Serialize;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum Error {

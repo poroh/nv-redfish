@@ -256,7 +256,7 @@ impl<'a> StructDef<'a> {
         let name = self.name.for_update(None);
         tokens.extend([quote! {
             #[doc = #comment]
-            #[derive(Serialize, Debug, Default)]
+            #[derive(Serialize, Debug)]
             pub struct #name { #content }
         }]);
     }
@@ -308,7 +308,7 @@ impl<'a> StructDef<'a> {
         let name = self.name.for_create();
         tokens.extend([quote! {
             #[doc = #comment]
-            #[derive(Serialize, Debug, Default)]
+            #[derive(Serialize, Debug)]
             pub struct #name { #content }
         }]);
     }
@@ -434,6 +434,9 @@ impl<'a> StructDef<'a> {
                 ptype
                 @ (PropertyType::One((typeinfo, v)) | PropertyType::Collection((typeinfo, v))),
             ) => {
+                if typeinfo.permissions.is_some_and(|p| p == Permissions::Read) {
+                    return quote! {};
+                }
                 let full_type = FullTypeName::new(v, config).for_update(Some(typeinfo.class));
                 let optional = Some(*p.is_nullable.inner());
                 Self::gen_de_struct_field(&ptype, full_type, rename, optional)
@@ -516,12 +519,14 @@ impl<'a> StructDef<'a> {
             for p in &a.parameters {
                 let top = &config.top_module_alias;
                 let name = StructFieldName::new_parameter(p.name);
-                params.extend(quote! { #name, });
                 let argtype = match p.ptype {
                     ParameterType::Type(
                         ptype @ (PropertyType::One((typeinfo, v))
                         | PropertyType::Collection((typeinfo, v))),
                     ) => {
+                        if typeinfo.permissions.is_some_and(|p| p == Permissions::Read) {
+                            continue;
+                        }
                         let full_type =
                             FullTypeName::new(v, config).for_update(Some(typeinfo.class));
                         Self::gen_de_struct_field_type(
@@ -535,6 +540,7 @@ impl<'a> StructDef<'a> {
                         Self::gen_de_struct_field_type(&e, full_type, Some(true))
                     }
                 };
+                params.extend(quote! { #name, });
                 arglist.extend(quote! {, #name: #argtype });
             }
             content.extend([
