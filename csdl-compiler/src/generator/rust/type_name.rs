@@ -17,6 +17,7 @@ use crate::compiler::TypeClass;
 use crate::edmx::ActionName as EdmxActionName;
 use crate::edmx::ParameterName;
 use crate::edmx::attribute_values::SimpleIdentifier;
+use crate::generator::casemungler;
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -73,7 +74,7 @@ impl ToTokens for TypeName<'_> {
 impl Display for TypeName<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            Self::Qualified(v) => f.write_str(v.inner()),
+            Self::Qualified(v) => f.write_str(&casemungler::to_camel(v.inner())),
 
             Self::Action {
                 binding_name,
