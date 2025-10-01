@@ -13,14 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use nv_redfish::Expandable;
+use nv_redfish::ODataId;
 use nv_redfish::bmc::BmcCredentials;
 use nv_redfish::http::BmcReqwestError;
 use nv_redfish::http::ExpandQuery;
 use nv_redfish::http::HttpBmc;
 use nv_redfish::http::ReqwestClient;
 use nv_redfish::http::ReqwestClientParams;
-use nv_redfish::Expandable;
-use nv_redfish::ODataId;
 use url::Url;
 
 #[tokio::main]
@@ -116,9 +116,9 @@ async fn main() -> Result<(), BmcReqwestError> {
         .run(
             &bmc,
             &redfish_std::redfish::bios::BiosChangePasswordAction {
-                password_name: Some("admin".into()),
-                old_password: Some("admin1".into()),
-                new_password: Some("admin2".into()),
+                password_name: "admin".into(),
+                old_password: "admin1".into(),
+                new_password: "admin2".into(),
             },
         )
         .await?;

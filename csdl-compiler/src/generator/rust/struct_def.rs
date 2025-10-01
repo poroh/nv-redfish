@@ -17,7 +17,6 @@ use crate::OneOrCollection;
 use crate::compiler::Action;
 use crate::compiler::ActionsMap;
 use crate::compiler::NavProperty;
-use crate::compiler::NavPropertyType;
 use crate::compiler::OData;
 use crate::compiler::Parameter;
 use crate::compiler::ParameterType;
@@ -36,7 +35,7 @@ use proc_macro2::Ident;
 use proc_macro2::Literal;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
-use quote::ToTokens as _;
+use quote::ToTokens;
 use quote::quote;
 use std::iter;
 
@@ -232,10 +231,10 @@ impl<'a> StructDef<'a> {
         let properties = self.properties.properties.iter().filter_map(|p| {
             if p.odata.permissions_is_write() {
                 let (class, v) = &p.ptype.inner();
-                let full_type_name = FullTypeName::new(*v, config).for_update(Some(*class));
+                let full_type = FullTypeName::new(*v, config).for_update(Some(*class));
                 let prop_type = match p.ptype {
-                    PropertyType::One(_) => quote! { Option<#full_type_name> },
-                    PropertyType::Collection(_) => quote! { Vec<#full_type_name> },
+                    PropertyType::One(_) => quote! { Option<#full_type> },
+                    PropertyType::Collection(_) => quote! { Vec<#full_type> },
                 };
                 let rename = Literal::string(p.name.inner().inner());
                 let name = StructFieldName::new_property(p.name);
@@ -262,17 +261,17 @@ impl<'a> StructDef<'a> {
         let properties = self.properties.properties.iter().filter_map(|p| {
             if p.odata.permissions_is_write() {
                 let (class, v) = &p.ptype.inner();
-                let full_type_name = FullTypeName::new(*v, config).for_update(Some(*class));
+                let full_type = FullTypeName::new(*v, config).for_update(Some(*class));
                 let prop_type = match p.ptype {
                     PropertyType::One(_) => {
                         if p.redfish.is_required_on_create.into_inner() {
-                            quote! { #full_type_name }
+                            quote! { #full_type }
                         } else {
-                            quote! { Option<#full_type_name> }
+                            quote! { Option<#full_type> }
                         }
                     }
                     PropertyType::Collection(_) => {
-                        quote! { Vec<#full_type_name> }
+                        quote! { Vec<#full_type> }
                     }
                 };
                 let rename = Literal::string(p.name.inner().inner());
@@ -317,30 +316,64 @@ impl<'a> StructDef<'a> {
 
     fn generate_property(p: &Property<'_>, config: &Config) -> TokenStream {
         let doc = doc_format_and_generate(p.name, &p.odata);
-        let ptype = FullTypeName::new(p.ptype.name(), config);
-        let rename = Literal::string(p.name.inner().inner());
-        let (serde, prop_type) = match p.ptype {
-            PropertyType::One(_) => (
-                quote! { #[serde(rename=#rename)] },
-                if p.redfish.is_required.into_inner() {
-                    quote! { #ptype }
-                } else {
-                    quote! { Option<#ptype> }
-                },
-            ),
-            PropertyType::Collection(_) => (
-                if p.redfish.is_required.into_inner() {
-                    quote! { #[serde(rename=#rename)] }
-                } else {
-                    quote! { #[serde(rename=#rename, default)] }
-                },
-                quote! { Vec<#ptype> },
-            ),
-        };
+        let (serde, field_type) = Self::gen_de_struct_field(
+            &p.ptype,
+            FullTypeName::new(p.ptype.name(), config),
+            Literal::string(p.name.inner().inner()),
+            Some(!p.redfish.is_required.into_inner()),
+        );
         let name = StructFieldName::new_property(p.name);
         quote! {
             #doc #serde
-            pub #name: #prop_type,
+            pub #name: #field_type,
+        }
+    }
+
+    // Returns serde annotation and field type token streams.
+    fn gen_de_struct_field<T>(
+        cardinality: &OneOrCollection<T>,
+        ftype: impl ToTokens,
+        rename: impl ToTokens,
+        optional: Option<bool>,
+    ) -> (TokenStream, TokenStream) {
+        (
+            Self::gen_de_struct_field_serde_annot(cardinality, rename, optional),
+            Self::gen_de_struct_field_type(cardinality, ftype, optional),
+        )
+    }
+
+    fn gen_de_struct_field_serde_annot<T>(
+        cardinality: &OneOrCollection<T>,
+        rename: impl ToTokens,
+        optional: Option<bool>,
+    ) -> TokenStream {
+        match cardinality {
+            OneOrCollection::One(_) => quote! { #[serde(rename=#rename)] },
+            OneOrCollection::Collection(_) => {
+                if optional.is_some_and(|v| v) {
+                    quote! { #[serde(rename=#rename, default)] }
+                } else {
+                    quote! { #[serde(rename=#rename)] }
+                }
+            }
+        }
+    }
+
+    // Returns serde annotation and field type token streams.
+    fn gen_de_struct_field_type<T>(
+        cardinality: &OneOrCollection<T>,
+        ftype: impl ToTokens,
+        optional: Option<bool>,
+    ) -> TokenStream {
+        match cardinality {
+            OneOrCollection::One(_) => {
+                if optional.is_some_and(|v| v) {
+                    quote! { Option<#ftype> }
+                } else {
+                    quote! { #ftype }
+                }
+            }
+            OneOrCollection::Collection(_) => quote! { Vec<#ftype> },
         }
     }
 
@@ -353,43 +386,19 @@ impl<'a> StructDef<'a> {
                     return TokenStream::new();
                 }
                 let doc = doc_format_and_generate(p.ptype.name(), &p.odata);
-                let ptype = FullTypeName::new(p.ptype.name(), config);
-                match p.ptype {
-                    NavPropertyType::One(_) => (
-                        doc,
-                        quote! { #[serde(rename=#rename)] },
-                        if p.redfish.is_required.into_inner() {
-                            quote! { NavProperty<#ptype> }
-                        } else {
-                            quote! { Option<NavProperty<#ptype>> }
-                        },
-                    ),
-                    NavPropertyType::Collection(_) => (
-                        doc,
-                        if p.redfish.is_required.into_inner() {
-                            quote! { #[serde(rename=#rename)] }
-                        } else {
-                            quote! { #[serde(rename=#rename, default)] }
-                        },
-                        quote! { Vec<NavProperty<#ptype>> },
-                    ),
-                }
+                let full_type = FullTypeName::new(p.ptype.name(), config);
+                let optional = Some(!p.redfish.is_required.into_inner());
+                let ptype = quote! { NavProperty<#full_type> };
+                let (sa, t) = Self::gen_de_struct_field(&p.ptype, ptype, rename, optional);
+                (doc, sa, t)
             }
-            NavProperty::Reference(OneOrCollection::One(_)) => {
+            NavProperty::Reference(r) => {
+                let doc = TokenStream::new();
                 let top = &config.top_module_alias;
-                (
-                    TokenStream::new(),
-                    quote! { #[serde(rename=#rename, default)] },
-                    quote! { Option<#top::Reference> },
-                )
-            }
-            NavProperty::Reference(OneOrCollection::Collection(_)) => {
-                let top = &config.top_module_alias;
-                (
-                    TokenStream::new(),
-                    quote! { #[serde(rename=#rename, default)] },
-                    quote! { Vec<#top::Reference> },
-                )
+                let optional = None;
+                let ptype = quote! { #top::Reference };
+                let (sa, t) = Self::gen_de_struct_field(r, ptype, rename, optional);
+                (doc, sa, t)
             }
         };
         quote! {
@@ -403,49 +412,23 @@ impl<'a> StructDef<'a> {
         let doc = doc_format_and_generate(p.name, &p.odata);
         let rename = Literal::string(p.name.inner().inner());
         let name = StructFieldName::new_parameter(p.name);
-        let (serde, parameter) = match p.ptype {
+        let (serde, ptype) = match p.ptype {
             ParameterType::Type(
                 ptype @ (PropertyType::One((class, v)) | PropertyType::Collection((class, v))),
             ) => {
-                let base_type = FullTypeName::new(v, config).for_update(Some(class));
-                match ptype {
-                    PropertyType::One(_) => (
-                        quote! { #[serde(rename=#rename)] },
-                        if *p.is_nullable.inner() {
-                            quote! { pub #name: #base_type }
-                        } else {
-                            quote! { pub #name: Option<#base_type> }
-                        },
-                    ),
-                    PropertyType::Collection(_) => (
-                        if *p.is_nullable.inner() {
-                            quote! { #[serde(rename=#rename)] }
-                        } else {
-                            quote! { #[serde(rename=#rename, default)] }
-                        },
-                        quote! { pub #name: Vec<#base_type> },
-                    ),
-                }
+                let full_type = FullTypeName::new(v, config).for_update(Some(class));
+                let optional = Some(*p.is_nullable.inner());
+                Self::gen_de_struct_field(&ptype, full_type, rename, optional)
             }
-            ParameterType::Entity(NavPropertyType::One(_)) => {
+            ParameterType::Entity(e) => {
                 let top = &config.top_module_alias;
-                (
-                    quote! { #[serde(rename=#rename)] },
-                    quote! { pub #name: Option<#top::Reference> },
-                )
-            }
-            ParameterType::Entity(NavPropertyType::Collection(_)) => {
-                let top = &config.top_module_alias;
-                (
-                    quote! { #[serde(rename=#rename, default)] },
-                    quote! { pub #name: Vec<#top::Reference> },
-                )
+                Self::gen_de_struct_field(&e, quote! { #top::Reference }, rename, Some(true))
             }
         };
         quote! {
             #doc
             #serde
-            #parameter,
+            pub #name: #ptype,
         }
     }
 
@@ -504,7 +487,7 @@ impl<'a> StructDef<'a> {
         let ret_type = match a.return_type {
             Some(OneOrCollection::One(v)) => FullTypeName::new(v, config).to_token_stream(),
             Some(OneOrCollection::Collection(v)) => {
-                let typename = FullTypeName::new(v, config).to_token_stream();
+                let typename = FullTypeName::new(v, config);
                 quote! { Vec<#typename> }
             }
             None => quote! { #top::Empty },
@@ -516,32 +499,24 @@ impl<'a> StructDef<'a> {
                 let top = &config.top_module_alias;
                 let name = StructFieldName::new_parameter(p.name);
                 params.extend(quote! { #name, });
-                match p.ptype {
+                let argtype = match p.ptype {
                     ParameterType::Type(
                         ptype @ (PropertyType::One((class, v))
                         | PropertyType::Collection((class, v))),
                     ) => {
-                        let base_type = FullTypeName::new(v, config).for_update(Some(class));
-                        match ptype {
-                            PropertyType::One(_) => {
-                                if *p.is_nullable.inner() {
-                                    arglist.extend(quote! {, #name: #base_type });
-                                } else {
-                                    arglist.extend(quote! {, #name: Option<#base_type> });
-                                }
-                            }
-                            PropertyType::Collection(_) => {
-                                arglist.extend(quote! {, #name: Vec<#base_type> });
-                            }
-                        }
+                        let full_type = FullTypeName::new(v, config).for_update(Some(class));
+                        Self::gen_de_struct_field_type(
+                            &ptype,
+                            full_type,
+                            Some(*p.is_nullable.inner()),
+                        )
                     }
-                    ParameterType::Entity(NavPropertyType::One(_)) => {
-                        arglist.extend(quote! {, #name: Option<#top::Reference> });
+                    ParameterType::Entity(e) => {
+                        let full_type = quote! { #top::Reference };
+                        Self::gen_de_struct_field_type(&e, full_type, Some(true))
                     }
-                    ParameterType::Entity(NavPropertyType::Collection(_)) => {
-                        arglist.extend(quote! {, #name: Vec<#top::Reference> });
-                    }
-                }
+                };
+                arglist.extend(quote! {, #name: #argtype });
             }
             content.extend([
                 doc_format_and_generate(a.name, &a.odata),
@@ -550,7 +525,7 @@ impl<'a> StructDef<'a> {
                     where B::Error: #top::ActionError,
                     {
                         if let Some(a) = &self.#name  {
-                            a.run(bmc, &#typename{
+                            a.run(bmc, &#typename {
                                 #params
                             }).await
                         } else {

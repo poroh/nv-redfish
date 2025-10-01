@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::Error;
 use crate::compiler::Config as CompilerConfig;
 use crate::compiler::EntityTypeFilter;
 use crate::compiler::EntityTypeFilterPattern;
@@ -21,10 +22,9 @@ use crate::edmx::Edmx;
 use crate::generator::rust::Config as GeneratorConfig;
 use crate::generator::rust::RustGenerator;
 use crate::optimizer::optimize;
-use crate::Error;
 use clap::Subcommand;
-use std::fs::write;
 use std::fs::File;
+use std::fs::write;
 use std::io::Read as _;
 use std::path::PathBuf;
 
