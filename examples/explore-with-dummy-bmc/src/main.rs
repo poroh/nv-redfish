@@ -15,12 +15,14 @@
 
 use nv_redfish::ActionError;
 use nv_redfish::Bmc;
+use nv_redfish::Creatable;
 use nv_redfish::Expandable;
 use nv_redfish::ODataId;
 use nv_redfish::Updatable;
 use nv_redfish::http::ExpandQuery;
 use redfish_oem_contoso::redfish::contoso_turboencabulator_service::ContosoTurboencabulatorServiceUpdate;
 use redfish_oem_contoso::redfish::contoso_turboencabulator_service::TurboencabulatorMode;
+use redfish_std::redfish::manager_account::ManagerAccountCreate;
 use redfish_std::redfish::resource::ResetType;
 use redfish_std::redfish::service_root::ServiceRoot;
 use serde::Deserialize;
@@ -60,6 +62,7 @@ impl MockBmc {
                       "Name": "Root Service",
                       "RedfishVersion": "1.19.0",
                       "UUID": "12345678-1234-1234-1234-123456789012",
+                      "AccountService": { "@odata.id": "/redfish/v1/AccountService" },
                       "Chassis": {"@odata.id": "/redfish/v1/Chassis"},
                       "Systems": {"@odata.id": "/redfish/v1/Systems"},
                       "SessionService": {"@odata.id": "/redfish/v1/SessionService"},
@@ -406,6 +409,43 @@ impl MockBmc {
                        "WillGovernmentBuy": true
                    }"##.to_string()
             }
+            "/redfish/v1/AccountService" => {
+                r##"{
+                   "@odata.id": "/redfish/v1/AccountService",
+                   "Id": "AccountService",
+                   "Accounts": { "@odata.id": "/redfish/v1/AccountService/Accounts" },
+                   "Description": "User Accounts",
+                   "LocalAccountAuth": "Enabled",
+                   "MinPasswordLength": 8,
+                   "Name": "Account Service",
+                   "Oem": {},
+                   "Roles": { "@odata.id": "/redfish/v1/AccountService/Roles" }
+               }"##.to_string()
+            }
+            "/redfish/v1/AccountService/Accounts" => {
+               r##"{
+                   "@odata.id": "/redfish/v1/AccountService/Accounts",
+                   "Description": "User Accounts",
+                   "Name": "Accounts",
+                   "Members": []
+               }"##.to_string()
+            }
+            "/redfish/v1/AccountService/Accounts/1" => {
+                r##"{
+                   "@odata.id": "/redfish/v1/AccountService/Accounts/1",
+                   "AccountTypes": [],
+                   "Id": "1",
+                   "Description": "User Account",
+                   "Enabled": true,
+                   "Links": {},
+                   "Name": "User Account",
+                   "Oem": {},
+                   "Password": null,
+                   "PasswordChangeRequired": false,
+                   "RoleId": "Administrator",
+                   "UserName": "Administrator"
+               }"##.to_string()
+            }
             _ => {
                 r#"{"id": "unknown", "name": "Unknown Resource"}"#.to_string()
             }
@@ -452,10 +492,17 @@ impl Bmc for MockBmc {
         R: Sync + Send + Sized + for<'a> serde::Deserialize<'a>,
     >(
         &self,
-        _id: &ODataId,
-        _v: &V,
+        id: &ODataId,
+        create: &V,
     ) -> Result<R, Self::Error> {
-        todo!("unimplimented")
+        println!(
+            "BMC create {}: {}",
+            id,
+            serde_json::to_string(create).expect("serializable")
+        );
+        let mock_json = self.get_mock_json_for_uri("/redfish/v1/AccountService/Accounts/1");
+        let result: R = serde_json::from_str(&mock_json).map_err(Error::ParseError)?;
+        Ok(result)
     }
 
     async fn delete(&self, _id: &ODataId) -> Result<(), Self::Error> {
@@ -624,5 +671,51 @@ async fn main() -> Result<(), Error> {
     };
     turboencabulator_service.update(&bmc, &update).await?;
 
+    println!("Create account");
+    let account = service_root
+        .account_service
+        .as_ref()
+        .ok_or(Error::ExpectedField("account_service"))?
+        .get(&bmc)
+        .await?
+        .accounts
+        .as_ref()
+        .ok_or(Error::ExpectedField("accounts"))?
+        .get(&bmc)
+        .await?
+        .create(
+            &bmc,
+            &ManagerAccountCreate {
+                password: "secret_password".into(),
+                user_name: "Administrator".into(),
+                role_id: "admin".into(),
+                locked: None,
+                enabled: None,
+                password_change_required: None,
+                snmp: None,
+                account_types: None,
+                oem_account_types: None,
+                password_expiration: None,
+                strict_account_types: None,
+                account_expiration: None,
+                email_address: None,
+                phone_number: None,
+                one_time_passcode_delivery_address: None,
+            },
+        )
+        .await?;
+    println!("  Ok!");
+    println!("Returned account:");
+    println!(
+        "  User name: {}",
+        account.user_name.as_ref().unwrap_or(&"-".to_string())
+    );
+    println!(
+        "  Enabled: {}",
+        account
+            .enabled
+            .map(|b| b.to_string())
+            .unwrap_or("-".to_string())
+    );
     Ok(())
 }
