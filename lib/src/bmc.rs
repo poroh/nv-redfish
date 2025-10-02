@@ -18,11 +18,11 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::http::ExpandQuery;
 use crate::Action;
 use crate::EntityType;
 use crate::Expandable;
 use crate::ODataId;
+use crate::http::ExpandQuery;
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
@@ -50,11 +50,11 @@ pub trait Bmc {
         query: &V,
     ) -> impl Future<Output = Result<R, Self::Error>> + Send;
 
-    fn update<V: Sync + Send + Serialize>(
+    fn update<V: Sync + Send + Serialize, R: Send + Sync + Sized + for<'a> Deserialize<'a>>(
         &self,
         id: &ODataId,
         query: &V,
-    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    ) -> impl Future<Output = Result<R, Self::Error>> + Send;
 
     fn delete(&self, id: &ODataId) -> impl Future<Output = Result<(), Self::Error>> + Send;
 

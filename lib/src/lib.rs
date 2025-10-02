@@ -55,6 +55,14 @@ pub trait EntityType {
 
     /// Value of `@odata.etag` field of the Entity.
     fn etag(&self) -> &Option<ODataETag>;
+
+    /// Update entity using `update` as payload.
+    fn refresh<B: Bmc>(&self, bmc: &B) -> impl Future<Output = Result<Arc<Self>, B::Error>> + Send
+    where
+        Self: Sync + Send + 'static + Sized + for<'de> Deserialize<'de>,
+    {
+        bmc.get::<Self>(self.id())
+    }
 }
 
 pub trait Expandable: EntityType + Sized + for<'a> Deserialize<'a> {
@@ -99,14 +107,17 @@ pub trait Creatable<V: Sync + Send + Serialize, R: Sync + Send + Sized + for<'de
 
 /// This trait is assigned to entity types that are marked as
 /// updatable in CSDL specification.
-pub trait Updatable<V: Sync + Send + Serialize>: EntityType + Sized {
+pub trait Updatable<V: Sync + Send + Serialize>: EntityType + Sized
+where
+    Self: Sync + Send + Sized + for<'de> Deserialize<'de>,
+{
     /// Update entity using `update` as payload.
     fn update<B: Bmc>(
         &self,
         bmc: &B,
         update: &V,
-    ) -> impl Future<Output = Result<(), B::Error>> + Send {
-        bmc.update::<V>(self.id(), update)
+    ) -> impl Future<Output = Result<Self, B::Error>> + Send {
+        bmc.update::<V, Self>(self.id(), update)
     }
 }
 

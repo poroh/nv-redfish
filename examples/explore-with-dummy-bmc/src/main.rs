@@ -16,6 +16,7 @@
 use nv_redfish::ActionError;
 use nv_redfish::Bmc;
 use nv_redfish::Creatable;
+use nv_redfish::EntityType;
 use nv_redfish::Expandable;
 use nv_redfish::ODataId;
 use nv_redfish::Updatable;
@@ -474,17 +475,22 @@ impl Bmc for MockBmc {
         Ok(Arc::new(result))
     }
 
-    async fn update<V: Sync + Send + Serialize>(
+    async fn update<
+        V: Sync + Send + Serialize,
+        R: Sync + Send + Sized + for<'a> serde::Deserialize<'a>,
+    >(
         &self,
         id: &ODataId,
         update: &V,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<R, Self::Error> {
         println!(
             "BMC Update {}: {}",
             id,
             serde_json::to_string(update).expect("serializable")
         );
-        Ok(())
+        let mock_json = self.get_mock_json_for_uri(&id.to_string());
+        let result: R = serde_json::from_str(&mock_json).map_err(Error::ParseError)?;
+        Ok(result)
     }
 
     async fn create<
@@ -669,7 +675,8 @@ async fn main() -> Result<(), Error> {
         turboencabulator_mode: Some(TurboencabulatorMode::Turbo),
         service_enabled: None,
     };
-    turboencabulator_service.update(&bmc, &update).await?;
+    let updated = turboencabulator_service.update(&bmc, &update).await?;
+    let _ = updated.refresh(&bmc).await?;
 
     println!("Create account");
     let account = service_root

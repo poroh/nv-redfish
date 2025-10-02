@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{
     collections::HashMap,
     future::Future,
@@ -22,7 +22,7 @@ use std::{
 use url::Url;
 
 use crate::{
-    bmc::BmcCredentials, cache::TypeErasedCarCache, Bmc, EntityType, Expandable, ODataETag, ODataId,
+    Bmc, EntityType, Expandable, ODataETag, ODataId, bmc::BmcCredentials, cache::TypeErasedCarCache,
 };
 
 /// Builder for Redfish `$expand` query parameters according to DSP0266 specification.
@@ -481,11 +481,11 @@ where
         todo!()
     }
 
-    async fn update<V: Sync + Send + Serialize>(
+    async fn update<V: Sync + Send + Serialize, R: Sync + Send + for<'de> Deserialize<'de>>(
         &self,
         _id: &ODataId,
         _v: &V,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<R, Self::Error> {
         todo!()
     }
 
