@@ -37,6 +37,7 @@ use std::time::Duration as StdDuration;
 /// This type designed to prevent data loss during deserialization and
 /// provides conversion to specific data types. If you don't care
 /// about precision you can always use conversion to f64 seconds.
+#[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct EdmDuration(Decimal);
 

@@ -189,7 +189,7 @@ impl<'a> RustGenerator<'a> {
                 /// Mapping of Edm.Boolean type
                 pub type Boolean = bool;
                 /// Mapping of DateTimeOffset type
-                pub type DateTimeOffset = String;
+                pub type DateTimeOffset = nv_redfish::EdmDateTimeOffset;
                 /// Mapping of Edm.Decimal
                 pub type Decimal = f64;
                 /// Mapping of Duration type
