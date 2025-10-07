@@ -257,6 +257,7 @@ dependencies = [
  "serde_json",
  "syn",
  "tagged-types",
+ "toml",
 ]
 
 [[package]]

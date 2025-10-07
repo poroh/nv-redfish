@@ -1,0 +1,26 @@
+
+[[features]]
+name = "accounts"
+csdl_files = [
+    "AccountService_v1.xml",
+    "ManagerAccountCollection_v1.xml",
+    "ManagerAccount_v1.xml",
+    "Privileges_v1.xml"
+]
+patterns = [
+    "AccountService.*",
+    "ManagerAccountCollection.*",
+    "ManagerAccount.*"
+]
+
+[[features]]
+name = "events"
+csdl_files = [
+    "EventService_v1.xml",
+    "Event_v1.xml",
+    "EventDestination_v1.xml",
+]
+patterns = [
+    "EventService.*",
+]
+

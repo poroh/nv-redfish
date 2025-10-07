@@ -41,6 +41,7 @@ time = { version = "0.3", default-features = false }
 rust_decimal = { version = "1.38", default-features = false }
 nv-redfish-core = { version = "0.1", path = "./core" }
 csdl-compiler = { version = "0.1", path = "./csdl-compiler" }
+toml = { version = "0.9", default-features = false }
 
 # Dev
 tokio = "1"

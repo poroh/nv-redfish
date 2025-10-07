@@ -18,6 +18,10 @@
 use crate::compiler::QualifiedName;
 use crate::compiler::SchemaIndex;
 use crate::edmx::SimpleIdentifier;
+use serde::Deserialize;
+use serde::Deserializer;
+use serde::de::Error as DeError;
+use serde::de::Visitor;
 use std::collections::HashSet;
 use std::error::Error as StdError;
 use std::fmt::Display;
@@ -129,6 +133,23 @@ impl FromStr for EntityTypeFilterPattern {
         } else {
             Err(FilterPatternError::EmptyPattern)
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for EntityTypeFilterPattern {
+    fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        struct ValVisitor {}
+        impl Visitor<'_> for ValVisitor {
+            type Value = EntityTypeFilterPattern;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> FmtResult {
+                formatter.write_str("entity filter pattern string")
+            }
+            fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
+                value.parse().map_err(DeError::custom)
+            }
+        }
+        de.deserialize_string(ValVisitor {})
     }
 }
 

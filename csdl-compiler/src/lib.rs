@@ -47,6 +47,8 @@ pub mod compiler;
 pub mod edmx;
 /// Errors of compiler.
 pub mod error;
+/// Manifest defines features to be compiled.
+pub mod features_manifest;
 /// Redfish code generator.
 pub mod generator;
 /// OData-related functions.
