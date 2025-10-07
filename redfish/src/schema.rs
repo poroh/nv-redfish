@@ -13,11 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod schema;
-
-/// Accounts Service.
-#[cfg(feature = "accounts")]
-pub mod accounts;
-/// Events Service.
-#[cfg(feature = "events")]
-pub mod events;
+/// Compiled schema that contains all serialized / deserialized data
+/// types required for features. We don't export these types to
+/// user. Each individual feature implementation may reexport if
+/// needed.
+#[allow(dead_code)]
+pub(crate) mod redfish {
+    include!(concat!(env!("OUT_DIR"), "/redfish.rs"));
+}

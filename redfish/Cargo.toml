@@ -16,6 +16,7 @@ events = []
 
 [dependencies]
 nv-redfish-core = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
 [build-dependencies]
 csdl-compiler = { workspace = true }
