@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{
     collections::HashMap,
+    error::Error as StdError,
     future::Future,
     sync::{Arc, RwLock},
 };
@@ -286,7 +287,7 @@ impl ExpandQuery {
 use std::time::Duration;
 
 pub trait HttpClient: Send + Sync {
-    type Error: Send;
+    type Error: Send + StdError;
 
     /// Perform an HTTP GET request with optional conditional headers.
     fn get<T>(
@@ -403,7 +404,7 @@ where
 }
 
 /// A tagged type representing a Redfish endpoint URL.
-/// 
+///
 /// Provides convenient conversion methods to build endpoint URLs from ODataId paths.
 #[derive(Debug, Clone)]
 pub struct RedfishEndpoint {
@@ -459,7 +460,7 @@ pub trait CacheableError {
 
 impl<C: HttpClient> Bmc for HttpBmc<C>
 where
-    C::Error: CacheableError,
+    C::Error: CacheableError + StdError,
 {
     type Error = C::Error;
 
@@ -523,7 +524,9 @@ where
         id: &ODataId,
         query: ExpandQuery,
     ) -> Result<Arc<T>, Self::Error> {
-        let endpoint_url = self.redfish_endpoint.with_path_and_query(&id.to_string(), &query.to_query_string());
+        let endpoint_url = self
+            .redfish_endpoint
+            .with_path_and_query(&id.to_string(), &query.to_query_string());
 
         self.client
             .get::<T>(endpoint_url, &self.credentials, None)
@@ -882,7 +885,8 @@ impl HttpClient for ReqwestClient {
         B: Serialize,
         T: DeserializeOwned,
     {
-        self.send_json_request(reqwest::Method::POST, url, body, credentials).await
+        self.send_json_request(reqwest::Method::POST, url, body, credentials)
+            .await
     }
 
     async fn patch<B, T>(
@@ -895,7 +899,8 @@ impl HttpClient for ReqwestClient {
         B: Serialize + Sync,
         T: DeserializeOwned + Send,
     {
-        self.send_json_request(reqwest::Method::PATCH, url, body, credentials).await
+        self.send_json_request(reqwest::Method::PATCH, url, body, credentials)
+            .await
     }
 
     async fn delete(&self, url: Url, credentials: &BmcCredentials) -> Result<Empty, Self::Error> {

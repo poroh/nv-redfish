@@ -31,7 +31,6 @@ use nv_redfish_tests::base::redfish::service_root::ActionType;
 use nv_redfish_tests::base::redfish::service_root::ServiceRootUpdate;
 use nv_redfish_tests::base::redfish::service_root::TestCollectionMemberCreate;
 use nv_redfish_tests::json_merge;
-
 use serde_json::json;
 use tokio::test;
 

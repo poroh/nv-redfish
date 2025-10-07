@@ -13,7 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod error;
 pub mod schema;
+
+/// Implmentation of service root.
+pub mod service_root;
 
 /// Accounts Service.
 #[cfg(feature = "accounts")]
@@ -21,3 +25,9 @@ pub mod accounts;
 /// Events Service.
 #[cfg(feature = "events")]
 pub mod events;
+
+#[doc(inline)]
+pub use error::Error;
+
+#[doc(inline)]
+pub use service_root::ServiceRoot;

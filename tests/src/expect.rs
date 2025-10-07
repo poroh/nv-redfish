@@ -27,6 +27,11 @@ pub enum Expect {
         id: ODataId,
         response: serde_json::Value,
     },
+    /// Expectation of get of specific object
+    Expand {
+        id: ODataId,
+        response: serde_json::Value,
+    },
     /// Expectation of update of specific object
     Update {
         id: ODataId,
@@ -50,6 +55,12 @@ pub enum Expect {
 impl Expect {
     pub fn get(uri: impl Display, response: impl Display) -> Self {
         Expect::Get {
+            id: uri.to_string().into(),
+            response: serde_json::from_str(&response.to_string()).expect("invalid json"),
+        }
+    }
+    pub fn expand(uri: impl Display, response: impl Display) -> Self {
+        Expect::Expand {
             id: uri.to_string().into(),
             response: serde_json::from_str(&response.to_string()).expect("invalid json"),
         }

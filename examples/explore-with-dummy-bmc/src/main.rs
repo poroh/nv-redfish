@@ -31,6 +31,10 @@ use redfish_std::redfish::resource::ResetType;
 use redfish_std::redfish::service_root::ServiceRoot;
 use serde::Deserialize;
 use serde::Serialize;
+use std::error::Error as StdError;
+use std::fmt::Display;
+use std::fmt::Formatter;
+use std::fmt::Result as FmtResult;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -44,6 +48,23 @@ pub enum Error {
     ParseError(serde_json::Error),
     ExpectedField(&'static str),
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::GenericError => write!(f, "generic error"),
+            Self::NotFound => write!(f, "not found"),
+            Self::NetworkError => write!(f, "network error"),
+            Self::AuthError => write!(f, "auth error"),
+            Self::NotSupported => write!(f, "not supported"),
+            Self::CannotFillOem(err) => write!(f, "cannot fill OEM: {err}"),
+            Self::ParseError(err) => write!(f, "parse error: {err}"),
+            Self::ExpectedField(field) => write!(f, "field is absent: {field}"),
+        }
+    }
+}
+
+impl StdError for Error {}
 
 #[derive(Debug, Default)]
 pub struct MockBmc {}

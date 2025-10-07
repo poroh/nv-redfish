@@ -989,6 +989,7 @@ name = "nv-redfish-tests"
 version = "0.1.0"
 dependencies = [
  "csdl-compiler",
+ "nv-redfish",
  "nv-redfish-core",
  "serde",
  "serde_json",

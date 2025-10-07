@@ -24,6 +24,10 @@ use nv_redfish_core::http::ExpandQuery;
 use serde::Serialize;
 use serde_json::Error as JsonError;
 use std::collections::VecDeque;
+use std::error::Error as StdError;
+use std::fmt::Display;
+use std::fmt::Formatter;
+use std::fmt::Result as FmtResult;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::PoisonError;
@@ -35,10 +39,50 @@ pub enum Error {
     NothingIsExpected,
     BadResponseJson(JsonError),
     UnexpectedGet(ODataId, Expect),
+    UnexpectedExpand(ODataId, Expect),
     UnexpectedUpdate(ODataId, String, Expect),
     UnexpectedCreate(ODataId, String, Expect),
     UnexpectedAction(ActionTarget, String, Expect),
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::NotSupported => write!(f, "not supported"),
+            Self::MutexLock(err) => write!(f, "lock error: {err}"),
+            Self::NothingIsExpected => {
+                write!(f, "nothing is expected to happen but something happened")
+            }
+            Self::BadResponseJson(err) => write!(f, "bad json response: {err}"),
+            Self::UnexpectedGet(id, expected) => {
+                write!(f, "unexpected get: {id}; expected: {expected:?}")
+            }
+            Self::UnexpectedExpand(id, expected) => {
+                write!(f, "unexpected expand: {id}; expected: {expected:?}")
+            }
+            Self::UnexpectedUpdate(id, json, expected) => {
+                write!(
+                    f,
+                    "unexpected update: {id}; json: {json} expected: {expected:?}"
+                )
+            }
+            Self::UnexpectedCreate(id, json, expected) => {
+                write!(
+                    f,
+                    "unexpected create: {id}; json: {json} expected: {expected:?}"
+                )
+            }
+            Self::UnexpectedAction(id, json, expected) => {
+                write!(
+                    f,
+                    "unexpected action: {id}; json: {json} expected: {expected:?}"
+                )
+            }
+        }
+    }
+}
+
+impl StdError for Error {}
 
 impl Error {
     pub fn mutex_lock<T>(err: PoisonError<T>) -> Self {
@@ -70,11 +114,23 @@ impl Bmc {
 impl NvRedfishBmc for Bmc {
     type Error = Error;
 
-    async fn expand<T>(&self, _id: &ODataId, _query: ExpandQuery) -> Result<Arc<T>, Error>
+    async fn expand<T>(&self, in_id: &ODataId, _query: ExpandQuery) -> Result<Arc<T>, Error>
     where
         T: Expandable,
     {
-        todo!("unimplimented")
+        let expect = self
+            .expect
+            .lock()
+            .map_err(Error::mutex_lock)?
+            .pop_front()
+            .ok_or(Error::NothingIsExpected)?;
+        match expect {
+            Expect::Expand { id, response } if id == *in_id => {
+                let result: T = serde_json::from_value(response).map_err(Error::BadResponseJson)?;
+                Ok(Arc::new(result))
+            }
+            _ => Err(Error::UnexpectedExpand(in_id.clone(), expect)),
+        }
     }
 
     async fn get<T: nv_redfish_core::EntityTypeRef + Sized + for<'a> serde::Deserialize<'a>>(

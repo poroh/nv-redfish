@@ -19,10 +19,12 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::Action;
+use crate::Empty;
 use crate::EntityTypeRef;
 use crate::Expandable;
 use crate::ODataId;
 use crate::http::ExpandQuery;
+use std::error::Error as StdError;
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
@@ -31,7 +33,7 @@ use std::sync::Arc;
 /// Redfish protocol.
 pub trait Bmc {
     /// BMC Error
-    type Error;
+    type Error: StdError + Send;
 
     fn expand<T: Expandable>(
         &self,
@@ -56,7 +58,7 @@ pub trait Bmc {
         query: &V,
     ) -> impl Future<Output = Result<R, Self::Error>> + Send;
 
-    fn delete(&self, id: &ODataId) -> impl Future<Output = Result<crate::Empty, Self::Error>> + Send;
+    fn delete(&self, id: &ODataId) -> impl Future<Output = Result<Empty, Self::Error>> + Send;
 
     fn action<T: Send + Sync + Serialize, R: Send + Sync + Sized + for<'a> Deserialize<'a>>(
         &self,
