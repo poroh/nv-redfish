@@ -32,7 +32,7 @@ use std::sync::Arc;
 #[serde(deny_unknown_fields)]
 pub struct Reference {
     #[serde(rename = "@odata.id")]
-    pub odata_id: ODataId,
+    odata_id: ODataId,
 }
 
 /// Container struct for expanded property variant
@@ -92,13 +92,17 @@ impl<T: Deletable> Deletable for NavProperty<T> {}
 impl<T: Expandable> Expandable for NavProperty<T> {}
 
 impl<T: EntityTypeRef> NavProperty<T> {
-    pub fn new_reference(odata_id: ODataId) -> Self {
+    /// Create navigation property with reference using `OData`
+    /// identifier.
+    #[must_use]
+    pub const fn new_reference(odata_id: ODataId) -> Self {
         Self::Reference(Reference { odata_id })
     }
 }
 
 impl<T: EntityTypeRef> NavProperty<T> {
     /// Extract identifier from navigation property.
+    #[must_use]
     pub fn id(&self) -> &ODataId {
         match self {
             Self::Reference(v) => &v.odata_id,
@@ -109,6 +113,13 @@ impl<T: EntityTypeRef> NavProperty<T> {
 
 impl<T: EntityTypeRef + Sized + for<'a> Deserialize<'a> + 'static + Send + Sync> NavProperty<T> {
     /// Get property
+    ///
+    /// # Errors
+    ///
+    /// If navigation property is already expanded then no error is returned.
+    ///
+    /// If navigation is reference then BMC error may be returned if
+    /// failed to retrieve entity.
     pub async fn get<B: Bmc>(&self, bmc: &B) -> Result<Arc<T>, B::Error> {
         match self {
             Self::Expanded(v) => Ok(v.0.clone()),

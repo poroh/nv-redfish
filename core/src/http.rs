@@ -98,6 +98,7 @@ impl ExpandQuery {
     /// let query = ExpandQuery::new();
     /// assert_eq!(query.to_query_string(), "$expand=.($levels=1)");
     /// ```
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -122,6 +123,7 @@ impl ExpandQuery {
     /// let deep = ExpandQuery::all().levels(3);
     /// assert_eq!(deep.to_query_string(), "$expand=*($levels=3)");
     /// ```
+    #[must_use]
     pub fn all() -> Self {
         Self {
             expand_expression: "*".to_string(),
@@ -144,6 +146,7 @@ impl ExpandQuery {
     /// let query = ExpandQuery::current();
     /// assert_eq!(query.to_query_string(), "$expand=.($levels=1)");
     /// ```
+    #[must_use]
     pub fn current() -> Self {
         Self {
             expand_expression: ".".to_string(),
@@ -166,6 +169,7 @@ impl ExpandQuery {
     /// let query = ExpandQuery::links();
     /// assert_eq!(query.to_query_string(), "$expand=~($levels=1)");
     /// ```
+    #[must_use]
     pub fn links() -> Self {
         Self {
             expand_expression: "~".to_string(),
@@ -220,6 +224,7 @@ impl ExpandQuery {
     /// let system = ExpandQuery::properties(&["Processors", "Memory", "Storage"]);
     /// assert_eq!(system.to_query_string(), "$expand=Processors,Memory,Storage($levels=1)");
     /// ```
+    #[must_use]
     pub fn properties(properties: &[&str]) -> Self {
         Self {
             expand_expression: properties.join(","),
@@ -249,12 +254,13 @@ impl ExpandQuery {
     /// let deep = ExpandQuery::all().levels(3);
     /// assert_eq!(deep.to_query_string(), "$expand=*($levels=3)");
     /// ```
-    pub fn levels(mut self, levels: u32) -> Self {
+    #[must_use]
+    pub const fn levels(mut self, levels: u32) -> Self {
         self.levels = Some(levels);
         self
     }
 
-    /// Convert to the OData query string according to Redfish specification.
+    /// Convert to the `OData` query string according to Redfish specification.
     ///
     /// This generates the actual query parameter string that will be appended to
     /// HTTP requests to Redfish services.
@@ -275,6 +281,8 @@ impl ExpandQuery {
     /// let query = ExpandQuery::all();
     /// assert_eq!(query.to_query_string(), "$expand=*($levels=1)");
     /// ```
+    #[must_use]
+    #[allow(clippy::option_if_let_else)]
     pub fn to_query_string(&self) -> String {
         match self.levels {
             Some(levels) => format!("$expand={}($levels={})", self.expand_expression, levels),
@@ -297,7 +305,7 @@ pub trait HttpClient: Send + Sync {
         etag: Option<ODataETag>,
     ) -> impl Future<Output = Result<T, Self::Error>> + Send
     where
-        T: DeserializeOwned;
+        T: DeserializeOwned + Send + Sync;
 
     /// Perform an HTTP POST request.
     fn post<B, T>(
@@ -307,8 +315,8 @@ pub trait HttpClient: Send + Sync {
         credentials: &BmcCredentials,
     ) -> impl Future<Output = Result<T, Self::Error>> + Send
     where
-        B: Serialize + Sync,
-        T: DeserializeOwned + Send;
+        B: Serialize + Send + Sync,
+        T: DeserializeOwned + Send + Sync;
 
     /// Perform an HTTP PATCH request.
     fn patch<B, T>(
@@ -318,8 +326,8 @@ pub trait HttpClient: Send + Sync {
         credentials: &BmcCredentials,
     ) -> impl Future<Output = Result<T, Self::Error>> + Send
     where
-        B: Serialize + Sync,
-        T: DeserializeOwned + Send;
+        B: Serialize + Send + Sync,
+        T: DeserializeOwned + Send + Sync;
 
     /// Perform an HTTP DELETE request.
     fn delete(
@@ -405,19 +413,21 @@ where
 
 /// A tagged type representing a Redfish endpoint URL.
 ///
-/// Provides convenient conversion methods to build endpoint URLs from ODataId paths.
+/// Provides convenient conversion methods to build endpoint URLs from `ODataId` paths.
 #[derive(Debug, Clone)]
 pub struct RedfishEndpoint {
     base_url: Url,
 }
 
 impl RedfishEndpoint {
-    /// Create a new RedfishEndpoint from a base URL
-    pub fn new(base_url: Url) -> Self {
+    /// Create a new `RedfishEndpoint` from a base URL
+    #[must_use]
+    pub const fn new(base_url: Url) -> Self {
         Self { base_url }
     }
 
     /// Convert a path to a full Redfish endpoint URL
+    #[must_use]
     pub fn with_path(&self, path: &str) -> Url {
         let mut url = self.base_url.clone();
         url.set_path(path);
@@ -425,6 +435,7 @@ impl RedfishEndpoint {
     }
 
     /// Convert a path to a full Redfish endpoint URL with query parameters
+    #[must_use]
     pub fn with_path_and_query(&self, path: &str, query: &str) -> Url {
         let mut url = self.with_path(path);
         url.set_query(Some(query));
@@ -464,6 +475,7 @@ where
 {
     type Error = C::Error;
 
+    #[allow(clippy::significant_drop_tightening)]
     async fn get<T: EntityTypeRef + Sized + for<'de> Deserialize<'de> + 'static + Send + Sync>(
         &self,
         id: &ODataId,
@@ -519,7 +531,7 @@ where
         }
     }
 
-    async fn expand<T: Expandable>(
+    async fn expand<T: Expandable + Send + Sync>(
         &self,
         id: &ODataId,
         query: ExpandQuery,
@@ -584,7 +596,7 @@ pub enum BmcReqwestError {
 #[cfg(feature = "reqwest")]
 impl From<reqwest::Error> for BmcReqwestError {
     fn from(value: reqwest::Error) -> Self {
-        BmcReqwestError::ReqwestError(value)
+        Self::ReqwestError(value)
     }
 }
 
@@ -592,7 +604,7 @@ impl From<reqwest::Error> for BmcReqwestError {
 impl CacheableError for BmcReqwestError {
     fn is_cached(&self) -> bool {
         match self {
-            BmcReqwestError::InvalidResponse(response) => {
+            Self::InvalidResponse(response) => {
                 response.status() == reqwest::StatusCode::NOT_MODIFIED
             }
             _ => false,
@@ -600,33 +612,35 @@ impl CacheableError for BmcReqwestError {
     }
 
     fn cache_miss() -> Self {
-        BmcReqwestError::CacheMiss
+        Self::CacheMiss
     }
 
     fn cache_error(reason: String) -> Self {
-        BmcReqwestError::CacheError(reason)
+        Self::CacheError(reason)
     }
 }
 
 #[cfg(feature = "reqwest")]
+#[allow(clippy::absolute_paths)]
 impl std::fmt::Display for BmcReqwestError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BmcReqwestError::ReqwestError(e) => write!(f, "HTTP client error: {e}"),
-            BmcReqwestError::InvalidResponse(response) => {
+            Self::ReqwestError(e) => write!(f, "HTTP client error: {e}"),
+            Self::InvalidResponse(response) => {
                 write!(f, "Invalid HTTP response: {}", response.status())
             }
-            BmcReqwestError::CacheMiss => write!(f, "Resource not found in cache"),
-            BmcReqwestError::CacheError(r) => write!(f, "Error occurred in cache {r}"),
+            Self::CacheMiss => write!(f, "Resource not found in cache"),
+            Self::CacheError(r) => write!(f, "Error occurred in cache {r}"),
         }
     }
 }
 
 #[cfg(feature = "reqwest")]
+#[allow(clippy::absolute_paths)]
 impl std::error::Error for BmcReqwestError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            BmcReqwestError::ReqwestError(e) => Some(e),
+            Self::ReqwestError(e) => Some(e),
             _ => None,
         }
     }
@@ -687,41 +701,49 @@ impl Default for ReqwestClientParams {
 
 #[cfg(feature = "reqwest")]
 impl ReqwestClientParams {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn timeout(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
-    pub fn connect_timeout(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn connect_timeout(mut self, timeout: Duration) -> Self {
         self.connect_timeout = Some(timeout);
         self
     }
 
+    #[must_use]
     pub fn user_agent<S: Into<String>>(mut self, user_agent: S) -> Self {
         self.user_agent = Some(user_agent.into());
         self
     }
 
-    pub fn accept_invalid_certs(mut self, accept: bool) -> Self {
+    #[must_use]
+    pub const fn accept_invalid_certs(mut self, accept: bool) -> Self {
         self.accept_invalid_certs = accept;
         self
     }
 
-    pub fn max_redirects(mut self, max: usize) -> Self {
+    #[must_use]
+    pub const fn max_redirects(mut self, max: usize) -> Self {
         self.max_redirects = Some(max);
         self
     }
 
-    pub fn tcp_keepalive(mut self, keepalive: Duration) -> Self {
+    #[must_use]
+    pub const fn tcp_keepalive(mut self, keepalive: Duration) -> Self {
         self.tcp_keepalive = Some(keepalive);
         self
     }
 
-    pub fn no_timeout(mut self) -> Self {
+    #[must_use]
+    pub const fn no_timeout(mut self) -> Self {
         self.timeout = None;
         self
     }
@@ -763,6 +785,8 @@ pub struct ReqwestClient {
 }
 
 #[cfg(feature = "reqwest")]
+#[allow(clippy::missing_errors_doc)]
+#[allow(clippy::absolute_paths)]
 impl ReqwestClient {
     pub fn new() -> Result<Self, reqwest::Error> {
         Self::with_params(ReqwestClientParams::default())
@@ -808,7 +832,8 @@ impl ReqwestClient {
         })
     }
 
-    pub fn with_client(client: reqwest::Client) -> Self {
+    #[must_use]
+    pub const fn with_client(client: reqwest::Client) -> Self {
         Self { client }
     }
 }
@@ -834,8 +859,8 @@ impl ReqwestClient {
         credentials: &BmcCredentials,
     ) -> Result<T, BmcReqwestError>
     where
-        B: Serialize,
-        T: DeserializeOwned,
+        B: Serialize + Send + Sync,
+        T: DeserializeOwned + Send + Sync,
     {
         let response = self
             .client
@@ -882,8 +907,8 @@ impl HttpClient for ReqwestClient {
         credentials: &BmcCredentials,
     ) -> Result<T, Self::Error>
     where
-        B: Serialize,
-        T: DeserializeOwned,
+        B: Serialize + Send + Sync,
+        T: DeserializeOwned + Send + Sync,
     {
         self.send_json_request(reqwest::Method::POST, url, body, credentials)
             .await
@@ -896,8 +921,8 @@ impl HttpClient for ReqwestClient {
         credentials: &BmcCredentials,
     ) -> Result<T, Self::Error>
     where
-        B: Serialize + Sync,
-        T: DeserializeOwned + Send,
+        B: Serialize + Send + Sync,
+        T: DeserializeOwned + Send + Sync,
     {
         self.send_json_request(reqwest::Method::PATCH, url, body, credentials)
             .await

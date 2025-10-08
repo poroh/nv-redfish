@@ -28,7 +28,6 @@ use nv_redfish_core::Expandable;
 use nv_redfish_core::NavProperty;
 use nv_redfish_core::ODataETag;
 use nv_redfish_core::ODataId;
-use nv_redfish_core::Reference;
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
@@ -57,9 +56,7 @@ where
             // Patches are not free so we keep separate branch for
             // patched collections only having this cost on systems
             // that requires to pay the price.
-            let patched_collection_ref = NavProperty::<Collection>::Reference(Reference {
-                odata_id: nav.id().clone(),
-            });
+            let patched_collection_ref = NavProperty::<Collection>::new_reference(nav.id().clone());
             let collection = patched_collection_ref
                 .expand(bmc, query)
                 .await

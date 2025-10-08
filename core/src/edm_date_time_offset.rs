@@ -46,6 +46,7 @@ impl Display for EdmDateTimeOffset {
     }
 }
 
+#[allow(clippy::absolute_paths)]
 impl FromStr for EdmDateTimeOffset {
     type Err = time::error::Parse;
 

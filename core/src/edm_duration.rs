@@ -15,7 +15,7 @@
 
 //! Edm.EdmDuration data type.
 
-use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::prelude::ToPrimitive as _;
 use rust_decimal::Decimal;
 use serde::de::Error as DeError;
 use serde::de::Visitor;
@@ -32,7 +32,7 @@ use std::str::Chars;
 use std::str::FromStr;
 use std::time::Duration as StdDuration;
 
-/// EdmDuration represented by Edm.EdmDuration type.
+/// `EdmDuration` represented by Edm.EdmDuration type.
 ///
 /// This type designed to prevent data loss during deserialization and
 /// provides conversion to specific data types. If you don't care
@@ -44,16 +44,18 @@ pub struct EdmDuration(Decimal);
 impl EdmDuration {
     /// Convert to seconds represented as f64. Note that this function
     /// may return +Inf or -Inf if number outside of f64 range.
+    #[must_use]
     pub fn as_f64_seconds(&self) -> f64 {
         Self::decimal_to_f64_lossy(self.0)
     }
 
-    /// Extract seconds represented be `Decimal` from EdmDuration.
-    pub fn as_decimal(&self) -> Decimal {
+    /// Extract seconds represented be `Decimal` from `EdmDuration`.
+    #[must_use]
+    pub const fn as_decimal(&self) -> Decimal {
         self.0
     }
 
-    fn take_digits<'a>(chars: Chars<'a>) -> (&'a str, Option<char>, Chars<'a>) {
+    fn take_digits<'a>(chars: &Chars<'a>) -> (&'a str, Option<char>, Chars<'a>) {
         let s = chars.as_str();
         for (i, ch) in s.char_indices() {
             if ch.is_ascii_digit() || ch == '.' {
@@ -82,11 +84,17 @@ impl EdmDuration {
     }
 }
 
+/// Errors of `EdmDuration`.
 #[derive(Debug)]
 pub enum Error {
+    /// Invalid Edm.Duration string.
     InvalidEdmDuration(String),
+    /// Data cannot be represented by internal type.
     Overflow(String),
+    /// Cannot convert negative Edm.Duration to standard duration,
     CannotConvertNegativeEdmDuration,
+    /// Value of Edm.Duration is too big to be represented by standard
+    /// duration.
     ValueTooBig,
 }
 
@@ -110,34 +118,34 @@ impl StdError for Error {}
 impl TryFrom<EdmDuration> for StdDuration {
     type Error = Error;
 
-    fn try_from(v: EdmDuration) -> Result<StdDuration, Error> {
+    fn try_from(v: EdmDuration) -> Result<Self, Error> {
         if v.0.is_sign_negative() {
             return Err(Error::CannotConvertNegativeEdmDuration);
         }
         if v.0.is_integer() {
             let p = u64::try_from(v.0).map_err(|_| Error::ValueTooBig)?;
-            return Ok(StdDuration::from_secs(p));
+            return Ok(Self::from_secs(p));
         }
         let v =
             v.0.checked_mul(Decimal::ONE_THOUSAND)
                 .ok_or(Error::ValueTooBig)?;
         if v.is_integer() {
             let p = u64::try_from(v).map_err(|_| Error::ValueTooBig)?;
-            return Ok(StdDuration::from_millis(p));
+            return Ok(Self::from_millis(p));
         }
         let v = v
             .checked_mul(Decimal::ONE_THOUSAND)
             .ok_or(Error::ValueTooBig)?;
         if v.is_integer() {
             let p = u64::try_from(v).map_err(|_| Error::ValueTooBig)?;
-            return Ok(StdDuration::from_micros(p));
+            return Ok(Self::from_micros(p));
         }
         let v = v
             .checked_mul(Decimal::ONE_THOUSAND)
             .ok_or(Error::ValueTooBig)?
             .round();
         let p = u64::try_from(v).map_err(|_| Error::ValueTooBig)?;
-        Ok(StdDuration::from_nanos(p))
+        Ok(Self::from_nanos(p))
     }
 }
 
@@ -162,23 +170,23 @@ impl FromStr for EdmDuration {
         };
 
         let mut result = Decimal::ZERO;
-        let (val, maybe_next, mut chars) = Self::take_digits(chars);
+        let (val, maybe_next, mut chars) = Self::take_digits(&chars);
         match maybe_next {
             Some('T') => (),
             Some('D') => match chars.next() {
                 Some('T') => {
                     result = result
                         .checked_add(to_decimal(val, 3600 * 24)?)
-                        .ok_or_else(overflow_err)?
+                        .ok_or_else(overflow_err)?;
                 }
-                None => return to_decimal(val, 3600 * 24).map(|v| EdmDuration(v * neg)),
+                None => return to_decimal(val, 3600 * 24).map(|v| Self(v * neg)),
                 _ => Err(make_err())?,
             },
             _ => Err(make_err())?,
-        };
+        }
 
         loop {
-            let (val, maybe_next, new_chars) = Self::take_digits(chars);
+            let (val, maybe_next, new_chars) = Self::take_digits(&chars);
             chars = new_chars;
             let mul = match maybe_next {
                 Some('H') => 3600,
@@ -191,7 +199,7 @@ impl FromStr for EdmDuration {
                 .checked_add(to_decimal(val, mul)?)
                 .ok_or_else(overflow_err)?;
         }
-        Ok(EdmDuration(result * neg))
+        Ok(Self(result * neg))
     }
 }
 

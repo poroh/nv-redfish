@@ -34,7 +34,7 @@ struct CacheEntry<K, V> {
 }
 
 impl<K, V> CacheEntry<K, V> {
-    fn new(key: K, value: V) -> Self {
+    const fn new(key: K, value: V) -> Self {
         Self {
             key,
             value,
@@ -61,6 +61,7 @@ struct GhostList<K> {
     size: usize,
 }
 
+#[allow(clippy::manual_let_else)]
 impl<K: Clone> GhostList<K> {
     fn new(capacity: usize) -> Self {
         Self {
@@ -73,7 +74,7 @@ impl<K: Clone> GhostList<K> {
     }
 
     /// Insert at tail (MRU position) - O(1)
-    /// Returns (slot, evicted_key) where evicted_key is Some if an item was evicted
+    /// Returns `(slot, evicted_key)` where `evicted_key` is Some if an item was evicted
     fn insert_at_tail(&mut self, key: K) -> Option<(usize, Option<K>)> {
         // If we're at capacity, remove LRU first
         let evicted_key = if self.free_slots.is_empty() {
@@ -161,7 +162,7 @@ impl<K: Clone> GhostList<K> {
         true
     }
 
-    fn len(&self) -> usize {
+    const fn len(&self) -> usize {
         self.size
     }
 }
@@ -228,7 +229,7 @@ impl<K: Clone, V> ClockList<K, V> {
         Some(entry)
     }
 
-    fn advance_hand(&mut self) {
+    const fn advance_hand(&mut self) {
         self.hand = (self.hand + 1) % self.entries.len();
     }
 
@@ -236,7 +237,7 @@ impl<K: Clone, V> ClockList<K, V> {
         self.entries.get_mut(slot)?.as_mut()
     }
 
-    fn len(&self) -> usize {
+    const fn len(&self) -> usize {
         self.size
     }
 }
@@ -275,6 +276,7 @@ where
     K: Eq + Hash + Clone,
 {
     /// Create new CAR cache with given capacity
+    #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
             c: capacity,
@@ -417,7 +419,7 @@ where
         replaced_key
     }
 
-    /// Line 5: replace() - exact implementation of pseudocode
+    /// Line 5: `replace()` - exact implementation of pseudocode
     fn replace(&mut self) -> Option<V> {
         // Line 23: repeat
         loop {
@@ -425,22 +427,21 @@ where
             if self.t1.len() >= 1.max(self.p) {
                 if let Some(found) = self.try_replace_from_t1() {
                     return Some(found);
-                } else {
-                    self.t1.advance_hand();
                 }
+                self.t1.advance_hand();
             } else {
                 // Line 31: else
                 if let Some(found) = self.try_replace_from_t2() {
                     return Some(found);
-                } else {
-                    self.t2.advance_hand();
                 }
+                self.t2.advance_hand();
             }
         }
         // Line 39: until (found)
     }
 
     /// Try to replace from T1, returns true if replacement was successful
+    #[allow(clippy::if_not_else)]
     fn try_replace_from_t1(&mut self) -> Option<V> {
         if let Some(head_entry) = self.t1.get_head_page() {
             // Line 25: if (the page reference bit of head page in T1 is 0) then
@@ -475,6 +476,7 @@ where
     }
 
     /// Try to replace from T2, returns true if replacement was successful
+    #[allow(clippy::if_not_else)]
     fn try_replace_from_t2(&mut self) -> Option<V> {
         if let Some(head_entry) = self.t2.get_head_page() {
             // Line 32: if (the page reference bit of head page in T2 is 0), then
@@ -510,44 +512,45 @@ where
 
     /// Helper function to check if key is in B1 or B2
     fn is_in_b1_or_b2(&self, key: &K) -> bool {
-        matches!(
-            self.index.get(key),
-            Some(Location::B1(_)) | Some(Location::B2(_))
-        )
+        matches!(self.index.get(key), Some(Location::B1(_) | Location::B2(_)))
     }
 
     /// Get current cache size (items in T1 + T2)
-    pub fn len(&self) -> usize {
+    #[must_use]
+    pub const fn len(&self) -> usize {
         self.t1.len() + self.t2.len()
     }
 
     /// Check if cache is empty
-    pub fn is_empty(&self) -> bool {
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Get cache capacity
-    pub fn capacity(&self) -> usize {
+    #[must_use]
+    pub const fn capacity(&self) -> usize {
         self.c
     }
 
     /// Get current adaptation parameter
-    pub fn adaptation_parameter(&self) -> usize {
+    #[must_use]
+    pub const fn adaptation_parameter(&self) -> usize {
         self.p
     }
 }
 
-pub type TypeErasedCarCache<K> = CarCache<K, Box<dyn Any + Send + Sync>>;
+pub(crate) type TypeErasedCarCache<K> = CarCache<K, Box<dyn Any + Send + Sync>>;
 
 impl<K> TypeErasedCarCache<K>
 where
     K: Eq + Hash + Clone,
 {
-    pub fn get_typed<T: 'static + Send + Sync>(&mut self, key: &K) -> Option<&T> {
+    pub(crate) fn get_typed<T: 'static + Send + Sync>(&mut self, key: &K) -> Option<&T> {
         self.get(key)?.downcast_ref::<T>()
     }
 
-    pub fn put_typed<T: 'static + Send + Sync>(&mut self, key: K, value: T) -> Option<T> {
+    pub(crate) fn put_typed<T: 'static + Send + Sync>(&mut self, key: K, value: T) -> Option<T> {
         let ret = self.put(key, Box::new(value) as Box<dyn Any + Send + Sync>);
         ret?.downcast::<T>().ok().map(|r| *r)
     }

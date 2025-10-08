@@ -19,6 +19,10 @@ use serde::Deserializer;
 /// Deserialize optional nullable field. nv-redfish models these field
 /// with `Option<Option<T>>`. Where `None` means "no field",
 /// `Some(None)` means field set to null.
+///
+/// # Errors
+///
+/// Returns error if deserialization of underlying type is failed
 pub fn de_optional_nullable<'de, D, T>(de: D) -> Result<Option<Option<T>>, D::Error>
 where
     D: Deserializer<'de>,
@@ -29,6 +33,10 @@ where
 
 /// Deserialize required nullable field. nv-redfish model these fields
 /// with `Option<T>`. Where `None` means null.
+///
+/// # Errors
+///
+/// Returns error if deserialization of underlying type is failed
 pub fn de_required_nullable<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
 where
     D: Deserializer<'de>,

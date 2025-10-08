@@ -26,6 +26,7 @@ pub struct ODataId(String);
 
 impl ODataId {
     /// Redfish service root id.
+    #[must_use]
     pub fn service_root() -> Self {
         Self("/redfish/v1".into())
     }
@@ -33,7 +34,7 @@ impl ODataId {
 
 impl From<String> for ODataId {
     fn from(s: String) -> Self {
-        ODataId(s)
+        Self(s)
     }
 }
 

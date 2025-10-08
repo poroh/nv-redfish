@@ -27,7 +27,9 @@ use std::marker::PhantomData;
 pub struct ActionTarget(String);
 
 impl ActionTarget {
-    pub fn new(v: String) -> Self {
+    /// Creates new `ActionTarget`.
+    #[must_use]
+    pub const fn new(v: String) -> Self {
         Self(v)
     }
 }
@@ -38,17 +40,27 @@ impl Display for ActionTarget {
     }
 }
 
+/// Defines deserializable Action. It is almost always member of
+/// `Actions` struct in different parts of Redfish object tree.
+///
+/// `T` is type for parameters.
+/// `R` is type for return type.
 #[derive(Deserialize, Debug)]
 pub struct Action<T, R> {
+    /// Path that is used to trigger acction/
     #[serde(rename = "target")]
     pub target: ActionTarget,
     // TODO: we can retrieve constrains on attributes here.
+    /// Just make dependency for `T` (paramaters) type.
     #[serde(skip_deserializing)]
     pub _marker: PhantomData<T>,
+    /// Just make dependency for `R` (return result) type.
     #[serde(skip_deserializing)]
     pub _marker_retval: PhantomData<R>,
 }
 
+/// Action error trait. It is needed in the generated code when action
+/// function is called for action that wasn't specified by server.
 pub trait ActionError {
     /// Create an error when action is not supported
     fn not_supported() -> Self;
@@ -56,6 +68,10 @@ pub trait ActionError {
 
 impl<T: Send + Sync + Serialize, R: Send + Sync + Sized + for<'a> Deserialize<'a>> Action<T, R> {
     /// Run specific action with parameters passed as argument.
+    ///
+    /// # Errors
+    ///
+    /// Return error if BMC returned error on action.
     pub async fn run<B: Bmc>(&self, bmc: &B, params: &T) -> Result<R, B::Error> {
         bmc.action::<T, R>(self, params).await
     }

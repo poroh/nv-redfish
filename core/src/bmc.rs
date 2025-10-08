@@ -35,31 +35,50 @@ pub trait Bmc: Send + Sync {
     /// BMC Error
     type Error: StdError + Send;
 
-    fn expand<T: Expandable>(
+    /// Expand any expandable object (navigation property or entity).
+    ///
+    /// `T` is structure that is used for return type.
+    fn expand<T: Expandable + Send + Sync>(
         &self,
         id: &ODataId,
         query: ExpandQuery,
     ) -> impl Future<Output = Result<Arc<T>, Self::Error>> + Send;
 
+    /// Get data of the object (navigation property or entity).
+    ///
+    /// `T` is structure that is used for return type.
     fn get<T: EntityTypeRef + Sized + for<'a> Deserialize<'a> + 'static + Send + Sync>(
         &self,
         id: &ODataId,
     ) -> impl Future<Output = Result<Arc<T>, Self::Error>> + Send;
 
+    /// Creates element of the collection.
+    ///
+    /// `V` is structure that is used for create.
+    /// `R` is structure that is used for return type.
     fn create<V: Sync + Send + Serialize, R: Send + Sync + Sized + for<'a> Deserialize<'a>>(
         &self,
         id: &ODataId,
         query: &V,
     ) -> impl Future<Output = Result<R, Self::Error>> + Send;
 
+    /// Update entity.
+    ///
+    /// `V` is structure that is used for update.
+    /// `R` is structure that is used for return type (updated entity).
     fn update<V: Sync + Send + Serialize, R: Send + Sync + Sized + for<'a> Deserialize<'a>>(
         &self,
         id: &ODataId,
         query: &V,
     ) -> impl Future<Output = Result<R, Self::Error>> + Send;
 
+    /// Delete entity.
     fn delete(&self, id: &ODataId) -> impl Future<Output = Result<Empty, Self::Error>> + Send;
 
+    /// Run action.
+    ///
+    /// `T` is structure that contains action parameters.
+    /// `R` is structure with return type.
     fn action<T: Send + Sync + Serialize, R: Send + Sync + Sized + for<'a> Deserialize<'a>>(
         &self,
         action: &Action<T, R>,
@@ -67,17 +86,23 @@ pub trait Bmc: Send + Sync {
     ) -> impl Future<Output = Result<R, Self::Error>> + Send;
 }
 
+/// Credentials used to access to the BMC.
 #[derive(Clone)]
 pub struct BmcCredentials {
+    /// Username to access BMC.
     pub username: String,
     password: String,
 }
 
 impl BmcCredentials {
-    pub fn new(username: String, password: String) -> Self {
+    /// Create new credentials.
+    #[must_use]
+    pub const fn new(username: String, password: String) -> Self {
         Self { username, password }
     }
 
+    /// Get password.
+    #[must_use]
     pub fn password(&self) -> &str {
         &self.password
     }
