@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Error;
 use crate::schema::redfish::service_root::ServiceRoot as SchemaServiceRoot;
+use crate::Error;
 use nv_redfish_core::Bmc;
 use nv_redfish_core::NavProperty;
 use nv_redfish_core::ODataId;

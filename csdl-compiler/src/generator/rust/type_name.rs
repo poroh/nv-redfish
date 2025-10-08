@@ -14,9 +14,9 @@
 // limitations under the License.
 
 use crate::compiler::TypeClass;
+use crate::edmx::attribute_values::SimpleIdentifier;
 use crate::edmx::ActionName as EdmxActionName;
 use crate::edmx::ParameterName;
-use crate::edmx::attribute_values::SimpleIdentifier;
 use crate::generator::casemungler;
 use proc_macro2::Ident;
 use proc_macro2::Span;

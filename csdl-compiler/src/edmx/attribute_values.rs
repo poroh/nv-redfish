@@ -15,8 +15,8 @@
 
 //! Types defined in 17 Attribute Values
 
-use crate::OneOrCollection;
 use crate::edmx::QualifiedTypeName;
+use crate::OneOrCollection;
 use serde::de::Error as DeError;
 use serde::de::Visitor;
 use serde::Deserialize;

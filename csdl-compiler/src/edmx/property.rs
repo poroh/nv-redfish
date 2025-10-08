@@ -13,11 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::IsNullable;
 use crate::edmx::Annotation;
 use crate::edmx::PropertyName;
 use crate::edmx::TypeName;
 use crate::edmx::ValidateError;
+use crate::IsNullable;
 use serde::Deserialize;
 
 /// 6.1 Element edm:Property

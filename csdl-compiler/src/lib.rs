@@ -94,8 +94,8 @@ pub enum IsRequiredOnCreateTag {}
 
 #[cfg(test)]
 mod test {
-    use super::edmx::Edmx;
     use super::edmx::attribute_values::SimpleIdentifier;
+    use super::edmx::Edmx;
     use crate::Error;
     use std::fs;
     use std::path::Path;

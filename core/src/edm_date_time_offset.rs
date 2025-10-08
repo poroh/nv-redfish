@@ -19,8 +19,8 @@ use std::fmt::Display;
 use std::fmt::Error as FmtError;
 use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
-use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
+use time::OffsetDateTime;
 
 /// Type corresponding to `Edm.DateTimeOffset`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

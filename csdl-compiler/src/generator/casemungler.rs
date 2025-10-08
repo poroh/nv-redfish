@@ -16,7 +16,7 @@
 const SNAKE_WORD_SEPARATOR: &str = "~!#%^&*()+-:<>?,./ ";
 const CAMEL_WORD_SEPARATOR: &str = "_~!#%^&*()+-:<>?,./ ";
 
-/// Wrapper for snakecase producer 
+/// Wrapper for snakecase producer
 #[must_use]
 pub fn to_snake(s: impl AsRef<str>) -> String {
     tokenize(s.as_ref(), SNAKE_WORD_SEPARATOR).map_or_else(
@@ -25,7 +25,7 @@ pub fn to_snake(s: impl AsRef<str>) -> String {
     )
 }
 
-/// Wrapper for camelcase producer 
+/// Wrapper for camelcase producer
 #[must_use]
 pub fn to_camel(s: impl AsRef<str>) -> String {
     let orig_str = String::from(s.as_ref());
@@ -48,7 +48,7 @@ pub fn to_camel(s: impl AsRef<str>) -> String {
     })
 }
 
-/// Tokenizer is a wrapper for word splitter with custom separators 
+/// Tokenizer is a wrapper for word splitter with custom separators
 fn tokenize(s: &str, separators: &str) -> Option<impl Iterator<Item = String>> {
     let mut itr = split_to_words(s, separators).peekable();
 
@@ -117,7 +117,7 @@ fn is_acronym_to_word_transition(chars: &[char], idx: usize) -> bool {
 }
 
 /// Split a string slice into vector of strings (words) iterator so the caller
-/// can do something with the resulting words 
+/// can do something with the resulting words
 fn split_to_words(s: &str, separators: &str) -> impl Iterator<Item = String> {
     let str_chars: Vec<char> = s.chars().collect();
 
@@ -127,7 +127,7 @@ fn split_to_words(s: &str, separators: &str) -> impl Iterator<Item = String> {
         .fold(vec![vec![]], |mut words: Vec<Vec<char>>, (i, &ch)| {
             if is_word_boundary(&str_chars, i, ch, separators) {
                 // Create a new word _only_ if the current word has 1+ character,
-                // otherwise all weird corner cases will pop up 
+                // otherwise all weird corner cases will pop up
                 if words[words.len() - 1].len() > 1 {
                     words.push(vec![]);
                 }

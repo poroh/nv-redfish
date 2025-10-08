@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use csdl_compiler::OneOrCollection;
 use csdl_compiler::compiler::Config;
 use csdl_compiler::compiler::NavProperty;
 use csdl_compiler::compiler::NavPropertyExpandable;
@@ -24,6 +23,7 @@ use csdl_compiler::edmx::attribute_values::Error as AttributeValuesError;
 use csdl_compiler::edmx::Edmx;
 use csdl_compiler::edmx::ValidateError;
 use csdl_compiler::optimizer::optimize;
+use csdl_compiler::OneOrCollection;
 use std::io::Error as IoError;
 use std::io::Read;
 

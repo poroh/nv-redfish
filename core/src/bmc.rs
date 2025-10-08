@@ -18,12 +18,12 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::http::ExpandQuery;
 use crate::Action;
 use crate::Empty;
 use crate::EntityTypeRef;
 use crate::Expandable;
 use crate::ODataId;
-use crate::http::ExpandQuery;
 use std::error::Error as StdError;
 use std::fmt;
 use std::future::Future;

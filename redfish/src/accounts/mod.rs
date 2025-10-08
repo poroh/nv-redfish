@@ -16,8 +16,6 @@
 //! This module represents AccountService defined in Redfish
 //! specification.
 
-use crate::Error;
-use crate::ServiceRoot;
 use crate::patch_support::CollectionWithPatch;
 use crate::patch_support::CreateWithPatch;
 use crate::patch_support::JsonValue;
@@ -27,12 +25,14 @@ use crate::schema::redfish::account_service::AccountService as SchemaAccountServ
 use crate::schema::redfish::manager_account::ManagerAccount;
 use crate::schema::redfish::manager_account_collection::ManagerAccountCollection;
 use crate::schema::redfish::resource::ResourceCollection;
+use crate::Error;
+use crate::ServiceRoot;
+use nv_redfish_core::http::ExpandQuery;
 use nv_redfish_core::Bmc;
 use nv_redfish_core::Deletable;
 use nv_redfish_core::EntityTypeRef;
 use nv_redfish_core::NavProperty;
 use nv_redfish_core::ODataId;
-use nv_redfish_core::http::ExpandQuery;
 use std::sync::Arc;
 
 pub use crate::schema::redfish::manager_account::AccountTypes;

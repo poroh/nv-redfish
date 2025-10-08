@@ -13,9 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Error;
 use crate::patch_support::JsonValue;
 use crate::patch_support::ReadPatchFn;
+use crate::Error;
 use nv_redfish_core::Bmc;
 use nv_redfish_core::EntityTypeRef;
 use nv_redfish_core::ODataETag;

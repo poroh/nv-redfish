@@ -13,12 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::IsRequired;
-use crate::IsRequiredOnCreate;
 use crate::edmx::Annotation;
 use crate::edmx::NavigationProperty;
 use crate::edmx::Parameter;
 use crate::edmx::StructuralProperty;
+use crate::IsRequired;
+use crate::IsRequiredOnCreate;
 
 pub trait RedfishAnnotation {
     fn is_redfish_annotation(&self, name: &str) -> bool;

@@ -14,13 +14,13 @@
 // limitations under the License.
 
 use crate::Expect;
+use nv_redfish_core::action::ActionTarget;
+use nv_redfish_core::http::ExpandQuery;
 use nv_redfish_core::ActionError;
 use nv_redfish_core::Bmc as NvRedfishBmc;
 use nv_redfish_core::Empty;
 use nv_redfish_core::Expandable;
 use nv_redfish_core::ODataId;
-use nv_redfish_core::action::ActionTarget;
-use nv_redfish_core::http::ExpandQuery;
 use serde::Serialize;
 use serde_json::Error as JsonError;
 use std::collections::VecDeque;

@@ -15,17 +15,17 @@
 
 //! Integration tests of Account Service.
 
-use nv_redfish::ServiceRoot;
 use nv_redfish::accounts::AccountCollection;
 use nv_redfish::accounts::AccountService;
 use nv_redfish::accounts::AccountTypes;
+use nv_redfish::ServiceRoot;
 use nv_redfish_core::ODataId;
 use nv_redfish_tests::Bmc;
 use nv_redfish_tests::Expect;
 use nv_redfish_tests::ODATA_ID;
 use nv_redfish_tests::ODATA_TYPE;
-use serde_json::Value as JsonValue;
 use serde_json::json;
+use serde_json::Value as JsonValue;
 use std::error::Error as StdError;
 use std::sync::Arc;
 use tokio::test;
@@ -97,22 +97,20 @@ async fn list_no_patch_accounts() -> Result<(), Box<dyn StdError>> {
     let root_id = ODataId::service_root();
     let account_service = get_account_service(bmc.clone(), &root_id, "Contoso").await?;
     let maccount_id = format!("{}/Accounts/1", account_service.odata_id());
-    assert!(
-        get_account_collection(
-            bmc.clone(),
-            &account_service,
-            json! {[{
-                ODATA_ID: maccount_id,
-                ODATA_TYPE: MANAGER_ACCOUNT_DATA_TYPE,
-                "Id": "1",
-                "Name": "User Account",
-                "UserName": "Administrator",
-                "RoleId": "AdministratorRole",
-            }]},
-        )
-        .await
-        .is_err()
-    );
+    assert!(get_account_collection(
+        bmc.clone(),
+        &account_service,
+        json! {[{
+            ODATA_ID: maccount_id,
+            ODATA_TYPE: MANAGER_ACCOUNT_DATA_TYPE,
+            "Id": "1",
+            "Name": "User Account",
+            "UserName": "Administrator",
+            "RoleId": "AdministratorRole",
+        }]},
+    )
+    .await
+    .is_err());
     Ok(())
 }
 

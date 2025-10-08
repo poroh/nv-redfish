@@ -13,18 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use nv_redfish_core::Creatable;
-use nv_redfish_core::Deletable;
-use nv_redfish_core::EntityTypeRef;
-use nv_redfish_core::Expandable;
-use nv_redfish_core::NavProperty;
-use nv_redfish_core::ODataId;
 use nv_redfish_core::bmc::BmcCredentials;
 use nv_redfish_core::http::BmcReqwestError;
 use nv_redfish_core::http::ExpandQuery;
 use nv_redfish_core::http::HttpBmc;
 use nv_redfish_core::http::ReqwestClient;
 use nv_redfish_core::http::ReqwestClientParams;
+use nv_redfish_core::Creatable;
+use nv_redfish_core::Deletable;
+use nv_redfish_core::EntityTypeRef;
+use nv_redfish_core::Expandable;
+use nv_redfish_core::NavProperty;
+use nv_redfish_core::ODataId;
 use redfish_std::redfish::manager_account::ManagerAccount;
 use redfish_std::redfish::manager_account::ManagerAccountCreate;
 use redfish_std::redfish::service_root::ServiceRoot;

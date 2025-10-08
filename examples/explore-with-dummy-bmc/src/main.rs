@@ -23,7 +23,6 @@ use nv_redfish_core::Expandable;
 use nv_redfish_core::NavProperty;
 use nv_redfish_core::ODataId;
 use nv_redfish_core::Updatable;
-use nv_redfish_core::http::ExpandQuery;
 use redfish_oem_contoso::redfish::contoso_turboencabulator_service::ContosoTurboencabulatorServiceUpdate;
 use redfish_oem_contoso::redfish::contoso_turboencabulator_service::TurboencabulatorMode;
 use redfish_std::redfish::manager_account::ManagerAccountCreate;

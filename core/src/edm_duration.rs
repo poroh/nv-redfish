@@ -15,14 +15,14 @@
 
 //! Edm.EdmDuration data type.
 
-use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
+use serde::de::Error as DeError;
+use serde::de::Visitor;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
-use serde::de::Error as DeError;
-use serde::de::Visitor;
 use std::convert::TryFrom;
 use std::error::Error as StdError;
 use std::fmt::Display;

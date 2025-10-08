@@ -17,10 +17,10 @@
 #[allow(dead_code)]
 pub mod test_utils {
     use nv_redfish_core::{
-        EntityTypeRef, Expandable, ODataETag, ODataId,
         action::Action,
         bmc::BmcCredentials,
         http::{HttpBmc, ReqwestClient},
+        EntityTypeRef, Expandable, ODataETag, ODataId,
     };
     use serde::{Deserialize, Serialize};
     use url::Url;

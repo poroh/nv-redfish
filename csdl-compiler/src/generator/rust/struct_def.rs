@@ -13,9 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::IsNullable;
-use crate::IsRequired;
-use crate::OneOrCollection;
 use crate::compiler::Action;
 use crate::compiler::ActionsMap;
 use crate::compiler::NavProperty;
@@ -26,20 +23,23 @@ use crate::compiler::Properties;
 use crate::compiler::Property;
 use crate::compiler::PropertyType;
 use crate::compiler::QualifiedName;
+use crate::generator::rust::doc::format_and_generate as doc_format_and_generate;
 use crate::generator::rust::ActionName;
 use crate::generator::rust::Config;
 use crate::generator::rust::Error;
 use crate::generator::rust::FullTypeName;
 use crate::generator::rust::StructFieldName;
 use crate::generator::rust::TypeName;
-use crate::generator::rust::doc::format_and_generate as doc_format_and_generate;
 use crate::odata::annotations::Permissions;
+use crate::IsNullable;
+use crate::IsRequired;
+use crate::OneOrCollection;
 use proc_macro2::Ident;
 use proc_macro2::Literal;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
-use quote::ToTokens;
 use quote::quote;
+use quote::ToTokens;
 use std::iter;
 
 #[derive(Debug)]

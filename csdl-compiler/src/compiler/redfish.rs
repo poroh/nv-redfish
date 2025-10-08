@@ -15,9 +15,9 @@
 
 //! Redfish-related attributes needed to generate code.
 
+use crate::redfish::annotations::RedfishPropertyAnnotations;
 use crate::IsRequired;
 use crate::IsRequiredOnCreate;
-use crate::redfish::annotations::RedfishPropertyAnnotations;
 
 /// Redfish property attributes attached to different compiled enities.
 #[derive(Debug)]

@@ -116,9 +116,6 @@ pub use traits::MapType;
 #[doc(inline)]
 pub use traits::PropertiesManipulation;
 
-use crate::IsNullable;
-use crate::IsRequired;
-use crate::OneOrCollection;
 use crate::compiler::odata::MustHaveId;
 use crate::edmx::Action as EdmxAction;
 use crate::edmx::ActionName;
@@ -128,6 +125,9 @@ use crate::edmx::Schema;
 use crate::edmx::SimpleIdentifier;
 use crate::edmx::Type;
 use crate::redfish::annotations::RedfishPropertyAnnotations as _;
+use crate::IsNullable;
+use crate::IsRequired;
+use crate::OneOrCollection;
 use schema_index::SchemaIndex;
 use stack::Stack;
 

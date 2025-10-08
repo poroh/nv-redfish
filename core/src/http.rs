@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::HashMap,
     error::Error as StdError,
@@ -24,8 +24,8 @@ use url::Url;
 #[cfg(feature = "reqwest")]
 use crate::Empty;
 use crate::{
-    Bmc, EntityTypeRef, Expandable, ODataETag, ODataId, bmc::BmcCredentials,
-    cache::TypeErasedCarCache,
+    bmc::BmcCredentials, cache::TypeErasedCarCache, Bmc, EntityTypeRef, Expandable, ODataETag,
+    ODataId,
 };
 
 /// Builder for Redfish `$expand` query parameters according to DSP0266 specification.

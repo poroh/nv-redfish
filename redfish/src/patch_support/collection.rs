@@ -13,13 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Error;
 use crate::patch_support::JsonValue;
 use crate::patch_support::Payload;
 use crate::patch_support::ReadPatchFn;
 use crate::schema::redfish::resource::ItemOrCollection;
 use crate::schema::redfish::resource::Oem;
 use crate::schema::redfish::resource::ResourceCollection;
+use crate::Error;
+use nv_redfish_core::http::ExpandQuery;
 use nv_redfish_core::Bmc;
 use nv_redfish_core::Creatable;
 use nv_redfish_core::EntityTypeRef;
@@ -28,7 +29,6 @@ use nv_redfish_core::NavProperty;
 use nv_redfish_core::ODataETag;
 use nv_redfish_core::ODataId;
 use nv_redfish_core::Reference;
-use nv_redfish_core::http::ExpandQuery;
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;

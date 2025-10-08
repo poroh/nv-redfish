@@ -18,12 +18,12 @@ mod common;
 #[cfg(feature = "reqwest")]
 mod reqwest_client_tests {
     use nv_redfish_core::{
-        Bmc,
         http::{BmcReqwestError, ExpandQuery},
+        Bmc,
     };
     use wiremock::{
-        Mock, MockServer, ResponseTemplate,
         matchers::{body_json, header, method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
     };
 
     use crate::common::test_utils::*;

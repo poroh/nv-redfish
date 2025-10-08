@@ -18,10 +18,10 @@
 use crate::compiler::QualifiedName;
 use crate::compiler::SchemaIndex;
 use crate::edmx::SimpleIdentifier;
-use serde::Deserialize;
-use serde::Deserializer;
 use serde::de::Error as DeError;
 use serde::de::Visitor;
+use serde::Deserialize;
+use serde::Deserializer;
 use std::collections::HashSet;
 use std::error::Error as StdError;
 use std::fmt::Display;
