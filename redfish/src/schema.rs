@@ -18,6 +18,12 @@
 /// user. Each individual feature implementation may reexport if
 /// needed.
 #[allow(dead_code)]
-pub(crate) mod redfish {
+#[allow(clippy::doc_markdown)]
+#[allow(clippy::absolute_paths)]
+#[allow(clippy::option_option)]
+#[allow(clippy::missing_const_for_fn)]
+#[allow(clippy::struct_field_names)]
+#[allow(missing_docs)]
+pub mod redfish {
     include!(concat!(env!("OUT_DIR"), "/redfish.rs"));
 }

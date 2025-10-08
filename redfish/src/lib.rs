@@ -13,9 +13,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Implementation of Redfish protocol client.
+
+#![deny(
+    clippy::all,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::suspicious,
+    clippy::complexity,
+    clippy::perf
+)]
+#![deny(
+    clippy::absolute_paths,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::tests_outside_test_module,
+    clippy::panic,
+    clippy::unwrap_used,
+    clippy::unwrap_in_result,
+    clippy::unused_trait_names,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
+#![deny(missing_docs)]
+
+pub(crate) mod patch_support;
+pub(crate) mod schema;
+
+/// Errors defined by the crate.
 pub mod error;
-pub mod patch_support;
-pub mod schema;
 
 /// Implmentation of service root.
 pub mod service_root;

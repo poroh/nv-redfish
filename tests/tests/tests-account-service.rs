@@ -54,7 +54,7 @@ async fn list_accounts() -> Result<(), Box<dyn StdError>> {
         }]},
     )
     .await?;
-    let accounts = accounts.all_accounts().await?;
+    let accounts = accounts.all_accounts_data().await?;
     assert_eq!(accounts.len(), 1);
     let account = accounts.first().unwrap().raw();
     assert_eq!(account.user_name, Some("Administrator".into()));
@@ -83,7 +83,7 @@ async fn list_hpe_accounts() -> Result<(), Box<dyn StdError>> {
         }]},
     )
     .await?;
-    let accounts = accounts.all_accounts().await?;
+    let accounts = accounts.all_accounts_data().await?;
     assert_eq!(accounts.len(), 1);
     let account = accounts.first().unwrap().raw();
     assert_eq!(account.user_name, Some("Administrator".into()));

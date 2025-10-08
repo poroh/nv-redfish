@@ -24,10 +24,10 @@ use nv_redfish_core::Updatable;
 use serde::Deserialize;
 use serde::Serialize;
 
-pub(crate) trait UpdateWithPatch<T, V, B>
+pub trait UpdateWithPatch<T, V, B>
 where
     V: Serialize + Send + Sync,
-    T: EntityTypeRef + Updatable<V>,
+    T: EntityTypeRef + Updatable<V> + Sync + Send,
     B: Bmc,
 {
     fn entity_ref(&self) -> &T;
@@ -62,7 +62,7 @@ pub struct Payload(JsonValue);
 impl Payload {
     /// Apply function f to payload and then try to deserialize to the
     /// target type.
-    pub fn to_target<T, B, F>(&self, f: F) -> Result<T, Error<B>>
+    pub(crate) fn to_target<T, B, F>(&self, f: F) -> Result<T, Error<B>>
     where
         T: for<'de> Deserialize<'de>,
         B: Bmc,
@@ -72,7 +72,7 @@ impl Payload {
     }
 }
 
-pub struct Updator<'a> {
+struct Updator<'a> {
     id: &'a ODataId,
 }
 
@@ -86,12 +86,12 @@ impl EntityTypeRef for Updator<'_> {
 }
 
 impl Updator<'_> {
-    pub async fn update<B, U, T, F>(&self, bmc: &B, update: &U, patch_fn: F) -> Result<T, Error<B>>
+    async fn update<B, U, T, F>(&self, bmc: &B, update: &U, patch_fn: F) -> Result<T, Error<B>>
     where
         B: Bmc,
-        T: EntityTypeRef + for<'de> Deserialize<'de>,
+        T: EntityTypeRef + for<'de> Deserialize<'de> + Sync + Send,
         U: Serialize + Send + Sync,
-        F: Fn(JsonValue) -> JsonValue,
+        F: Fn(JsonValue) -> JsonValue + Sync + Send,
     {
         bmc.update::<U, Payload>(self.id(), update)
             .await

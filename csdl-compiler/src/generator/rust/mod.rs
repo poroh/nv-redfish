@@ -186,19 +186,19 @@ impl<'a> RustGenerator<'a> {
                 //! to change it you need to change source code of
                 //! generator.
                 //!
-                /// Mapping of Edm.Boolean type
+                /// Mapping of `Edm.Boolean` type
                 pub type Boolean = bool;
-                /// Mapping of DateTimeOffset type
+                /// Mapping of `Edm.DateTimeOffset` type
                 pub type DateTimeOffset = nv_redfish_core::EdmDateTimeOffset;
-                /// Mapping of Edm.Decimal
+                /// Mapping of `Edm.Decimal`
                 pub type Decimal = f64;
-                /// Mapping of Duration type
+                /// Mapping of `Edm.Duration` type
                 pub type Duration = nv_redfish_core::EdmDuration;
-                /// Mapping of Guid type
+                /// Mapping of `Guid` type
                 pub type Guid = nv_redfish_core::EdmGuid;
-                /// Mapping of Edm.Int64 type
+                /// Mapping of `Edm.Int64` type
                 pub type Int64 = i64;
-                /// Mapping of Edm.String type
+                /// Mapping of `Edm.String` type
                 pub type String = ::std::string::String;
             }
         });

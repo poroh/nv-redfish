@@ -13,22 +13,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This is patching support module
+//! Sometime Redfish implementations are not perfectly match CSDL
+//! specification. This module provides helpers to deal with it.
 
-pub(crate) mod collection;
-pub(crate) mod payload;
+/// Redfish collection related patches.
+mod collection;
+/// Redfish payload patches.
+mod payload;
 
 #[doc(inline)]
-pub(crate) use collection::CollectionWithPatch;
+pub use collection::CollectionWithPatch;
 #[doc(inline)]
-pub(crate) use collection::CreateWithPatch;
+pub use collection::CreateWithPatch;
 #[doc(inline)]
-pub(crate) use payload::Payload;
+pub use payload::Payload;
 #[doc(inline)]
-pub(crate) use payload::UpdateWithPatch;
+pub use payload::UpdateWithPatch;
 #[doc(inline)]
-pub(crate) use serde_json::Value as JsonValue;
+pub use serde_json::Value as JsonValue;
 
 use std::sync::Arc;
 
-pub(crate) type ReadPatchFn = Arc<dyn Fn(JsonValue) -> JsonValue>;
+/// Reference to patch funcion. This function should transform json
+/// structure to Redfish-compatible structure.
+pub type ReadPatchFn = Arc<dyn Fn(JsonValue) -> JsonValue + Sync + Send>;

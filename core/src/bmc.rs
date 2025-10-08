@@ -31,7 +31,7 @@ use std::sync::Arc;
 
 /// BMC trait defined access to Board Management Controller using
 /// Redfish protocol.
-pub trait Bmc {
+pub trait Bmc: Send + Sync {
     /// BMC Error
     type Error: StdError + Send;
 

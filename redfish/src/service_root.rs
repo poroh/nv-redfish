@@ -23,6 +23,7 @@ use std::sync::Arc;
 #[cfg(feature = "accounts")]
 use crate::accounts::AccountService;
 
+/// Represents `ServiceRoot` in the BMC model.
 pub struct ServiceRoot<B: Bmc> {
     root: Arc<SchemaServiceRoot>,
     bmc: Arc<B>,
@@ -38,17 +39,27 @@ impl<B: Bmc> Clone for ServiceRoot<B> {
 }
 
 impl<B: Bmc> ServiceRoot<B> {
+    /// Create new service root.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if failed to retrieve root path using Redfish.
     pub async fn new(bmc: Arc<B>) -> Result<Self, Error<B>> {
         let root = NavProperty::<SchemaServiceRoot>::new_reference(ODataId::service_root())
             .get(bmc.as_ref())
             .await
             .map_err(Error::Bmc)?;
-        Ok(ServiceRoot {
+        Ok(Self {
             root,
             bmc: bmc.clone(),
         })
     }
 
+    /// Get account service that belongs the BMC.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if failed to retrieve accoint service data.
     #[cfg(feature = "accounts")]
     pub async fn account_service(&self) -> Result<AccountService<B>, Error<B>> {
         let service = self
@@ -59,7 +70,7 @@ impl<B: Bmc> ServiceRoot<B> {
             .get(self.bmc.as_ref())
             .await
             .map_err(Error::Bmc)?;
-        Ok(AccountService::new(self.clone(), service, self.bmc.clone()))
+        Ok(AccountService::new(self, service, self.bmc.clone()))
     }
 }
 

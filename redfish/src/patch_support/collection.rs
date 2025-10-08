@@ -33,7 +33,13 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
 
-pub(crate) trait CollectionWithPatch<T, M, B>
+/// Trait that provides possibility to patch collection members data
+/// before it deserialized to member data structure. This is required
+/// in situations where BMC implementation do something that is not
+/// aligned with CSDL schema.
+///
+/// Example of usage is in `AccountCollection` implementation.
+pub trait CollectionWithPatch<T, M, B>
 where
     T: EntityTypeRef + Expandable + Send + Sync + 'static,
     M: EntityTypeRef + Send + Sync + for<'de> Deserialize<'de>,
@@ -74,11 +80,15 @@ where
     }
 }
 
-pub(crate) trait CreateWithPatch<T, M, C, B>
+/// Trait that provides possibility to create collection member and patch
+/// response before it is deserialized to member datastructure.
+///
+/// Example of usage is in `AccountCollection` implementation.
+pub trait CreateWithPatch<T, M, C, B>
 where
-    T: EntityTypeRef + Creatable<C, M>,
-    C: Serialize + Send + Sync,
-    M: Send + Sync + for<'de> Deserialize<'de>,
+    T: EntityTypeRef + Creatable<C, M> + Sync + Send,
+    C: Serialize + Sync + Send,
+    M: for<'de> Deserialize<'de> + Sync + Send,
     B: Bmc,
 {
     fn entity_ref(&self) -> &T;
@@ -105,21 +115,21 @@ where
 /// This Collection can be use to deserialize this collection and then
 /// restore original collection by patching payload of members.
 #[derive(Deserialize)]
-pub struct Collection {
+struct Collection {
     #[serde(flatten)]
-    pub base: ResourceCollection,
+    base: ResourceCollection,
     #[serde(rename = "Members")]
-    pub members: Vec<Payload>,
+    members: Vec<Payload>,
 }
 
 impl Collection {
-    pub async fn create<T, F, C, B, V>(orig: &T, bmc: &B, create: &C, f: F) -> Result<V, Error<B>>
+    async fn create<T, F, C, B, V>(orig: &T, bmc: &B, create: &C, f: F) -> Result<V, Error<B>>
     where
-        T: EntityTypeRef,
+        T: EntityTypeRef + Sync + Send,
         V: for<'de> Deserialize<'de>,
         B: Bmc,
         C: Serialize + Sync + Send,
-        F: FnOnce(JsonValue) -> JsonValue,
+        F: FnOnce(JsonValue) -> JsonValue + Sync + Send,
     {
         Creator { id: orig.id() }
             .create(bmc, create)
@@ -128,7 +138,7 @@ impl Collection {
             .to_target(f)
     }
 
-    pub fn base(&self) -> ResourceCollection {
+    fn base(&self) -> ResourceCollection {
         ResourceCollection {
             base: ItemOrCollection {
                 odata_id: self.base.base.odata_id.clone(),
@@ -143,7 +153,7 @@ impl Collection {
         }
     }
 
-    pub fn members<T, F, B>(&self, f: &F) -> Result<Vec<NavProperty<T>>, Error<B>>
+    fn members<T, F, B>(&self, f: &F) -> Result<Vec<NavProperty<T>>, Error<B>>
     where
         T: EntityTypeRef + for<'de> Deserialize<'de>,
         F: Fn(JsonValue) -> JsonValue,

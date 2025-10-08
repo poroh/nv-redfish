@@ -29,16 +29,21 @@ use crate::Error;
 use crate::ServiceRoot;
 use nv_redfish_core::http::ExpandQuery;
 use nv_redfish_core::Bmc;
-use nv_redfish_core::Deletable;
-use nv_redfish_core::EntityTypeRef;
+use nv_redfish_core::Deletable as _;
+use nv_redfish_core::EntityTypeRef as _;
 use nv_redfish_core::NavProperty;
 use nv_redfish_core::ODataId;
 use std::sync::Arc;
 
+#[doc(inline)]
 pub use crate::schema::redfish::manager_account::AccountTypes;
+#[doc(inline)]
 pub use crate::schema::redfish::manager_account::ManagerAccountCreate;
+#[doc(inline)]
 pub use crate::schema::redfish::manager_account::ManagerAccountUpdate;
 
+/// Account service. Provide possibility to manage accounts using
+/// Redfish.
 pub struct AccountService<B: Bmc> {
     account_read_patch_fn: Option<ReadPatchFn>,
     service: Arc<SchemaAccountService>,
@@ -46,8 +51,10 @@ pub struct AccountService<B: Bmc> {
 }
 
 impl<B: Bmc> AccountService<B> {
+    /// Create new account service. This is always done by
+    /// `ServiceRoot` object.
     pub(crate) fn new(
-        root: ServiceRoot<B>,
+        root: &ServiceRoot<B>,
         service: Arc<SchemaAccountService>,
         bmc: Arc<B>,
     ) -> Self {
@@ -69,10 +76,23 @@ impl<B: Bmc> AccountService<B> {
             bmc,
         }
     }
+
+    /// `OData` identifier of the `AccountService` in the Redfish.
+    ///
+    /// It is almost always `/redfish/v1/AccountService`.
+    #[must_use]
     pub fn odata_id(&self) -> &ODataId {
         self.service.as_ref().id()
     }
 
+    /// Get accounts collection.
+    ///
+    /// Note that it tries to use `expand` to get all members of the
+    /// collection in one request.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if failed to expand collection.
     pub async fn accounts(&self) -> Result<AccountCollection<B>, Error<B>> {
         let collection_ref = self
             .service
@@ -95,6 +115,9 @@ impl<B: Bmc> AccountService<B> {
     }
 }
 
+/// Accounts collection.
+///
+/// Provides function for access collection members.
 pub struct AccountCollection<B: Bmc> {
     read_patch_fn: Option<ReadPatchFn>,
     bmc: Arc<B>,
@@ -112,7 +135,8 @@ impl<B: Bmc> CollectionWithPatch<ManagerAccountCollection, ManagerAccount, B>
     }
 }
 
-impl<B: Bmc> CreateWithPatch<ManagerAccountCollection, ManagerAccount, ManagerAccountCreate, B>
+impl<B: Bmc + Sync + Send>
+    CreateWithPatch<ManagerAccountCollection, ManagerAccount, ManagerAccountCreate, B>
     for AccountCollection<B>
 {
     fn entity_ref(&self) -> &ManagerAccountCollection {
@@ -126,11 +150,20 @@ impl<B: Bmc> CreateWithPatch<ManagerAccountCollection, ManagerAccount, ManagerAc
     }
 }
 
-impl<B: Bmc> AccountCollection<B> {
+impl<B: Bmc + Sync + Send> AccountCollection<B> {
+    /// `OData` identifier of the account collection in the Redfish.
+    ///
+    /// It is almost always `/redfish/v1/AccountService/Accounts`.
+    #[must_use]
     pub fn odata_id(&self) -> &ODataId {
         self.collection.as_ref().id()
     }
 
+    /// Create new account.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if failed to create new account.
     pub async fn create_account(
         &self,
         create: &ManagerAccountCreate,
@@ -139,32 +172,46 @@ impl<B: Bmc> AccountCollection<B> {
         Ok(Account {
             read_patch_fn: self.read_patch_fn.clone(),
             bmc: self.bmc.clone(),
-            account: Arc::new(account),
+            data: Arc::new(account),
         })
     }
 
-    pub async fn all_accounts(&self) -> Result<Vec<Account<B>>, Error<B>> {
+    /// Get accounts data.
+    ///
+    /// This metod doesn't update collection itself. It is only
+    /// retrieve all accounts data (if it hasn't retrieved yet).
+    ///
+    /// # Errors
+    ///
+    /// Returns error if failed to get account data. Note that it is
+    /// only happens if account collection wasn't expanded by any
+    /// reason.
+    pub async fn all_accounts_data(&self) -> Result<Vec<Account<B>>, Error<B>> {
         let mut result = Vec::with_capacity(self.collection.members.len());
         for m in &self.collection.members {
             result.push(Account {
                 read_patch_fn: self.read_patch_fn.clone(),
                 bmc: self.bmc.clone(),
-                account: m.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?,
-            })
+                data: m.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?,
+            });
         }
         Ok(result)
     }
 }
 
+/// Represents `ManagerAccount` in the Redfish.
 pub struct Account<B: Bmc> {
     read_patch_fn: Option<ReadPatchFn>,
     bmc: Arc<B>,
-    account: Arc<ManagerAccount>,
+    data: Arc<ManagerAccount>,
 }
 
-impl<B: Bmc> UpdateWithPatch<ManagerAccount, ManagerAccountUpdate, B> for Account<B> {
+impl<B> UpdateWithPatch<ManagerAccount, ManagerAccountUpdate, B> for Account<B>
+where
+    B: Bmc + Sync + Send,
+{
     fn entity_ref(&self) -> &ManagerAccount {
-        self.account.as_ref()
+        self.data.as_ref()
     }
     fn patch(&self) -> Option<&ReadPatchFn> {
         self.read_patch_fn.as_ref()
@@ -174,20 +221,41 @@ impl<B: Bmc> UpdateWithPatch<ManagerAccount, ManagerAccountUpdate, B> for Accoun
     }
 }
 
-impl<B: Bmc> Account<B> {
+impl<B> Account<B>
+where
+    B: Bmc + Sync + Send,
+{
+    /// Raw data of the account.
+    #[must_use]
     pub fn raw(&self) -> Arc<ManagerAccount> {
-        self.account.clone()
+        self.data.clone()
     }
 
+    /// Update account using Redfish.
+    ///
+    /// Function returns newly created account.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if server returned error or if response failed
+    /// to be parsed.
     pub async fn update(&self, update: &ManagerAccountUpdate) -> Result<Self, Error<B>> {
         let account = self.update_with_patch(update).await?;
-        Ok(Account {
+        Ok(Self {
             read_patch_fn: self.read_patch_fn.clone(),
             bmc: self.bmc.clone(),
-            account: Arc::new(account),
+            data: Arc::new(account),
         })
     }
 
+    /// Update account password.
+    ///
+    /// Note that function returns new (updated) account as result.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if server returned error or if response failed
+    /// to be parsed.
     pub async fn update_password(&self, password: String) -> Result<Self, Error<B>> {
         self.update(
             &ManagerAccountUpdate::builder()
@@ -197,6 +265,14 @@ impl<B: Bmc> Account<B> {
         .await
     }
 
+    /// Update current account's user name.
+    ///
+    /// Note that function returns new (updated) account as result.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if server returned error or if response failed
+    /// to be parsed.
     pub async fn update_user_name(&self, user_name: String) -> Result<Self, Error<B>> {
         self.update(
             &ManagerAccountUpdate::builder()
@@ -206,8 +282,13 @@ impl<B: Bmc> Account<B> {
         .await
     }
 
+    /// Delete current account.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if server returned error on delete.
     pub async fn delete(&self) -> Result<(), Error<B>> {
-        self.account
+        self.data
             .delete(self.bmc.as_ref())
             .await
             .map_err(Error::Bmc)

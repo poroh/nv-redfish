@@ -277,6 +277,7 @@ impl<'a> StructDef<'a> {
         let properties_impl = properties.iter().map(|(_, name, prop_type)| {
             let fn_name = Ident::new(&format!("with_{name}"), Span::call_site());
             quote! {
+                #[must_use]
                 pub fn #fn_name(mut self, v: #prop_type) -> Self {
                     self.#name = Some(v);
                     self
@@ -289,10 +290,12 @@ impl<'a> StructDef<'a> {
         // Generate builder for struct.
         tokens.extend(quote! {
             impl #name {
+                #[must_use]
                 pub fn builder() -> Self {
                     Self::default()
                 }
-                pub fn build(self) -> Self {
+                #[must_use]
+                pub const fn build(self) -> Self {
                     self
                 }
                 #content
@@ -374,6 +377,7 @@ impl<'a> StructDef<'a> {
                 } else {
                     let fn_name = Ident::new(&format!("with_{name}"), Span::call_site());
                     Some(quote! {
+                        #[must_use]
                         pub fn #fn_name(mut self, v: #prop_type) -> Self {
                             self.#name = Some(v);
                             self
@@ -386,11 +390,13 @@ impl<'a> StructDef<'a> {
 
         tokens.extend([quote! {
             impl #name {
+                #[must_use]
                 pub fn builder(#builder_fn_arglist) -> Self {
                     Self {
                         #builder_fn_impl
                     }
                 }
+                #[must_use]
                 pub fn build(self) -> Self {
                     self
                 }

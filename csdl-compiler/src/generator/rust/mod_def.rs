@@ -365,7 +365,7 @@ impl<'a> ModDef<'a> {
                     #[allow(unused_imports)]
                     use #top::{NavProperty, ODataId, ODataETag, de_optional_nullable, de_required_nullable};
                     #[allow(unused_imports)]
-                    use #top::ActionError;
+                    use #top::ActionError as _;
                 },
             ]);
             generate(&mut content);
