@@ -312,39 +312,35 @@ impl<'a> StructDef<'a> {
                 {
                     let full_type = FullTypeName::new(*v, config).for_update(Some(typeinfo.class));
                     let required = p.redfish.is_required_on_create.into_inner();
-                    let serde_opt = if required {
-                        quote! {}
-                    } else {
-                        quote! {#[serde(skip_serializing_if = "Option::is_none")]}
-                    };
                     let prop_type = match p.ptype {
                         PropertyType::One(_) => quote! { #full_type },
                         PropertyType::Collection(_) => quote! { Vec<#full_type> },
                     };
                     let rename = Literal::string(p.name.inner().inner());
                     let name = StructFieldName::new_property(p.name);
-                    Some((rename, serde_opt, name, prop_type, required))
+                    Some((rename, name, prop_type, required))
                 } else {
                     None
                 }
             })
             .collect::<Vec<_>>();
 
-        let properties_content =
-            properties
-                .iter()
-                .map(|(rename, serde_opt, name, prop_type, required)| {
-                    let t = if *required {
-                        prop_type
-                    } else {
-                        &quote! { Option<#prop_type> }
-                    };
+        let properties_content = properties
+            .iter()
+            .map(|(rename, name, prop_type, required)| {
+                if *required {
                     quote! {
                         #[serde(rename=#rename)]
-                        #serde_opt
-                        pub #name: #t,
+                        pub #name: #prop_type,
                     }
-                });
+                } else {
+                    quote! {
+                        #[serde(rename=#rename)]
+                        #[serde(skip_serializing_if = "Option::is_none")]
+                        pub #name: Option<#prop_type>,
+                    }
+                }
+            });
 
         let mut content = TokenStream::new();
         content.extend(properties_content);
@@ -359,7 +355,7 @@ impl<'a> StructDef<'a> {
         // Implement builder for create struct:
         let (builder_fn_arglist, builder_fn_impl) = properties.iter().fold(
             (TokenStream::new(), TokenStream::new()),
-            |(mut arglist, mut implcontent), (_, _, name, prop_type, required)| {
+            |(mut arglist, mut implcontent), (_, name, prop_type, required)| {
                 if *required {
                     arglist.extend(quote! {#name: #prop_type,});
                     implcontent.extend(quote! { #name, });
@@ -372,7 +368,7 @@ impl<'a> StructDef<'a> {
 
         let prop_fn_impl = properties
             .iter()
-            .filter_map(|(_, _, name, prop_type, required)| {
+            .filter_map(|(_, name, prop_type, required)| {
                 if *required {
                     None
                 } else {

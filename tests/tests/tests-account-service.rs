@@ -79,13 +79,18 @@ async fn list_accounts() -> Result<(), Box<dyn StdError>> {
                     "Id": "1",
                     "Name": "User Account",
                     "UserName": "Administrator",
-                    "RoleId": "Administrator",
+                    "RoleId": "AdministratorRole",
                     "AccountTypes": []
                 }
             ],
         }),
     ));
-    let accounts = account_service.accounts().await?;
-    assert_eq!(accounts.all_accounts().await?.len(), 1);
+    let accounts = account_service.accounts().await?.all_accounts().await?;
+    assert_eq!(accounts.len(), 1);
+    let account = accounts.first().unwrap().raw();
+    assert_eq!(account.user_name, Some("Administrator".into()));
+    assert_eq!(account.role_id, Some("AdministratorRole".into()));
+    assert_eq!(account.base.name, "User Account");
+    assert_eq!(account.base.id, "1");
     Ok(())
 }
