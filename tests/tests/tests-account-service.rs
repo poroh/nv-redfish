@@ -16,23 +16,113 @@
 //! Integration tests of Account Service.
 
 use nv_redfish::ServiceRoot;
+use nv_redfish::accounts::AccountCollection;
+use nv_redfish::accounts::AccountService;
+use nv_redfish::accounts::AccountTypes;
 use nv_redfish_core::ODataId;
 use nv_redfish_tests::Bmc;
 use nv_redfish_tests::Expect;
 use nv_redfish_tests::ODATA_ID;
 use nv_redfish_tests::ODATA_TYPE;
+use serde_json::Value as JsonValue;
 use serde_json::json;
 use std::error::Error as StdError;
 use std::sync::Arc;
 use tokio::test;
 
+const ACCOUNT_SERVICE_DATA_TYPE: &str = "#AccountService.v1_5_0.AccountService";
+const ACCOUNTS_DATA_TYPE: &str = "#ManagerAccountCollection.ManagerAccountCollection";
+const MANAGER_ACCOUNT_DATA_TYPE: &str = "#ManagerAccount.v1_3_0.ManagerAccount";
+
 #[test]
 async fn list_accounts() -> Result<(), Box<dyn StdError>> {
     let bmc = Arc::new(Bmc::default());
     let root_id = ODataId::service_root();
+    let account_service = get_account_service(bmc.clone(), &root_id, "Contoso").await?;
+    let maccount_id = format!("{}/Accounts/1", account_service.odata_id());
+    let accounts = get_account_collection(
+        bmc.clone(),
+        &account_service,
+        json! {[{
+            ODATA_ID: maccount_id,
+            ODATA_TYPE: MANAGER_ACCOUNT_DATA_TYPE,
+            "Id": "1",
+            "Name": "User Account",
+            "UserName": "Administrator",
+            "RoleId": "AdministratorRole",
+            "AccountTypes": []
+        }]},
+    )
+    .await?;
+    let accounts = accounts.all_accounts().await?;
+    assert_eq!(accounts.len(), 1);
+    let account = accounts.first().unwrap().raw();
+    assert_eq!(account.user_name, Some("Administrator".into()));
+    assert_eq!(account.role_id, Some("AdministratorRole".into()));
+    assert_eq!(account.base.name, "User Account");
+    assert_eq!(account.base.id, "1");
+    Ok(())
+}
+
+#[test]
+async fn list_hpe_accounts() -> Result<(), Box<dyn StdError>> {
+    let bmc = Arc::new(Bmc::default());
+    let root_id = ODataId::service_root();
+    let account_service = get_account_service(bmc.clone(), &root_id, "HPE").await?;
+    let maccount_id = format!("{}/Accounts/1", account_service.odata_id());
+    let accounts = get_account_collection(
+        bmc.clone(),
+        &account_service,
+        json! {[{
+            ODATA_ID: maccount_id,
+            ODATA_TYPE: MANAGER_ACCOUNT_DATA_TYPE,
+            "Id": "1",
+            "Name": "User Account",
+            "UserName": "Administrator",
+            "RoleId": "AdministratorRole",
+        }]},
+    )
+    .await?;
+    let accounts = accounts.all_accounts().await?;
+    assert_eq!(accounts.len(), 1);
+    let account = accounts.first().unwrap().raw();
+    assert_eq!(account.user_name, Some("Administrator".into()));
+    assert_eq!(account.account_types, vec![AccountTypes::Redfish]);
+    Ok(())
+}
+
+#[test]
+async fn list_no_patch_accounts() -> Result<(), Box<dyn StdError>> {
+    let bmc = Arc::new(Bmc::default());
+    let root_id = ODataId::service_root();
+    let account_service = get_account_service(bmc.clone(), &root_id, "Contoso").await?;
+    let maccount_id = format!("{}/Accounts/1", account_service.odata_id());
+    assert!(
+        get_account_collection(
+            bmc.clone(),
+            &account_service,
+            json! {[{
+                ODATA_ID: maccount_id,
+                ODATA_TYPE: MANAGER_ACCOUNT_DATA_TYPE,
+                "Id": "1",
+                "Name": "User Account",
+                "UserName": "Administrator",
+                "RoleId": "AdministratorRole",
+            }]},
+        )
+        .await
+        .is_err()
+    );
+    Ok(())
+}
+
+async fn get_account_service(
+    bmc: Arc<Bmc>,
+    root_id: &ODataId,
+    vendor: &str,
+) -> Result<AccountService<Bmc>, Box<dyn StdError>> {
     let account_service_id = format!("{root_id}/AccountService");
     let data_type = "#ServiceRoot.v1_13_0.ServiceRoot";
-    let account_service_data_type = "#AccountService.v1_5_0.AccountService";
     bmc.expect(Expect::get(
         &root_id,
         json!({
@@ -43,18 +133,18 @@ async fn list_accounts() -> Result<(), Box<dyn StdError>> {
             "AccountService": {
                 ODATA_ID: &account_service_id,
             },
+            "Vendor": vendor,
             "Links": {},
         }),
     ));
     let service_root = ServiceRoot::new(bmc.clone()).await?;
 
     let accounts_id = format!("{account_service_id}/Accounts");
-    let accounts_data_type = "#ManagerAccountCollection.ManagerAccountCollection";
     bmc.expect(Expect::get(
         &account_service_id,
         json!({
             ODATA_ID: &account_service_id,
-            ODATA_TYPE: &account_service_data_type,
+            ODATA_TYPE: &ACCOUNT_SERVICE_DATA_TYPE,
             "Id": "AccountService",
             "Name": "AccountService",
             "Accounts": {
@@ -62,35 +152,23 @@ async fn list_accounts() -> Result<(), Box<dyn StdError>> {
             },
         }),
     ));
+    Ok(service_root.account_service().await?)
+}
 
-    let maccount_id = format!("{account_service_id}/Accounts/1");
-    let maccount_data_type = "#ManagerAccount.v1_3_0.ManagerAccount";
-    let account_service = service_root.account_service().await?;
+async fn get_account_collection(
+    bmc: Arc<Bmc>,
+    account_service: &AccountService<Bmc>,
+    members: JsonValue,
+) -> Result<AccountCollection<Bmc>, Box<dyn StdError>> {
+    let accounts_id = format!("{}/Accounts", account_service.odata_id());
     bmc.expect(Expect::expand(
         &accounts_id,
         json!({
             ODATA_ID: &accounts_id,
-            ODATA_TYPE: &accounts_data_type,
+            ODATA_TYPE: &ACCOUNTS_DATA_TYPE,
             "Name": "User Accounts",
-            "Members": [
-                {
-                    ODATA_ID: maccount_id,
-                    ODATA_TYPE: maccount_data_type,
-                    "Id": "1",
-                    "Name": "User Account",
-                    "UserName": "Administrator",
-                    "RoleId": "AdministratorRole",
-                    "AccountTypes": []
-                }
-            ],
+            "Members": members,
         }),
     ));
-    let accounts = account_service.accounts().await?.all_accounts().await?;
-    assert_eq!(accounts.len(), 1);
-    let account = accounts.first().unwrap().raw();
-    assert_eq!(account.user_name, Some("Administrator".into()));
-    assert_eq!(account.role_id, Some("AdministratorRole".into()));
-    assert_eq!(account.base.name, "User Account");
-    assert_eq!(account.base.id, "1");
-    Ok(())
+    Ok(account_service.accounts().await?)
 }

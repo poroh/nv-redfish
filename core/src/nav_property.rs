@@ -29,6 +29,7 @@ use std::sync::Arc;
 /// Reference varian of the navigation property (only `@odata.id`
 /// property specified).
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct Reference {
     #[serde(rename = "@odata.id")]
     pub odata_id: ODataId,

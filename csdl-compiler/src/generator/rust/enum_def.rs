@@ -15,19 +15,19 @@
 
 use crate::compiler::EnumType;
 use crate::edmx::attribute_values::SimpleIdentifier;
-use crate::generator::rust::doc::format_and_generate as doc_format_and_generate;
+use crate::generator::casemungler;
 use crate::generator::rust::Config;
 use crate::generator::rust::TypeName;
-use crate::generator::casemungler;
+use crate::generator::rust::doc::format_and_generate as doc_format_and_generate;
 use proc_macro2::Delimiter;
 use proc_macro2::Group;
 use proc_macro2::Ident;
 use proc_macro2::Literal;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
-use quote::quote;
 use quote::ToTokens;
 use quote::TokenStreamExt as _;
+use quote::quote;
 
 /// Type definition that maps to simple type.
 #[derive(Debug)]
@@ -56,9 +56,8 @@ impl EnumDef<'_> {
         tokens.extend([
             doc_format_and_generate(self.name, &self.compiled.odata),
             quote! {
-                #[derive(Serialize, Deserialize, Debug)]
+                #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
                 #[allow(clippy::enum_variant_names)]
-                //#[allow(non_camel_case_types)]
                 pub enum #name
             },
         ]);

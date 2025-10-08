@@ -28,6 +28,15 @@ pub struct ServiceRoot<B: Bmc> {
     bmc: Arc<B>,
 }
 
+impl<B: Bmc> Clone for ServiceRoot<B> {
+    fn clone(&self) -> Self {
+        Self {
+            root: self.root.clone(),
+            bmc: self.bmc.clone(),
+        }
+    }
+}
+
 impl<B: Bmc> ServiceRoot<B> {
     pub async fn new(bmc: Arc<B>) -> Result<Self, Error<B>> {
         let root = NavProperty::<SchemaServiceRoot>::new_reference(ODataId::service_root())
@@ -50,6 +59,18 @@ impl<B: Bmc> ServiceRoot<B> {
             .get(self.bmc.as_ref())
             .await
             .map_err(Error::Bmc)?;
-        Ok(AccountService::new(service, self.bmc.clone()))
+        Ok(AccountService::new(self.clone(), service, self.bmc.clone()))
+    }
+}
+
+// Known Redfish implementation bugs checks.
+impl<B: Bmc> ServiceRoot<B> {
+    // Account type is required according to schema specification
+    // (marked with Redfish.Required annotation) but some vendors
+    // ignores this flag. Workaround of this bug is supporte by
+    // `nv-redfish`.
+    #[cfg(feature = "accounts")]
+    pub(crate) fn bug_no_account_type_in_accounts(&self) -> bool {
+        self.root.vendor.as_ref().is_some_and(|v| v == "HPE")
     }
 }

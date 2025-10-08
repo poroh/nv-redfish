@@ -13,22 +13,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod error;
-pub mod patch_support;
-pub mod schema;
+//! This is patching support module
 
-/// Implmentation of service root.
-pub mod service_root;
-
-/// Accounts Service.
-#[cfg(feature = "accounts")]
-pub mod accounts;
-/// Events Service.
-#[cfg(feature = "events")]
-pub mod events;
+pub(crate) mod collection;
+pub(crate) mod payload;
 
 #[doc(inline)]
-pub use error::Error;
-
+pub(crate) use collection::CollectionWithPatch;
 #[doc(inline)]
-pub use service_root::ServiceRoot;
+pub(crate) use collection::CreateWithPatch;
+#[doc(inline)]
+pub(crate) use payload::Payload;
+#[doc(inline)]
+pub(crate) use payload::UpdateWithPatch;
+#[doc(inline)]
+pub(crate) use serde_json::Value as JsonValue;
+
+use std::sync::Arc;
+
+pub(crate) type ReadPatchFn = Arc<dyn Fn(JsonValue) -> JsonValue>;

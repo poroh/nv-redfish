@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use nv_redfish_core::Bmc;
+use serde_json::Error as JsonError;
 use std::error::Error as StdError;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -24,12 +25,14 @@ pub enum Error<B: Bmc> {
     Bmc(B::Error),
     #[cfg(feature = "accounts")]
     AccountServiceNotSupported,
+    Json(JsonError),
 }
 
 impl<B: Bmc> Display for Error<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             Self::Bmc(err) => write!(f, "BMC error: {err}"),
+            Self::Json(err) => write!(f, "JSON error: {err}"),
             #[cfg(feature = "accounts")]
             Self::AccountServiceNotSupported => {
                 write!(f, "Account service is not supported by system")

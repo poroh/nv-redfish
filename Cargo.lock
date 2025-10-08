@@ -965,6 +965,7 @@ dependencies = [
  "csdl-compiler",
  "nv-redfish-core",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
