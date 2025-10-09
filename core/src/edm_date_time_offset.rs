@@ -13,6 +13,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! `Edm.DateTimeOffset` primitive wrapper
+//!
+//! Represents Redfish/OData `Edm.DateTimeOffset` values. Internally wraps
+//! `time::OffsetDateTime` and (de)serializes using RFC 3339. Display always
+//! uses canonical RFC 3339 formatting; `+00:00` is rendered as `Z` while
+//! non‑UTC offsets are preserved.
+//!
+//! References:
+//! - OASIS OData 4.01 CSDL, Primitive Types: Edm.DateTimeOffset — `https://docs.oasis-open.org/odata/`
+//! - DMTF Redfish Specification DSP0266 — `https://www.dmtf.org/standards/redfish`
+//! - RFC 3339: Date and Time on the Internet — `https://datatracker.ietf.org/doc/html/rfc3339`
+//!
+//! Examples
+//! ```rust
+//! use nv_redfish_core::EdmDateTimeOffset;
+//! use std::str::FromStr;
+//!
+//! let z = EdmDateTimeOffset::from_str("2021-03-04T05:06:07Z").unwrap();
+//! assert_eq!(z.to_string(), "2021-03-04T05:06:07Z".to_string());
+//!
+//! let plus = EdmDateTimeOffset::from_str("2021-03-04T10:36:07+05:30").unwrap();
+//! assert_eq!(plus.to_string(), "2021-03-04T10:36:07+05:30");
+//! ```
+//!
+//! ```rust
+//! use nv_redfish_core::EdmDateTimeOffset;
+//!
+//! // Serde JSON uses RFC3339 strings; +00:00 canonicalizes to Z
+//! let v: EdmDateTimeOffset = "2021-03-04T05:06:07+00:00".parse().unwrap();
+//! let s = serde_json::to_string(&v).unwrap();
+//! assert_eq!(s, r#""2021-03-04T05:06:07Z""#);
+//! ```
+//!
+
 use core::str::FromStr;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;

@@ -13,7 +13,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Edm.EdmDuration data type.
+//! `Edm.Duration` primitive wrapper
+//!
+//! Represents ISO 8601 durations as used by OData/Redfish via `Edm.Duration`.
+//! Internally uses `rust_decimal::Decimal` seconds to preserve precision, supports
+//! negative values and fractional seconds, and displays in canonical
+//! `[-]P[nD][T[nH][nM]nS]` form.
+//!
+//! References:
+//! - OASIS OData 4.01 CSDL, Primitive Types: Edm.Duration — see `Part 3: CSDL`
+//!   (`https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part3-csdl.html`).
+//! - DMTF Redfish Specification DSP0266 (`https://www.dmtf.org/standards/redfish`).
+//!
+//! Examples
+//! ```rust
+//! use nv_redfish_core::EdmDuration;
+//! use std::str::FromStr;
+//!
+//! let d = EdmDuration::from_str("PT1H2M3.5S").unwrap();
+//! assert_eq!(d.to_string(), "PT1H2M3.5S");
+//! assert!((d.as_f64_seconds() - 3723.5).abs() < f64::EPSILON);
+//! ```
+//!
+//! ```rust
+//! use nv_redfish_core::EdmDuration;
+//! use std::convert::TryFrom;
+//! use std::time::Duration as StdDuration;
+//! use std::str::FromStr;
+//!
+//! let one_day = EdmDuration::from_str("P1D").unwrap();
+//! let std = StdDuration::try_from(one_day).unwrap();
+//! assert_eq!(std.as_secs(), 86_400);
+//! // Negative durations cannot convert to StdDuration
+//! assert!(StdDuration::try_from(EdmDuration::from_str("-PT1S").unwrap()).is_err());
+//! ```
 
 use rust_decimal::prelude::ToPrimitive as _;
 use rust_decimal::Decimal;
@@ -243,7 +276,7 @@ impl<'de> Deserialize<'de> for EdmDuration {
             type Value = EdmDuration;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> FmtResult {
-                formatter.write_str("Edm.EdmDuration string")
+                formatter.write_str("Edm.Duration string")
             }
             fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
                 value.parse().map_err(DeError::custom)

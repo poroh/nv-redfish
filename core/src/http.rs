@@ -471,7 +471,7 @@ pub trait CacheableError {
 
 impl<C: HttpClient> Bmc for HttpBmc<C>
 where
-    C::Error: CacheableError + StdError,
+    C::Error: CacheableError + StdError + Send + Sync,
 {
     type Error = C::Error;
 

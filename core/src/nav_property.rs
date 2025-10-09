@@ -13,6 +13,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Navigation property wrapper for generated types
+//!
+//! Represents Redfish/OData navigation properties which may appear either as
+//! a reference (only `@odata.id`) or as an expanded object. Generated code wraps
+//! navigation properties in [`NavProperty<T>`], allowing code to work uniformly
+//! with both forms and resolve references on demand.
+//!
+//! - Reference form: `{ "@odata.id": "/redfish/v1/Chassis/1/Thermal" }`
+//! - Expanded form: full object payload for `T` (includes `@odata.id` and fields)
+//!
+//! Key points
+//! - [`NavProperty<T>::id`] is always available (delegates to inner entity for expanded form).
+//! - [`NavProperty<T>::get`] returns `Arc<T>`; if already expanded, it clones the `Arc` without I/O.
+//! - [`EntityTypeRef::etag`] is `None` for reference form.
+//!
+//! References:
+//! - DMTF Redfish Specification DSP0266 — `https://www.dmtf.org/standards/redfish`
+//! - OASIS OData 4.01 — navigation properties in CSDL
+//!
+
 use crate::Bmc;
 use crate::Creatable;
 use crate::Deletable;
@@ -26,8 +46,8 @@ use serde::Deserializer;
 use serde::Serialize;
 use std::sync::Arc;
 
-/// Reference varian of the navigation property (only `@odata.id`
-/// property specified).
+/// Reference variant of the navigation property (only `@odata.id`
+/// property is specified).
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Reference {
@@ -35,11 +55,11 @@ pub struct Reference {
     odata_id: ODataId,
 }
 
-/// Container struct for expanded property variant
+/// Container struct for the expanded property variant.
 #[derive(Debug)]
 pub struct Expanded<T>(Arc<T>);
 
-/// Deserializer wraps Expanded property into Arc
+/// Deserializer that wraps the expanded property value into an `Arc`.
 impl<'de, T> Deserialize<'de> for Expanded<T>
 where
     T: Deserialize<'de>,
@@ -57,10 +77,10 @@ where
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum NavProperty<T: EntityTypeRef> {
-    /// Expanded property variant (content included into the
+    /// Expanded property variant (content included in the
     /// response).
     Expanded(Expanded<T>),
-    /// Reference variant (only `@odata.id` is included into the
+    /// Reference variant (only `@odata.id` is included in the
     /// response).
     Reference(Reference),
 }
@@ -92,7 +112,7 @@ impl<T: Deletable> Deletable for NavProperty<T> {}
 impl<T: Expandable> Expandable for NavProperty<T> {}
 
 impl<T: EntityTypeRef> NavProperty<T> {
-    /// Create navigation property with reference using `OData`
+    /// Create a navigation property with a reference using the `OData`
     /// identifier.
     #[must_use]
     pub const fn new_reference(odata_id: ODataId) -> Self {
@@ -101,7 +121,7 @@ impl<T: EntityTypeRef> NavProperty<T> {
 }
 
 impl<T: EntityTypeRef> NavProperty<T> {
-    /// Extract identifier from navigation property.
+    /// Extract the identifier from a navigation property.
     #[must_use]
     pub fn id(&self) -> &ODataId {
         match self {
@@ -112,14 +132,14 @@ impl<T: EntityTypeRef> NavProperty<T> {
 }
 
 impl<T: EntityTypeRef + Sized + for<'a> Deserialize<'a> + 'static + Send + Sync> NavProperty<T> {
-    /// Get property
+    /// Get the property value.
     ///
     /// # Errors
     ///
-    /// If navigation property is already expanded then no error is returned.
+    /// If the navigation property is already expanded then no error is returned.
     ///
-    /// If navigation is reference then BMC error may be returned if
-    /// failed to retrieve entity.
+    /// If the navigation is a reference then a BMC error may be returned if
+    /// retrieval of the entity fails.
     pub async fn get<B: Bmc>(&self, bmc: &B) -> Result<Arc<T>, B::Error> {
         match self {
             Self::Expanded(v) => Ok(v.0.clone()),
