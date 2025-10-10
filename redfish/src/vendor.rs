@@ -23,4 +23,16 @@ pub enum Vendor {
     /// Support HPE systems.
     #[cfg(feature = "oem-hpe")]
     Hpe,
+    /// Support Supermicro systems.
+    #[cfg(feature = "oem-supermicro")]
+    Supermicro,
+    /// Support Dell systems.
+    #[cfg(feature = "oem-dell")]
+    Dell,
+    /// Support NVIDIA Viking (H100) systems.
+    #[cfg(feature = "oem-nvidia-viking")]
+    NvidiaViking,
+    /// Support NVIDIA GB200 / GB300 systems.
+    #[cfg(feature = "oem-nvidia-gbx00")]
+    NvidiaGbx00,
 }

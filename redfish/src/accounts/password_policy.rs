@@ -30,14 +30,26 @@ use crate::Vendor;
 use serde::Serialize;
 
 /// Policy with never-expired passwords with minimal restrictions on
-/// locking.
+/// locking. Returns `None` if password policy setup is not supported
+/// by vendor.
 #[must_use]
-pub fn never_expire_policy(vendor: &Vendor) -> AccountServiceUpdate {
+pub fn never_expire_policy(vendor: &Vendor) -> Option<AccountServiceUpdate> {
     match vendor {
         #[cfg(feature = "oem-lenovo")]
-        Vendor::Lenovo => never_expire_policy_lenovo(),
+        Vendor::Lenovo => Some(never_expire_policy_lenovo()),
         #[cfg(feature = "oem-hpe")]
-        Vendor::Hpe => never_expire_policy_hpe(),
+        Vendor::Hpe => Some(never_expire_policy_hpe()),
+        #[cfg(feature = "oem-supermicro")]
+        Vendor::Supermicro => Some(never_expire_policy_supermicro()),
+        // iDRAC does not suport changing password policy. They
+        // support IP blocking instead.
+        // https://github.com/dell/iDRAC-Redfish-Scripting/issues/295
+        #[cfg(feature = "oem-dell")]
+        Vendor::Dell => None,
+        #[cfg(feature = "oem-nvidia-viking")]
+        Vendor::NvidiaViking => Some(never_expire_policy_nvidia_viking()),
+        #[cfg(feature = "oem-nvidia-gbx00")]
+        Vendor::NvidiaGbx00 => Some(never_expire_policy_nvidia_gbx00()),
     }
 }
 
@@ -96,5 +108,44 @@ fn never_expire_policy_hpe() -> AccountServiceUpdate {
                 })
                 .build(),
         )
+        .build()
+}
+
+#[cfg(feature = "oem-supermicro")]
+fn never_expire_policy_supermicro() -> AccountServiceUpdate {
+    AccountServiceUpdate::builder()
+        .with_account_lockout_threshold(0)
+        .with_account_lockout_duration(0)
+        .with_account_lockout_counter_reset_after(0)
+        .build()
+}
+
+#[cfg(feature = "oem-nvidia-viking")]
+fn never_expire_policy_nvidia_viking() -> AccountServiceUpdate {
+    // Setting to (0,0,0,false,0) causes account lockout. So set them
+    // to less harmful values
+    AccountServiceUpdate::builder()
+        .with_account_lockout_threshold(4)
+        .with_account_lockout_duration(20)
+        .with_account_lockout_counter_reset_after(20)
+        .with_account_lockout_counter_reset_enabled(true)
+        .with_auth_failure_logging_threshold(2)
+        .build()
+}
+
+#[cfg(feature = "oem-nvidia-gbx00")]
+fn never_expire_policy_nvidia_gbx00() -> AccountServiceUpdate {
+    // We were able to set AccountLockoutThreshold on the initial 3 GB200 trays we received in pdx-lab
+    // however, with the recent trays we received, it is not happy with setting a value of 0
+    // for AccountLockoutThreshold: "The property 'AccountLockoutThreshold' with the requested value
+    // of '0' could not be written because the value does not meet the constraints of the implementation."
+    //
+    // Never lock
+    // ("AccountLockoutThreshold", Number(0.into())),
+    // instead, use the same threshold that we picked for vikings: the bmc will lock the account out after 4 attempts
+    AccountServiceUpdate::builder()
+        .with_account_lockout_threshold(4)
+        // 600 is the smallest value it will accept. 10 minutes, in seconds.
+        .with_account_lockout_duration(600)
         .build()
 }
