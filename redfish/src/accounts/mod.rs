@@ -56,10 +56,15 @@ pub use crate::schema::redfish::manager_account::ManagerAccountCreate;
 pub use crate::schema::redfish::manager_account::ManagerAccountUpdate;
 #[doc(inline)]
 pub use account::Account;
-#[doc(inline)]
 #[cfg(feature = "oem-lenovo")]
 #[cfg(feature = "oem-hpe")]
-pub use password_policy::never_expire_policy as never_expire_password_policy;
+#[cfg(feature = "oem-supermicro")]
+#[cfg(feature = "oem-dell")]
+#[cfg(feature = "oem-ami")]
+#[cfg(feature = "oem-nvidia-gbx00")]
+#[cfg(feature = "oem-nvidia-dpu")]
+#[doc(inline)]
+pub use password_policy::best_bmaas_policy as best_bmaas_password_policy;
 
 #[doc(inline)]
 pub(crate) use account::Config as AccountConfig;

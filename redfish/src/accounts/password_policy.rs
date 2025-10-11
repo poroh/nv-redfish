@@ -29,27 +29,27 @@ use crate::schema_oem_lenovo::redfish::lenovo_account_service::LenovoAccountServ
 use crate::Vendor;
 use serde::Serialize;
 
-/// Policy with never-expired passwords with minimal restrictions on
-/// locking. Returns `None` if password policy setup is not supported
-/// by vendor.
+/// Opionated best BMAAS password policy. It tends to be as less
+/// restrictive as possible from perspective of locking / password
+/// expiration / reuse / etc.
 #[must_use]
-pub fn never_expire_policy(vendor: &Vendor) -> Option<AccountServiceUpdate> {
+pub fn best_bmaas_policy(vendor: &Vendor) -> Option<AccountServiceUpdate> {
     match vendor {
         #[cfg(feature = "oem-lenovo")]
-        Vendor::Lenovo => Some(never_expire_policy_lenovo()),
+        Vendor::Lenovo => Some(best_bmaas_policy_lenovo()),
         #[cfg(feature = "oem-hpe")]
-        Vendor::Hpe => Some(never_expire_policy_hpe()),
+        Vendor::Hpe => Some(best_bmaas_policy_hpe()),
         #[cfg(feature = "oem-supermicro")]
-        Vendor::Supermicro => Some(never_expire_policy_supermicro()),
+        Vendor::Supermicro => Some(best_bmaas_policy_supermicro()),
         // iDRAC does not suport changing password policy. They
         // support IP blocking instead.
         // https://github.com/dell/iDRAC-Redfish-Scripting/issues/295
         #[cfg(feature = "oem-dell")]
         Vendor::Dell => None,
         #[cfg(feature = "oem-ami")]
-        Vendor::AMI => Some(never_expire_policy_ami()),
+        Vendor::AMI => Some(best_bmaas_policy_ami()),
         #[cfg(feature = "oem-nvidia-gbx00")]
-        Vendor::NvidiaGbx00 => Some(never_expire_policy_nvidia_gbx00()),
+        Vendor::NvidiaGbx00 => Some(best_bmaas_policy_nvidia_gbx00()),
         // Bluefield 2 and Bluefield 3 say that account properties are
         // read-only.
         #[cfg(feature = "oem-nvidia-dpu")]
@@ -65,7 +65,7 @@ struct LenovoOemUpdate {
 }
 
 #[cfg(feature = "oem-lenovo")]
-fn never_expire_policy_lenovo() -> AccountServiceUpdate {
+fn best_bmaas_policy_lenovo() -> AccountServiceUpdate {
     // Redfish equivalent of `accseccfg -pew 0 -pe 0 -chgnew off -rc 0 -ci 0 -lf 0`
     let oem_root = LenovoAccountServicePropertiesUpdate::builder()
         .with_password_expiration_period_days(0.0) // -pe 0
@@ -96,7 +96,7 @@ struct HpeOemUpdate {
 }
 
 #[cfg(feature = "oem-hpe")]
-fn never_expire_policy_hpe() -> AccountServiceUpdate {
+fn best_bmaas_policy_hpe() -> AccountServiceUpdate {
     let oem_root = HpeiLoAccountServiceUpdate::builder()
         .with_auth_failure_delay_time_seconds(2)
         .with_auth_failure_logging_threshold(0)
@@ -116,7 +116,7 @@ fn never_expire_policy_hpe() -> AccountServiceUpdate {
 }
 
 #[cfg(feature = "oem-supermicro")]
-fn never_expire_policy_supermicro() -> AccountServiceUpdate {
+fn best_bmaas_policy_supermicro() -> AccountServiceUpdate {
     AccountServiceUpdate::builder()
         .with_account_lockout_threshold(0)
         .with_account_lockout_duration(0)
@@ -125,7 +125,7 @@ fn never_expire_policy_supermicro() -> AccountServiceUpdate {
 }
 
 #[cfg(feature = "oem-ami")]
-fn never_expire_policy_ami() -> AccountServiceUpdate {
+fn best_bmaas_policy_ami() -> AccountServiceUpdate {
     // Setting to (0,0,0,false,0) causes account lockout. So set them
     // to less harmful values
     AccountServiceUpdate::builder()
@@ -138,7 +138,7 @@ fn never_expire_policy_ami() -> AccountServiceUpdate {
 }
 
 #[cfg(feature = "oem-nvidia-gbx00")]
-fn never_expire_policy_nvidia_gbx00() -> AccountServiceUpdate {
+fn best_bmaas_policy_nvidia_gbx00() -> AccountServiceUpdate {
     // We were able to set AccountLockoutThreshold on the initial 3 GB200 trays we received in pdx-lab
     // however, with the recent trays we received, it is not happy with setting a value of 0
     // for AccountLockoutThreshold: "The property 'AccountLockoutThreshold' with the requested value
