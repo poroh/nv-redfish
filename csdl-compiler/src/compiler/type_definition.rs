@@ -23,9 +23,9 @@ use crate::edmx::TypeDefinition as EdmxTypeDefinition;
 /// Compiled type definition.
 #[derive(Debug)]
 pub struct TypeDefinition<'a> {
-    /// Fully-qualified type name.
+    /// Fully qualified type name.
     pub name: QualifiedName<'a>,
-    /// Underlying type name. This is always primitive type in Edm
+    /// Underlying type name. Always a primitive type in the `Edm`
     /// namespace.
     pub underlying_type: QualifiedName<'a>,
 }

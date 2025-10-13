@@ -22,17 +22,17 @@ use std::fmt::Result as FmtResult;
 use std::hash::Hash;
 use std::hash::Hasher;
 
-/// This namespace is wrapper around original namespace. It adds
-/// additional useful possibilties like pruning tail elements of namespace.
+/// Wrapper around an EDMX namespace that enables operations like
+/// pruning trailing identifiers.
 #[derive(Clone, Copy)]
 pub struct Namespace<'a> {
     edmx_ns: &'a EdmxNamespace,
     len: usize,
 }
 
-#[allow(clippy::len_without_is_empty)] // CompiledNamespace cannot be empty.
+#[allow(clippy::len_without_is_empty)] // Namespace cannot be empty.
 impl<'a> Namespace<'a> {
-    /// Creates new compiled namespace.
+    /// Create a new namespace wrapper.
     #[must_use]
     pub const fn new(edmx_ns: &'a EdmxNamespace) -> Self {
         Self {
@@ -41,13 +41,13 @@ impl<'a> Namespace<'a> {
         }
     }
 
-    /// Number of ids in the namespace.
+    /// Number of identifiers in the namespace.
     #[must_use]
     pub const fn len(&self) -> usize {
         self.len
     }
 
-    /// Get identifier on the specified position.
+    /// Identifier at the specified depth.
     #[must_use]
     pub fn get_id(&self, depth: usize) -> Option<&'a SimpleIdentifier> {
         if self.len > depth {
@@ -57,7 +57,7 @@ impl<'a> Namespace<'a> {
         }
     }
 
-    /// Get parent namespace for namespace with 2 and more elements.
+    /// Parent namespace (for namespaces with at least two identifiers).
     #[must_use]
     pub const fn parent(&self) -> Option<Self> {
         if self.len > 1 {
@@ -70,7 +70,7 @@ impl<'a> Namespace<'a> {
         }
     }
 
-    /// Check if namespace is `Edm`.
+    /// Whether this namespace is `Edm`.
     #[must_use]
     pub fn is_edm(&self) -> bool {
         self.len == 1 && self.edmx_ns.is_edm()

@@ -34,7 +34,7 @@ use crate::redfish::annotations::RedfishPropertyAnnotations as _;
 use crate::IsNullable;
 use crate::OneOrCollection;
 
-/// Compiled Action.
+/// Compiled action.
 #[derive(Debug)]
 pub struct Action<'a> {
     /// Bound type.
@@ -48,7 +48,7 @@ pub struct Action<'a> {
     /// Type of the parameter. Note we reuse `PropertyType`, it
     /// maybe not exact and may be change in future.
     pub parameters: Vec<Parameter<'a>>,
-    /// Odata of action.
+    /// `OData` annotations of the action.
     pub odata: OData<'a>,
 }
 
@@ -84,15 +84,15 @@ pub(crate) fn compile_action<'a>(
     let binding_param = iter.next().ok_or(Error::NoBindingParameterForAction)?;
     let binding = binding_param.ptype.qualified_type_name().into();
     let binding_name = &binding_param.name;
-    // If action is bound to not compiled type, just ignore it. We
-    // will not have node to attach this action. Note: This may
-    // not be correct for common CSDL schema but Redfish always
-    // points to ComplexType (Actions).
+    // If the action is bound to a type we haven't compiled, ignore it;
+    // there is no node to attach the action to. Note: In generic CSDL
+    // this might be unexpected, but in Redfish the binding targets a
+    // ComplexType (Actions).
     if stack.complex_type_info(binding).is_none() {
         return Ok(Compiled::default());
     }
     let stack = stack.new_frame();
-    // Compile ReturnType if present
+    // Compile ReturnType if present.
     let (compiled_rt, return_type) = action
         .return_type
         .as_ref()
@@ -106,14 +106,12 @@ pub(crate) fn compile_action<'a>(
         .map_err(Box::new)
         .map_err(Error::ActionReturnType)?;
     let stack = stack.merge(compiled_rt);
-    // Compile other parameters except first one
+    // Compile parameters except the first binding parameter.
     let (stack, parameters) = iter.try_fold((stack, Vec::new()), |(cstack, mut params), p| {
-        // Sometime parameters refers to entity types. This is
-        // different from complex types / entity types where
-        // properties only points to complex / simple types
-        // and navigation poprerties points to entity type
-        // only. Example is AddResourceBlock in
-        // ComputerSystem schema.
+        // Sometimes parameters refer to entity types. Unlike properties
+        // (which point to complex/simple types) and navigation properties
+        // (which point to entity types), actions may take entities. Example:
+        // AddResourceBlock in the ComputerSystem schema.
         let qtype_name = p.ptype.qualified_type_name().into();
         let (compiled, ptype) = if is_simple_type(qtype_name) {
             Ok((

@@ -1,4 +1,3 @@
-// SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Compiler of multiple schemas
+//! Compiler for multiple schemas.
 
-/// Compiled Action.
+#![deny(missing_docs)]
+
+/// Compiled action.
 pub mod action;
 /// Compiled schema bundle.
 pub mod compiled;
@@ -31,26 +32,26 @@ pub mod enum_type;
 pub mod error;
 /// Compiled namespace.
 pub mod namespace;
-/// Compiled odata.
+/// Compiled OData.
 pub mod odata;
-/// Compiled Action parameter.
+/// Compiled action parameter.
 pub mod parameter;
 /// Compiled properties of `ComplexType` or `EntityType`.
 pub mod properties;
-/// Qualified name.
+/// Qualified (namespace + name) type identifier.
 pub mod qualified_name;
-/// Compiled redfish attrs.
+/// Compiled Redfish-specific attributes.
 pub mod redfish;
-/// Index of schemas.
+/// Index over parsed schemas.
 pub mod schema_index;
 /// Compilation stack.
 pub mod stack;
-/// Traits that are useful for compilation.
+/// Traits useful during compilation.
 pub mod traits;
 /// Compiled type definition.
 pub mod type_definition;
 
-// Types reexport
+// Type re-exports
 #[doc(inline)]
 pub use action::Action;
 #[doc(inline)]
@@ -104,7 +105,7 @@ pub use qualified_name::QualifiedName;
 #[doc(inline)]
 pub use type_definition::TypeDefinition;
 
-// Traits reexport
+// Trait re-exports
 #[doc(inline)]
 pub use traits::MapBase;
 #[doc(inline)]
@@ -120,7 +121,7 @@ use crate::edmx::Type;
 use schema_index::SchemaIndex;
 use stack::Stack;
 
-/// Type class needed for property attributes.
+/// Type class for property attributes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypeClass {
     /// Simple type like `Edm.String`, `Edm.Int64` etc.
@@ -133,14 +134,13 @@ pub enum TypeClass {
     ComplexType,
 }
 
-/// Collection of EDMX documents that are compiled together to produce
-/// code.
+/// Collection of EDMX documents compiled together to produce code.
 #[derive(Default)]
 pub struct SchemaBundle {
-    /// Parsed and validated Edmx documents.
+    /// Parsed and validated EDMX documents.
     pub edmx_docs: Vec<Edmx>,
-    /// If set then it defines number pf document that should be used
-    /// in root set (for `compile_all`)
+    /// If set, defines how many documents belong to the "root set"
+    /// (used by `compile_all`).
     pub root_set_threshold: Option<usize>,
 }
 
@@ -152,13 +152,13 @@ pub struct RootSet<'a> {
 }
 
 impl SchemaBundle {
-    /// Compile multiple schema, resolving all type dependencies.
+    /// Compile multiple schemas, resolving all type dependencies.
     ///
-    /// Root compiling set is defined by specified singletons.
+    /// The root set is defined by the specified singletons.
     ///
     /// # Errors
     ///
-    /// Returns compile error if any type cannot be resolved.
+    /// Returns a compile error if any type cannot be resolved.
     pub fn compile(
         &self,
         singletons: &[SimpleIdentifier],
@@ -174,13 +174,13 @@ impl SchemaBundle {
         self.compile_root_set(&root_set, &ctx)
     }
 
-    /// Compile multiple schema, resolving all type dependencies.
+    /// Compile multiple schemas, resolving all type dependencies.
     ///
-    /// Root compiling set is all entity and complex types.
+    /// The root set includes all entity and complex types.
     ///
     /// # Errors
     ///
-    /// Returns compile error if any type cannot be resolved.
+    /// Returns a compile error if any type cannot be resolved.
     pub fn compile_all(&self, config: Config) -> Result<Compiled<'_>, Error<'_>> {
         let root_set = self.root_set_all();
         let ctx = Context {
@@ -196,12 +196,11 @@ impl SchemaBundle {
         schema_index: &SchemaIndex<'a>,
         singletons: &[SimpleIdentifier],
     ) -> Result<RootSet<'a>, Error<'a>> {
-        // Go through: all signletons located in
-        //   edmx documents / schemas / entity container:
+        // Iterate through all singletons located in
+        // EDMX documents → schemas → entity containers.
         //
-        // Check if singleton one of required singletons. If so,
-        // collect its most recent descendant type as part of root
-        // set.
+        // If a singleton matches the requested set, collect its most recent
+        // descendant type into the root set.
         let entity_types = self
             .edmx_docs
             .iter()

@@ -29,11 +29,16 @@ use crate::compiler::Stack;
 use crate::compiler::TypeInfo;
 use crate::edmx::ComplexType as EdmxComplexType;
 
+/// Compiled complex type.
 #[derive(Debug)]
 pub struct ComplexType<'a> {
+    /// Fully qualified type name.
     pub name: QualifiedName<'a>,
+    /// Optional base complex type.
     pub base: Option<QualifiedName<'a>>,
+    /// Structural and navigation properties.
     pub properties: Properties<'a>,
+    /// Attached `OData` annotations.
     pub odata: OData<'a>,
 }
 
@@ -73,7 +78,7 @@ pub(crate) fn compile<'a>(
     stack: &Stack<'a, '_>,
 ) -> Result<(Compiled<'a>, TypeInfo), Error<'a>> {
     let name = qtype;
-    // Ensure that base entity type compiled if present.
+    // Ensure that the base complex type is compiled, if present.
     let (base, compiled) = if let Some(base_type) = &ct.base_type {
         let (compiled, _) = compile_type(base_type.into(), ctx, stack)?;
         (Some(base_type.into()), compiled)

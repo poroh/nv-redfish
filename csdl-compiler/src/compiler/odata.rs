@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! `OData` related attributes needed to generate code.
+//! `OData` attributes captured from annotations, used by code generation.
 
 use crate::odata::annotations::AdditionalProperties;
 use crate::odata::annotations::Deletable;
@@ -25,29 +25,38 @@ use crate::odata::annotations::Permissions;
 use crate::odata::annotations::Updatable;
 use tagged_types::TaggedType;
 
+/// Whether the type must include `@odata.id` in generated code.
 pub type MustHaveId = TaggedType<bool, MustHaveIdTag>;
+#[doc(hidden)]
 #[derive(tagged_types::Tag)]
 #[implement(Clone, Copy)]
 #[transparent(Debug)]
 #[capability(inner_access)]
 pub enum MustHaveIdTag {}
 
-/// `OData` attributes attached to different compiled enities.
+/// `OData` attributes attached to compiled entities.
 #[derive(Debug, Clone, Copy)]
 pub struct OData<'a> {
+    /// Whether `@odata.id` must be present.
     pub must_have_id: MustHaveId,
+    /// Short description.
     pub description: Option<DescriptionRef<'a>>,
+    /// Long description.
     pub long_description: Option<LongDescriptionRef<'a>>,
+    /// Permissions for the element.
     pub permissions: Option<Permissions>,
+    /// Additional properties can be added.
     pub additional_properties: Option<AdditionalProperties>,
+    /// Insertability (Capabilities.InsertRestrictions).
     pub insertable: Option<Insertable<'a>>,
+    /// Updatability (Capabilities.UpdateRestrictions).
     pub updatable: Option<Updatable<'a>>,
+    /// Deletability (Capabilities.DeleteRestrictions).
     pub deletable: Option<Deletable<'a>>,
 }
 
 impl<'a> OData<'a> {
-    /// Create new instance from reference to object that implements
-    /// annotations.
+    /// Create a new instance from an object that provides `OData` annotations.
     pub fn new(must_have_id: MustHaveId, src: &'a impl ODataAnnotations) -> Self {
         Self {
             must_have_id,
@@ -61,7 +70,7 @@ impl<'a> OData<'a> {
         }
     }
 
-    /// `OData` doesn't contain anything.
+    /// Whether no OData-related attributes are present.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.description.is_none()
@@ -72,13 +81,13 @@ impl<'a> OData<'a> {
             && self.deletable.is_none()
     }
 
-    /// Property is explicitly set to write only.
+    /// Property is explicitly `Write` only.
     #[must_use]
     pub fn permissions_is_write_only(&self) -> bool {
         self.permissions.is_some_and(|v| v == Permissions::Write)
     }
 
-    /// Property can be written.
+    /// Property is writable (not strictly `Read`).
     #[must_use]
     pub fn permissions_is_write(&self) -> bool {
         self.permissions.is_none_or(|v| v != Permissions::Read)

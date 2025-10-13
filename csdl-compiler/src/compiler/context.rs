@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Compilation context (immutable).
+//! Immutable compilation context.
 
 use crate::compiler::QualifiedName;
 use crate::compiler::SchemaIndex;
@@ -29,53 +29,55 @@ use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
 use std::str::FromStr;
 
-/// Compilation context
+/// Compilation context.
 ///
-/// Compliation context consist of immutable data that is passed to
-/// all function responsible for compilation.
-///
-/// Note: compilation `Stack` that represents "mutable" state of the
+/// Contains immutable data passed to all functions involved in
 /// compilation.
+///
+/// Note: see the compilation `Stack` for the mutable state.
 pub struct Context<'a> {
     /// Loaded schema search index.
     pub schema_index: SchemaIndex<'a>,
-    /// Configuation of the compilation.
+    /// Compilation configuration.
     pub config: Config,
     /// Set of root entities that must be compiled.
     pub root_set_entities: HashSet<QualifiedName<'a>>,
 }
 
-/// Configuration of the compilation
+/// Compilation configuration.
+/// Filter and include rules for entity types during compilation.
 #[derive(Default)]
 pub struct Config {
+    /// Entity type filter applied during compilation.
     pub entity_type_filter: EntityTypeFilter,
 }
 
+/// Entity type filter specified by wildcard patterns.
 #[derive(Default)]
 pub struct EntityTypeFilter {
     patterns: Vec<EntityTypeFilterPattern>,
 }
 
 impl EntityTypeFilter {
-    /// Create new filter for vector of patterns
+    /// Create a new filter from a list of patterns.
     #[must_use]
     pub const fn new(patterns: Vec<EntityTypeFilterPattern>) -> Self {
         Self { patterns }
     }
 
-    /// Check if filter matches name.
+    /// Check whether the filter matches a qualified entity type name.
     #[must_use]
     pub fn matches(&self, typename: &QualifiedName<'_>) -> bool {
         self.patterns.is_empty() || self.patterns.iter().any(|p| p.matches(typename))
     }
 }
 
-/// Qualified name pattens
+/// Qualified-name patterns.
 ///
 /// Possible patterns:
-/// `ServiceRoot.*.*` - any `EntityType` in any version of service root
-/// `SomeNamespace.*.Entity1|Entity2` - `EntityType1` or `EntityType2` from any versions of namespace `SomeNamespace`
-/// `*.*.Entity1|Entity2` - `EntityType1` or `EntityType2` from any versions of any namespaces
+/// `ServiceRoot.*.*` - any `EntityType` in any version of the service root
+/// `SomeNamespace.*.Entity1|Entity2` - `EntityType1` or `EntityType2` from any version of namespace `SomeNamespace`
+/// `*.*.Entity1|Entity2` - `EntityType1` or `EntityType2` from any version of any namespace
 #[derive(Clone, Debug)]
 pub struct EntityTypeFilterPattern {
     ns_ids: Vec<Option<SimpleIdentifier>>,
@@ -83,6 +85,7 @@ pub struct EntityTypeFilterPattern {
 }
 
 impl EntityTypeFilterPattern {
+    /// Check whether this pattern matches the qualified name.
     #[must_use]
     pub fn matches(&self, typename: &QualifiedName) -> bool {
         if !self.names.is_empty() && !self.names.contains(typename.name) {
@@ -156,9 +159,12 @@ impl<'de> Deserialize<'de> for EntityTypeFilterPattern {
     }
 }
 
+/// Errors that can occur while parsing filter patterns.
 #[derive(Debug)]
 pub enum FilterPatternError {
+    /// The pattern string is empty.
     EmptyPattern,
+    /// The pattern contains an invalid identifier.
     InvalidIdentifier(String),
 }
 

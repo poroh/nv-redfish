@@ -25,12 +25,12 @@ use std::collections::HashSet;
 use std::iter::once as iter_once;
 use tagged_types::TaggedType;
 
-/// Action name to compiled action map.
+/// Map from action name to compiled action.
 pub type ActionsMap<'a> = HashMap<&'a ActionName, Action<'a>>;
-/// All actions that belongs to the type defined by the name.
+/// All actions that belong to a type, keyed by its qualified name.
 pub type TypeActions<'a> = HashMap<QualifiedName<'a>, ActionsMap<'a>>;
 
-/// Flag that type is creatable.
+/// Whether a type is creatable.
 pub type IsCreatable = TaggedType<bool, IsCreatableTag>;
 #[doc(hidden)]
 #[derive(tagged_types::Tag)]
@@ -39,19 +39,26 @@ pub type IsCreatable = TaggedType<bool, IsCreatableTag>;
 #[capability(inner_access)]
 pub enum IsCreatableTag {}
 
-/// Compiled data from schema.
+/// Compiled outputs from schemas.
+/// Aggregated compilation outputs for a set of schemas.
 #[derive(Default, Debug)]
 pub struct Compiled<'a> {
+    /// Compiled complex types by name.
     pub complex_types: HashMap<QualifiedName<'a>, ComplexType<'a>>,
+    /// Compiled entity types by name.
     pub entity_types: HashMap<QualifiedName<'a>, EntityType<'a>>,
+    /// Compiled type definitions by name.
     pub type_definitions: HashMap<QualifiedName<'a>, TypeDefinition<'a>>,
+    /// Compiled enums by name.
     pub enum_types: HashMap<QualifiedName<'a>, EnumType<'a>>,
+    /// Actions bound to each type.
     pub actions: TypeActions<'a>,
+    /// Entity types whose collections are creatable.
     pub creatable_entity_types: HashSet<QualifiedName<'a>>,
 }
 
 impl<'a> Compiled<'a> {
-    /// Creates compiled data structure that contains only one compiled
+    /// Create a compiled structure containing a single compiled
     /// entity type.
     #[must_use]
     pub fn new_entity_type(v: EntityType<'a>) -> Self {
@@ -67,7 +74,7 @@ impl<'a> Compiled<'a> {
         }
     }
 
-    /// Creates compiled data structure that contains only one compiled
+    /// Create a compiled structure containing a single compiled
     /// complex type.
     #[must_use]
     pub fn new_complex_type(v: ComplexType<'a>) -> Self {
@@ -77,8 +84,7 @@ impl<'a> Compiled<'a> {
         }
     }
 
-    /// Creates compiled data structure that contains only one type
-    /// definition.
+    /// Create a compiled structure containing a single type definition.
     #[must_use]
     pub fn new_type_definition(v: TypeDefinition<'a>) -> Self {
         Self {
@@ -87,8 +93,7 @@ impl<'a> Compiled<'a> {
         }
     }
 
-    /// Creates compiled data structure that contains only one enum
-    /// type.
+    /// Create a compiled structure containing a single enum type.
     #[must_use]
     pub fn new_enum_type(v: EnumType<'a>) -> Self {
         Self {
@@ -97,8 +102,7 @@ impl<'a> Compiled<'a> {
         }
     }
 
-    /// Creates compiled data structure that contains only one enum
-    /// type.
+    /// Create a compiled structure containing a single action.
     #[must_use]
     pub fn new_action(v: Action<'a>) -> Self {
         Self {
@@ -109,7 +113,7 @@ impl<'a> Compiled<'a> {
         }
     }
 
-    /// Merge two compiled data structures.
+    /// Merge two compiled structures.
     #[must_use]
     pub fn merge(mut self, other: Self) -> Self {
         self.complex_types.extend(other.complex_types);

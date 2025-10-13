@@ -23,26 +23,44 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
 
-/// Compilation error.
+/// Compilation error kinds.
 #[derive(Debug)]
 pub enum Error<'a> {
+    /// Feature not yet implemented.
     Unimplemented,
+    /// Action must be bound.
     NotBoundAction,
+    /// Missing binding parameter for an action.
     NoBindingParameterForAction,
+    /// Entity type was not found.
     EntityTypeNotFound(QualifiedName<'a>),
+    /// Complex type was not found.
     ComplexTypeNotFound(QualifiedName<'a>),
+    /// Settings.Settings type was not found.
     SettingsTypeNotFound,
+    /// Settings.PreferredApplyTime type was not found.
     SettingsPreferredApplyTimeTypeNotFound,
+    /// Error while compiling an entity type.
     EntityType(QualifiedName<'a>, Box<Error<'a>>),
+    /// Type was not found.
     TypeNotFound(QualifiedName<'a>),
+    /// Type definition is not a primitive type.
     TypeDefinitionOfNotPrimitiveType(QualifiedName<'a>),
+    /// Error while compiling a type definition.
     TypeDefinition(QualifiedName<'a>, Box<Error<'a>>),
+    /// Error while compiling a type.
     Type(QualifiedName<'a>, Box<Error<'a>>),
+    /// Error while compiling a property.
     Property(&'a PropertyName, Box<Error<'a>>),
+    /// Error while compiling an action.
     Action(&'a ActionName, Box<Error<'a>>),
+    /// Error while compiling an action return type.
     ActionReturnType(Box<Error<'a>>),
+    /// Error while compiling an action parameter.
     ActionParameter(&'a ParameterName, Box<Error<'a>>),
+    /// Error while compiling a singleton.
     Singleton(&'a SimpleIdentifier, Box<Error<'a>>),
+    /// Error while compiling a schema.
     Schema(&'a Namespace, Box<Error<'a>>),
 }
 
@@ -54,24 +72,24 @@ impl Display for Error<'_> {
             Self::ComplexTypeNotFound(v) => writeln!(f, "complex type not found: {v}"),
             Self::SettingsTypeNotFound => writeln!(
                 f,
-                "cannot find type for redfish settings (Settings.Settings)"
+                "cannot find type for Redfish settings (Settings.Settings)"
             ),
             Self::SettingsPreferredApplyTimeTypeNotFound => writeln!(
                 f,
-                "cannot find type for redfish settings preferred apply time (Settings.PreferredApplyTime)"
+                "cannot find type for Redfish settings preferred apply time (Settings.PreferredApplyTime)"
             ),
             Self::NotBoundAction => {
                 write!(f, "unbound action is not supported")
             }
             Self::NoBindingParameterForAction => {
-                write!(f, "no required binding parameter")
+                write!(f, "missing required binding parameter for action")
             }
             Self::EntityType(name, err) => {
                 write!(f, "while compiling entity type: {name}\n{err}")
             }
             Self::TypeNotFound(v) => writeln!(f, "type not found: {v}"),
             Self::TypeDefinitionOfNotPrimitiveType(v) => {
-                write!(f, "type definition is not primitive type: {v}")
+                write!(f, "type definition is not a primitive type: {v}")
             }
             Self::TypeDefinition(name, err) => {
                 write!(f, "while compiling type definition: {name}\n{err}")
@@ -86,10 +104,10 @@ impl Display for Error<'_> {
                 write!(f, "while compiling action: {name}\n{err}")
             }
             Self::ActionReturnType(err) => {
-                write!(f, "while compiling return type\n{err}")
+                write!(f, "while compiling action return type\n{err}")
             }
             Self::ActionParameter(name, err) => {
-                write!(f, "while compiling parameter: {name}\n{err}")
+                write!(f, "while compiling action parameter: {name}\n{err}")
             }
             Self::Singleton(name, err) => write!(f, "while compiling singleton: {name}\n{err}"),
             Self::Schema(name, err) => write!(f, "while compiling schema: {name}\n{err}"),

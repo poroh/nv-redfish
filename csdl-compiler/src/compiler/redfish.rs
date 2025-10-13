@@ -13,22 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Redfish-related attributes needed to generate code.
+//! Redfish-specific attributes used during code generation.
 
 use crate::redfish::annotations::RedfishPropertyAnnotations;
 use crate::IsRequired;
 use crate::IsRequiredOnCreate;
 
-/// Redfish property attributes attached to different compiled enities.
+/// Redfish property attributes attached to compiled entities.
 #[derive(Debug)]
 pub struct RedfishProperty {
+    /// Whether the property is required.
     pub is_required: IsRequired,
+    /// Whether the property is required on create.
     pub is_required_on_create: IsRequiredOnCreate,
 }
 
 impl RedfishProperty {
-    /// Create new instance from reference to object that implements
-    /// annotations.
+    /// Create a new instance from an object that provides Redfish
+    /// property annotations.
     pub fn new(src: &impl RedfishPropertyAnnotations) -> Self {
         Self {
             is_required: src.is_required(),

@@ -21,17 +21,17 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
 
-/// Compiled qualified name
+/// Qualified (namespace + identifier) name used during compilation.
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct QualifiedName<'a> {
-    /// Namespace where name is located.
+    /// Namespace of the type.
     pub namespace: Namespace<'a>,
-    /// Name.
+    /// Unqualified identifier.
     pub name: &'a SimpleIdentifier,
 }
 
 impl<'a> QualifiedName<'a> {
-    /// Create new qualified name.
+    /// Create a new qualified name.
     #[must_use]
     pub const fn new(namespace: &'a EdmxNamespace, name: &'a SimpleIdentifier) -> Self {
         Self {

@@ -26,7 +26,7 @@ use crate::edmx::Type;
 use std::collections::HashMap;
 use std::convert::identity;
 
-/// Indexing of schema across different documents
+/// Index over schemas spanning multiple documents.
 pub struct SchemaIndex<'a> {
     index: HashMap<Namespace<'a>, &'a Schema>,
     /// Mapping from base types to all inherited types. This index is
@@ -35,7 +35,7 @@ pub struct SchemaIndex<'a> {
 }
 
 impl<'a> SchemaIndex<'a> {
-    /// Build index from docs.
+    /// Build an index from the provided documents.
     #[must_use]
     pub fn build(edmx_docs: &'a [Edmx]) -> Self {
         Self {
@@ -82,18 +82,18 @@ impl<'a> SchemaIndex<'a> {
         self.index.get(ns).map(|v| &**v)
     }
 
-    /// Find entity type by type name
+    /// Find an entity type by its qualified name.
     #[must_use]
     pub fn find_entity_type(&self, qtype: QualifiedName<'_>) -> Option<&'a EntityType> {
         self.get(&qtype.namespace)
             .and_then(|ns| ns.entity_types.get(qtype.name))
     }
 
-    /// Find most specific entity type child.
+    /// Find the most specific child entity type.
     ///
     /// # Errors
     ///
-    /// Returns error if entity type is not found.
+    /// Returns an error if the entity type is not found.
     pub fn find_child_entity_type(
         &self,
         qtype: QualifiedName<'a>,
@@ -105,11 +105,11 @@ impl<'a> SchemaIndex<'a> {
             .map(|v| (qtype, v))
     }
 
-    /// Find most specific complex type child.
+    /// Find the most specific child complex type.
     ///
     /// # Errors
     ///
-    /// Returns error if complex type is not found.
+    /// Returns an error if the complex type is not found.
     pub fn find_child_complex_type(
         &self,
         qtype: QualifiedName<'a>,
@@ -128,16 +128,16 @@ impl<'a> SchemaIndex<'a> {
             .map(|v| (qtype, v))
     }
 
-    /// Find type by type name
+    /// Find a type by its qualified name.
     #[must_use]
     pub fn find_type(&self, qtype: QualifiedName<'_>) -> Option<&'a Type> {
         self.get(&qtype.namespace)
             .and_then(|ns| ns.types.get(qtype.name))
     }
 
-    /// Find child type by typename. For complex / entity types it
-    /// returns most distant unique descendant. For other types just
-    /// returns parameter.
+    /// Find a child type by qualified name. For complex/entity types,
+    /// returns the most distant unique descendant; otherwise returns
+    /// the input type unchanged.
     #[must_use]
     pub fn find_child_type(&self, mut qtype: QualifiedName<'a>) -> QualifiedName<'a> {
         while let Some(children) = self.child_map.get(&qtype) {
@@ -158,17 +158,16 @@ impl<'a> SchemaIndex<'a> {
         qtype
     }
 
-    /// Find `Settings.Settings` object that represents
-    /// `@Redfish.Settings` annotation of data type.
+    /// Find the `Settings.Settings` type corresponding to the
+    /// `@Redfish.Settings` annotation.
     ///
     /// # Errors
     ///
-    /// Returns error if setting type is not found.
+    /// Returns an error if the settings type is not found.
     ///
     /// # Panics
     ///
-    /// Should never panic. Only if edmx `SimpleIdentifier` parser is
-    /// terribly broken.
+    /// Should never panic unless the EDMX `SimpleIdentifier` parser is broken.
     #[allow(clippy::unwrap_in_result)]
     pub fn redfish_settings_type(&self) -> Result<(QualifiedName<'a>, &'a ComplexType), Error<'a>> {
         let ns: EdmxNamespace = "Settings".parse().expect("must be parsed");
@@ -184,17 +183,16 @@ impl<'a> SchemaIndex<'a> {
         self.find_child_complex_type(qtype)
     }
 
-    /// Find `Settings.PreferredApplyTime` object that represents
-    /// `@Redfish.SettingsApplyTime` annotation of data type.
+    /// Find the `Settings.PreferredApplyTime` type corresponding to
+    /// the `@Redfish.SettingsApplyTime` annotation.
     ///
     /// # Errors
     ///
-    /// Returns error if setting type is not found.
+    /// Returns an error if the settings type is not found.
     ///
     /// # Panics
     ///
-    /// Should never panic. Only if edmx `SimpleIdentifier` parser is
-    /// terribly broken.
+    /// Should never panic unless the EDMX `SimpleIdentifier` parser is broken.
     #[allow(clippy::unwrap_in_result)]
     pub fn redfish_settings_preferred_apply_time_type(
         &self,

@@ -28,31 +28,29 @@ use std::fs::File;
 use std::io::Read as _;
 use std::path::PathBuf;
 
-/// Default root singleton that should be compiled.
+/// Default root singleton to compile.
 pub const DEFAULT_ROOT: &str = "Service";
 
-/// Compiler highlevel commands.
+/// Compiler high-level commands.
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Compile CSDL schemas
+    /// Compile CSDL schemas.
     Compile {
-        /// Root service to be compiled (one of the root singletons in
-        /// edm document).
+        /// Root service to compile (one of the root singletons in
+        /// the EDM document).
         #[arg(short, long, default_value = DEFAULT_ROOT)]
         root: String,
-        /// CSDL documents to be compiled. In most common case you
-        /// need to specify all schemas from Redfish and Swordfish
-        /// bundles.
+        /// CSDL documents to compile. In most cases you should
+        /// specify all schemas from the Redfish and Swordfish bundles.
         #[arg(required = true)]
         csdls: Vec<String>,
-        /// File that contains geneated code.
+        /// Output file for generated code.
         #[arg(short, long, default_value = "redfish.rs")]
         output: PathBuf,
-        /// Defines patterns of entity types that should be compiled
-        /// if referenced via navigation property. If this list is
-        /// empty then all entity types will be compiled.
+        /// Patterns of entity types to compile when referenced via a
+        /// navigation property. If empty, all entity types are compiled.
         ///
-        /// Pattern is wildcard of qualified name.
+        /// Pattern is a wildcard over the qualified name.
         /// Examples:
         /// `ServiceRoot.*.*` - any entity type in any version of the service root
         /// `SomeNamespace.*.Entity1|Entity2` - `EntityType1` or `EntityType2` from any versions of namespace `SomeNamespace`.
@@ -60,23 +58,22 @@ pub enum Commands {
         #[arg(short = 'p', long = "pattern")]
         entity_type_patterns: Vec<EntityTypeFilterPattern>,
     },
-    /// Compile Oem CSDL schemas
+    /// Compile OEM CSDL schemas.
     CompileOem {
-        /// CSDL documents to be compiled and included to root
-        /// set (all data types from Oem schema will be compiled).
+        /// CSDL documents to compile and include in the root set
+        /// (all data types from the OEM schema are compiled).
         #[arg(required = true, value_terminator = "@")]
         root_csdls: Vec<String>,
-        /// CSDL documents to for type resolution in `root_csdls`.
+        /// CSDL documents used for type resolution in `root_csdls`.
         #[arg(index = 2)]
         resolve_csdls: Vec<String>,
-        /// File that contains geneated code.
+        /// Output file for generated code.
         #[arg(short, long, default_value = "redfish.rs")]
         output: PathBuf,
-        /// Defines patterns of entity types that should be compiled
-        /// if referenced via navigation property. If this list is
-        /// empty then all entity types will be compiled.
+        /// Patterns of entity types to compile when referenced via a
+        /// navigation property. If empty, all entity types are compiled.
         ///
-        /// Pattern is wildcard of qualified name.
+        /// Pattern is a wildcard over the qualified name.
         /// Examples:
         /// `ServiceRoot.*.*` - any entity type in any version of the service root
         /// `SomeNamespace.*.Entity1|Entity2` - `EntityType1` or `EntityType2` from any versions of namespace `SomeNamespace`.
@@ -86,11 +83,11 @@ pub enum Commands {
     },
 }
 
-/// Process compiler command.
+/// Process a compiler command.
 ///
 /// # Errors
 ///
-/// If command is failed returns corresponding error.
+/// Returns an error if command processing fails.
 pub fn process_command(command: &Commands) -> Result<Vec<String>, Error> {
     let mut display_output = Vec::new();
     match command {

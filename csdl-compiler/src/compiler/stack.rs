@@ -17,13 +17,11 @@ use crate::compiler::Compiled;
 use crate::compiler::QualifiedName;
 use crate::compiler::TypeInfo;
 
-/// Compilation stack. Creates every time when we go inside recursion
-/// to compile inner type.
+/// Compilation stack. Created when recursing to compile nested types.
 ///
-/// Note: you should never return Stack frames from the function that
-/// do part of job. This is anti-pattern. Function that compiles
-/// something should create stack frame (if needed) and return
-/// `Compiled` data using done method.
+/// Note: never return `Stack` frames from helper functions. Instead,
+/// functions should create a frame (if needed) and return `Compiled`
+/// via `done()`.
 #[derive(Default)]
 pub struct Stack<'a, 'stack> {
     parent: Option<&'stack Stack<'a, 'stack>>,
@@ -34,10 +32,9 @@ pub struct Stack<'a, 'stack> {
 }
 
 impl<'a, 'stack> Stack<'a, 'stack> {
-    /// Create new stack frame and sets it's parent to the `self`.
-    /// Stack frame is concept that provides possibility to have own
-    /// mutable `current` compiled data and still access upper frames
-    /// to lookup for already compiled data structures.
+    /// Create a new stack frame with `self` as parent. Frames maintain
+    /// their own mutable `current` compiled data while still allowing
+    /// lookups in parent frames.
     #[must_use]
     pub fn new_frame(&'stack self) -> Self {
         Self {
@@ -47,10 +44,8 @@ impl<'a, 'stack> Stack<'a, 'stack> {
         }
     }
 
-    /// Entity types can refer to each other via navigation
-    /// properties. These references can produce cycles. Stack helps
-    /// avoiding infinite loops by possibility remember which entity
-    /// type is being compiled. This function enables this possiblity.
+    /// Track the entity type being compiled to avoid cycles caused by
+    /// navigation-property references.
     #[must_use]
     pub const fn with_enitity_type(mut self, name: QualifiedName<'a>) -> Self {
         self.entity_type = Some(name);

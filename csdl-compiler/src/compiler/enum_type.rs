@@ -23,24 +23,24 @@ use crate::edmx::EnumMemberName;
 use crate::edmx::EnumType as EdmxEnumType;
 use crate::edmx::EnumUnderlyingType;
 
-/// Compiled simple type (type definition or enumeration).
+/// Compiled enumeration type.
 #[derive(Debug)]
 pub struct EnumType<'a> {
     /// Fully-qualified type name.
     pub name: QualifiedName<'a>,
-    /// Underlying type. It is always Integer of some size.
+    /// Underlying integral type.
     pub underlying_type: EnumUnderlyingType,
     /// Members of the enum.
     pub members: Vec<EnumMember<'a>>,
-    /// `OData` annotations associated with enum type.
+    /// `OData` annotations associated with the enum type.
     pub odata: OData<'a>,
 }
-/// Compiled member of the enum type.
+/// Compiled member of an enum type.
 #[derive(Debug)]
 pub struct EnumMember<'a> {
     /// Name of the member.
     pub name: &'a EnumMemberName,
-    /// Attached Odata annotations.
+    /// Attached `OData` annotations.
     pub odata: OData<'a>,
 }
 

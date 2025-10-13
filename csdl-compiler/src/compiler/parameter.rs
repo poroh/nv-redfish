@@ -22,27 +22,28 @@ use crate::edmx::ParameterName;
 use crate::IsNullable;
 use crate::IsRequired;
 
-/// Compiled parameter of the action.
+/// Compiled action parameter.
 #[derive(Debug, Clone, Copy)]
 pub struct Parameter<'a> {
     /// Name of the parameter.
     pub name: &'a ParameterName,
-    /// Type of the parameter. Can be either entity reference or some
-    /// specific type.
+    /// Parameter type: either an entity reference or a specific type.
     pub ptype: ParameterType<'a>,
-    /// Flag that parameter is nullable.
+    /// Whether the parameter is nullable.
     pub nullable: IsNullable,
-    /// Flag that parameter is required.
+    /// Whether the parameter is required.
     pub required: IsRequired,
-    /// Odata for parameter
+    /// `OData` annotations for the parameter.
     pub odata: OData<'a>,
 }
 
-/// Type of the parameter. Note we reuse `CompiledPropertyType`, it
-/// maybe not exact and may be change in future.
+/// Parameter type. Reuses `CompiledPropertyType`; this may not be an
+/// exact match and could evolve in the future.
 #[derive(Debug, Clone, Copy)]
 pub enum ParameterType<'a> {
+    /// Entity parameter (navigation target).
     Entity(NavPropertyType<'a>),
+    /// Non-entity parameter (complex/simple type).
     Type(PropertyType<'a>),
 }
 

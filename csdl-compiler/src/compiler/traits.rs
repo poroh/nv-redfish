@@ -17,30 +17,33 @@ use crate::compiler::NavProperty;
 use crate::compiler::Property;
 use crate::compiler::QualifiedName;
 
-/// Update properties and navigation properties with specified
-/// function.
+/// Transform properties and navigation properties using a function.
 pub trait PropertiesManipulation<'a> {
+    /// Map each structural property with the provided function.
     #[must_use]
     fn map_properties<F>(self, f: F) -> Self
     where
         F: Fn(Property<'a>) -> Property<'a>;
 
+    /// Map each navigation property with the provided function.
     #[must_use]
     fn map_nav_properties<F>(self, f: F) -> Self
     where
         F: Fn(NavProperty<'a>) -> NavProperty<'a>;
 }
 
-/// Update type with specified function.
+/// Transform contained type references using a function.
 pub trait MapType<'a> {
+    /// Map referenced type names using the provided function.
     #[must_use]
     fn map_type<F>(self, f: F) -> Self
     where
         F: Fn(QualifiedName<'a>) -> QualifiedName<'a>;
 }
 
-/// Update base type with specified function.
+/// Transform the base type using a function.
 pub trait MapBase<'a> {
+    /// Map the base type using the provided function.
     #[must_use]
     fn map_base<F>(self, f: F) -> Self
     where

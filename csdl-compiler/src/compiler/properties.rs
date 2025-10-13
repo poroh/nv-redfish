@@ -34,21 +34,22 @@ use crate::odata::annotations::Permissions;
 use crate::IsNullable;
 use crate::OneOrCollection;
 
-/// Combination of all compiled properties and navigation properties.
+/// Combined structural and navigation properties.
 #[derive(Default, Debug)]
 pub struct Properties<'a> {
+    /// Structural properties.
     pub properties: Vec<Property<'a>>,
+    /// Navigation properties.
     pub nav_properties: Vec<NavProperty<'a>>,
 }
 
 impl<'a> Properties<'a> {
-    /// Compile properties of the object (both navigation and
-    /// structural). Also it compiles all dependencies of the
-    /// properties.
+    /// Compile an entity/complex type's properties (structural and
+    /// navigation), along with their type dependencies.
     ///
     /// # Errors
     ///
-    /// Returens error if failed to compile and dependency.
+    /// Returns an error if a property or its dependency fails to compile.
     pub fn compile(
         props: &'a [EdmxProperty],
         ctx: &Context<'a>,
@@ -88,9 +89,9 @@ impl<'a> Properties<'a> {
             .map(|(stack, p)| (stack.done(), p))
     }
 
-    /// Join properties in reverse order. This function is useful when
-    /// compiler have list of current object and all parents and it
-    /// needs all properties in order from parent to child.
+    /// Join properties in reverse order (from parent to child).
+    /// Useful when combining properties collected across inheritance
+    /// from current type and its ancestors.
     #[must_use]
     pub fn rev_join(src: Vec<Self>) -> Self {
         let (properties, nav_properties): (Vec<_>, Vec<_>) = src
@@ -119,9 +120,9 @@ impl<'a> Properties<'a> {
         if ctx.root_set_entities.contains(&qname) || ctx.config.entity_type_filter.matches(&qname) {
             let (ptype, compiled) = ctx
                 .schema_index
-                // We are searching for deepest available child in tre
-                // hierarchy of types for singleton. So, we can parse most
-                // recent protocol versions.
+                // Find the deepest available child in the type hierarchy
+                // for the singleton, to target the most recent protocol
+                // version.
                 .find_child_entity_type(qname)
                 .and_then(|(qtype, et)| {
                     if stack.contains_entity(qtype) {
@@ -151,17 +152,17 @@ impl<'a> Properties<'a> {
     }
 }
 
-/// Additional info about type that is used for properties.
+/// Additional type information used by properties.
 #[derive(Clone, Copy, Debug)]
 pub struct TypeInfo {
     /// Class of the type.
     pub class: TypeClass,
-    /// Permissions associated with type.
+    /// Permissions associated with the type.
     ///
-    /// In Redfish Permissions on the type level is only used for two
-    /// complex types (`Status` and `Condition`) in Resource namespace
-    /// but this is important to support because this is in the base
-    /// class of all Redfish resources.
+    /// In Redfish, type-level permissions are only used for two
+    /// complex types (`Status` and `Condition`) in the `Resource`
+    /// namespace, but supporting this is important as they sit in the
+    /// base class of all Redfish resources.
     pub permissions: Option<Permissions>,
 }
 
@@ -196,23 +197,16 @@ impl TypeInfo {
         Self {
             class: TypeClass::ComplexType,
             permissions: ct.odata.permissions.or_else(|| {
-                // We can also say that complex type is read only if
-                // it doesn't contain properties or all properties are
-                // marked as ReadOnly.
-                //
-                // Note that for all properties with complex type we
-                // also have type info and we also can use it as
-                // read-only indicator. But it may require careful
-                // handling in optimizer (it will be not enough just
-                // go through all complex type and collect new type
-                // info because type info depends on other type infos
-                // recursively).
+                // Consider a complex type read-only if it has no
+                // properties, or all properties are ReadOnly. While
+                // we also track nested type info for complex-typed
+                // properties, folding that recursively requires care
+                // in the optimizer.
                 if ct.odata.additional_properties.is_none_or(|v| {
-                    // OemActions check is redfish-specific
-                    // hack. Schema doesn't give clue if additional
-                    // properties are read-only or not. Here we assume
-                    // that any OemActions complex types additional
-                    // properties are readonly just by name.
+                    // Redfish-specific heuristic: treat additional
+                    // properties of `OemActions` complex types as
+                    // read-only; we do this because the schema does not indicate their
+                    // immutability.
                     !v.into_inner() || ct.name.name.inner().as_str() == "OemActions"
                 }) && (ct.properties.is_empty()
                     || ct.properties.properties.iter().all(|p| {
@@ -232,6 +226,7 @@ impl TypeInfo {
     }
 }
 
+/// Structural property type (one or a collection).
 pub type PropertyType<'a> = OneOrCollection<(TypeInfo, QualifiedName<'a>)>;
 
 impl<'a> PropertyType<'a> {
@@ -242,12 +237,18 @@ impl<'a> PropertyType<'a> {
     }
 }
 
+/// Structural property.
 #[derive(Debug)]
 pub struct Property<'a> {
+    /// Property identifier.
     pub name: &'a PropertyName,
+    /// Property type (one or collection).
     pub ptype: PropertyType<'a>,
+    /// Attached `OData` annotations.
     pub odata: OData<'a>,
+    /// Redfish-specific property annotations.
     pub redfish: RedfishProperty,
+    /// Whether the property is nullable.
     pub nullable: IsNullable,
 }
 
@@ -261,6 +262,7 @@ impl<'a> MapType<'a> for Property<'a> {
     }
 }
 
+/// Navigation property target type (one or a collection).
 pub type NavPropertyType<'a> = OneOrCollection<QualifiedName<'a>>;
 
 impl<'a> NavPropertyType<'a> {
@@ -271,14 +273,17 @@ impl<'a> NavPropertyType<'a> {
     }
 }
 
+/// Navigation property, either expandable or reference.
 #[derive(Debug)]
 pub enum NavProperty<'a> {
+    /// Expandable navigation property (with known type).
     Expandable(NavPropertyExpandable<'a>),
+    /// Reference navigation property (type is left as reference).
     Reference(OneOrCollection<&'a PropertyName>),
 }
 
 impl<'a> NavProperty<'a> {
-    /// Name of the property regrardless enum variant.
+    /// Name of the property regardless of variant.
     #[must_use]
     pub const fn name(&'a self) -> &'a PropertyName {
         match self {
@@ -288,12 +293,18 @@ impl<'a> NavProperty<'a> {
     }
 }
 
+/// Expandable navigation property details.
 #[derive(Debug)]
 pub struct NavPropertyExpandable<'a> {
+    /// Property identifier.
     pub name: &'a PropertyName,
+    /// Target type (one or collection).
     pub ptype: NavPropertyType<'a>,
+    /// Attached `OData` annotations.
     pub odata: OData<'a>,
+    /// Redfish-specific property annotations.
     pub redfish: RedfishProperty,
+    /// Whether the property is nullable.
     pub nullable: IsNullable,
 }
 

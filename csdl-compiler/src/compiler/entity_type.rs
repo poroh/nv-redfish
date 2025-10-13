@@ -29,24 +29,31 @@ use crate::edmx::entity_type::Key;
 use crate::edmx::EntityType as EdmxEntityType;
 use crate::IsAbstract;
 
+/// Compiled entity type.
 #[derive(Debug)]
 pub struct EntityType<'a> {
+    /// Fully qualified type name.
     pub name: QualifiedName<'a>,
+    /// Optional base entity type.
     pub base: Option<QualifiedName<'a>>,
+    /// Optional key definition.
     pub key: Option<&'a Key>,
+    /// Structural and navigation properties.
     pub properties: Properties<'a>,
+    /// Attached `OData` annotations.
     pub odata: OData<'a>,
+    /// Whether the type is abstract.
     pub is_abstract: IsAbstract,
 }
 
 impl<'a> EntityType<'a> {
-    /// Compiles entity type with specified name. Note that it also
-    /// compiles all dependencies of the enity type.
+    /// Compile an `EntityType` with the specified name, including all
+    /// of its dependencies.
     ///
     /// # Errors
     ///
-    /// Returns error if failed to compile any prerequisites of the
-    /// `schema_entity_type`.
+    /// Returns an error if any prerequisite of `schema_entity_type`
+    /// fails to compile.
     pub fn compile(
         name: QualifiedName<'a>,
         schema_entity_type: &'a EdmxEntityType,
@@ -81,12 +88,12 @@ impl<'a> EntityType<'a> {
             .done())
     }
 
-    /// Checks if `EntityType` with name `qtype` is compiled. If not
-    /// then compile it.
+    /// Ensure that the `EntityType` named `qtype` is compiled; compile
+    /// it if not already present.
     ///
     /// # Errors
     ///
-    /// Returns error if failed to compile entity type.
+    /// Returns an error if compiling the entity type fails.
     pub fn ensure(
         qtype: QualifiedName<'a>,
         ctx: &Context<'a>,
@@ -106,8 +113,8 @@ impl<'a> EntityType<'a> {
 
     /// Insertable collection member type.
     ///
-    /// For collections that are Insertable this method returns
-    /// type name of the collection members.
+    /// For collections marked `Insertable`, returns the member type
+    /// name.
     ///
     #[must_use]
     pub fn insertable_member_type(&self) -> Option<QualifiedName<'a>> {

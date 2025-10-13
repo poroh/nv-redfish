@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate defines compiler for [Common Schema Definition Language
-//! (CSDL)](https://docs.oasis-open.org/odata/odata/v4.0/odata-v4.0-part3-csdl.html)
+//! Compiler for the
+//! [Common Schema Definition Language (CSDL)](https://docs.oasis-open.org/odata/odata/v4.0/odata-v4.0-part3-csdl.html).
 
 #![deny(
     clippy::all,
@@ -39,25 +39,25 @@
 
 //#![deny(missing_docs)]
 
-/// Highlevel compiler commands.
+/// High-level compiler commands.
 pub mod commands;
 /// Redfish schema compiler.
 pub mod compiler;
 /// Entity Data Model XML definitions.
 pub mod edmx;
-/// Errors of compiler.
+/// Compiler errors.
 pub mod error;
-/// Manifest defines features to be compiled.
+/// Features manifest.
 pub mod features_manifest;
 /// Redfish code generator.
 pub mod generator;
-/// OData-related functions.
+/// OData-related utilities.
 pub mod odata;
-/// Type or collection of type.
+/// Type or a collection of a type.
 pub mod one_or_collection;
-/// Optimizer of compiled data strcutres.
+/// Optimizer for compiled data structures.
 pub mod optimizer;
-/// Redfish-related functions.
+/// Redfish-specific utilities.
 pub mod redfish;
 
 use tagged_types::TaggedType;
@@ -67,7 +67,7 @@ pub use error::Error;
 #[doc(inline)]
 pub use one_or_collection::OneOrCollection;
 
-/// Attribute is nullable.
+/// Whether an attribute is nullable.
 pub type IsNullable = TaggedType<bool, IsNullableTag>;
 #[doc(hidden)]
 #[derive(tagged_types::Tag)]
@@ -76,7 +76,7 @@ pub type IsNullable = TaggedType<bool, IsNullableTag>;
 #[capability(inner_access)]
 pub enum IsNullableTag {}
 
-/// Attribute is required.
+/// Whether an attribute is required.
 pub type IsRequired = TaggedType<bool, IsRequiredTag>;
 #[doc(hidden)]
 #[derive(tagged_types::Tag)]
@@ -85,7 +85,7 @@ pub type IsRequired = TaggedType<bool, IsRequiredTag>;
 #[capability(inner_access)]
 pub enum IsRequiredTag {}
 
-/// Attribute is required when object is created.
+/// Whether an attribute is required when an object is created.
 pub type IsRequiredOnCreate = TaggedType<bool, IsRequiredOnCreateTag>;
 #[doc(hidden)]
 #[derive(tagged_types::Tag)]
@@ -94,7 +94,7 @@ pub type IsRequiredOnCreate = TaggedType<bool, IsRequiredOnCreateTag>;
 #[capability(inner_access)]
 pub enum IsRequiredOnCreateTag {}
 
-/// Type is abastract.
+/// Whether a type is abstract.
 pub type IsAbstract = TaggedType<bool, IsAbstractTag>;
 #[doc(hidden)]
 #[derive(tagged_types::Tag)]
