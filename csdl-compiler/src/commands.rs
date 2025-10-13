@@ -13,6 +13,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Command-line entry points for the compiler
+//!
+//! Provides two subcommands used by build scripts or users:
+//! - `Compile`: parse and compile one or more CSDL/EDMX files starting
+//!   from a root singleton, then generate Rust to an output file.
+//! - `CompileOem`: compile OEM schemas into the root set (all types in
+//!   the OEM input) while resolving references from additional files.
+//!
+//! Both commands:
+//! - Read EDMX, build a `SchemaBundle`, and compile with optional
+//!   `EntityTypeFilter` patterns to limit navigation targets.
+//! - Optimize the compiled set and run the Rust generator.
+//! - Pretty-print the resulting syntax and write it to the `output` path.
+
 use crate::compiler::Config as CompilerConfig;
 use crate::compiler::EntityTypeFilter;
 use crate::compiler::EntityTypeFilterPattern;

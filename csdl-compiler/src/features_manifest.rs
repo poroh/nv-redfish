@@ -13,11 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Features manifest.
+//! Features manifest
 //!
-//! This module defines file format for features manifiest. Features
-//! manifest can be used in build script to define features what CSDL
-//! and part of schemas should be compiled.
+//! Defines a TOML format that selects which CSDL/EDMX files and
+//! entity-type patterns to compile. Intended for build scripts to
+//! tailor generated code per product or vendor.
 
 use crate::compiler::EntityTypeFilterPattern;
 use serde::Deserialize;
@@ -31,7 +31,7 @@ use std::io::Read as _;
 use std::path::PathBuf;
 use toml::de::Error as TomlError;
 
-/// Manifest that defines features schema compilation.
+/// Root manifest describing standard and OEM feature sets.
 #[derive(Deserialize, Debug)]
 pub struct FeaturesManifest {
     pub features: Vec<Feature>,
@@ -40,7 +40,7 @@ pub struct FeaturesManifest {
 }
 
 impl FeaturesManifest {
-    /// Read features manifest from toml file.
+    /// Read a features manifest from a TOML file.
     ///
     /// # Errors
     ///
@@ -53,13 +53,13 @@ impl FeaturesManifest {
         toml::from_str(&content).map_err(Error::Toml)
     }
 
-    /// All standard-features that defined in manifest.
+    /// All standard feature names defined in the manifest.
     #[must_use]
     pub fn all_features(&self) -> Vec<&String> {
         self.features.iter().map(|f| &f.name).collect()
     }
 
-    /// Collect CSDLs and patterns to be compiled.
+    /// Collect standard CSDLs and patterns for selected features.
     #[must_use]
     pub fn collect<'a>(
         &'a self,
@@ -76,13 +76,13 @@ impl FeaturesManifest {
             })
     }
 
-    /// Collect all vendors that are defined by the manifest.
+    /// All vendors defined by the manifest.
     #[must_use]
     pub fn all_vendors(&self) -> Vec<&String> {
         self.oem_features.iter().map(|f| &f.vendor).collect()
     }
 
-    /// All vendor-specific features defined in the manifest.
+    /// All vendor-specific feature names for a vendor.
     #[must_use]
     pub fn all_vendor_features(&self, vendor: &String) -> Vec<&String> {
         self.oem_features
@@ -97,7 +97,7 @@ impl FeaturesManifest {
             .collect()
     }
 
-    /// Collect CSDLs and patterns to be compiled.
+    /// Collect OEM root/resolve CSDLs and patterns for selected features.
     #[must_use]
     pub fn collect_vendor_features<'a>(
         &'a self,
@@ -122,6 +122,7 @@ impl FeaturesManifest {
     }
 }
 
+/// Standard feature block.
 #[derive(Deserialize, Debug)]
 pub struct Feature {
     pub name: String,
@@ -148,6 +149,7 @@ pub struct OemFeature {
     pub patterns: Vec<EntityTypeFilterPattern>,
 }
 
+/// Errors reading or parsing the manifest.
 #[derive(Debug)]
 pub enum Error {
     Io(IoError),

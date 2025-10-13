@@ -12,7 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Compiler for multiple schemas.
+//! Schema compiler pipeline
+//!
+//! This module turns a set of EDMX schemas into an intermediate
+//! representation (`Compiled`) that is later consumed by the Rust
+//! generator. The flow is intentionally simple and predictable:
+//!
+//! 1) Index
+//!    - Build a `SchemaIndex` across all EDMX documents to resolve
+//!      names and follow inheritance chains (entity/complex types).
+//!
+//! 2) Root set
+//!    - Choose what to compile: either a root set derived from service
+//!      singletons (`compile`) or all entity/complex types
+//!      (`compile_all`). The `Config`/`EntityTypeFilter` can narrow
+//!      which navigation targets are pulled in.
+//!
+//! 3) Traverse and compile
+//!    - Walk entity and complex types, compiling structural and
+//!      navigation properties. Navigation properties resolve to the
+//!      most specific descendant type that adds properties, allowing
+//!      newer protocol versions to be targeted.
+//!    - A `Stack` tracks frames and prevents cycles when types refer to
+//!      each other via navigation properties.
+//!    - `OData` and Redfish-specific annotations are captured alongside
+//!      types for later codegen (permissions, insert/update/delete,
+//!      required flags, etc.).
+//!
+//! 4) Actions
+//!    - Compile bound actions, their parameters and return types, and
+//!      attach them to the binding type in `Compiled`.
+//!
+//! Output
+//! - The result is a `Compiled` aggregate containing maps of entity
+//!   types, complex types, enums, type definitions, and actions. It is
+//!   designed to be stable, readable, and straightforward for the
+//!   generator to consume.
 
 #![deny(missing_docs)]
 

@@ -13,6 +13,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Compilation output aggregate
+//!
+//! `Compiled` is the intermediate representation produced by the
+//! compiler. It groups all resolved types and metadata in stable maps
+//! keyed by fully qualified names so the Rust generator can render code
+//! deterministically.
+//!
+//! Contents
+//! - Entity and complex types with their properties and captured
+//!   `OData`/Redfish annotations
+//! - Enum types and type definitions
+//! - Bound actions (parameters, return types) grouped by binding type
+//! - A set of creatable entity types (collections that accept inserts)
+//!
+//! Notes
+//! - Keys are `QualifiedName`s; merge operations favor later entries
+//!   and union action maps.
+//! - This module contains small helpers to build/merge `Compiled`
+//!   fragments as the traversal proceeds.
+//! - No codegen decisions happen here; the structure is intentionally
+//!   straightforward for generators to consume.
+
 use crate::compiler::Action;
 use crate::compiler::ComplexType;
 use crate::compiler::EntityType;
