@@ -14,10 +14,13 @@
 // limitations under the License.
 
 use crate::compiler::odata::MustHaveId;
+use crate::compiler::Compiled;
 use crate::compiler::OData;
 use crate::compiler::QualifiedName;
+use crate::compiler::TypeInfo;
 use crate::edmx::EnumMember as EdmxEnumMember;
 use crate::edmx::EnumMemberName;
+use crate::edmx::EnumType as EdmxEnumType;
 use crate::edmx::EnumUnderlyingType;
 
 /// Compiled simple type (type definition or enumeration).
@@ -48,4 +51,20 @@ impl<'a> From<&'a EdmxEnumMember> for EnumMember<'a> {
             odata: OData::new(MustHaveId::new(false), v),
         }
     }
+}
+
+pub(crate) fn compile<'a>(
+    qtype: QualifiedName<'a>,
+    et: &'a EdmxEnumType,
+) -> (Compiled<'a>, TypeInfo) {
+    let underlying_type = et.underlying_type.unwrap_or_default();
+    (
+        Compiled::new_enum_type(EnumType {
+            name: qtype,
+            underlying_type,
+            members: et.members.iter().map(Into::into).collect(),
+            odata: OData::new(MustHaveId::new(false), et),
+        }),
+        TypeInfo::enum_type(),
+    )
 }

@@ -15,52 +15,44 @@
 
 //! Compiler of multiple schemas
 
-/// Index of schemas
-pub mod schema_index;
-
-/// Compilation stack
-pub mod stack;
-
-/// Compilation context
-pub mod context;
-
-/// Error diagnostics
-pub mod error;
-
-/// Compiled schema bundle
+/// Compiled Action.
+pub mod action;
+/// Compiled schema bundle.
 pub mod compiled;
-
-/// Qualified name
-pub mod qualified_name;
-
-/// Compiled namespace
+/// Compiled complex type.
+pub mod complex_type;
+/// Compilation context.
+pub mod context;
+/// Compiled entity type.
+pub mod entity_type;
+/// Compiled enum type.
+pub mod enum_type;
+/// Error diagnostics.
+pub mod error;
+/// Compiled namespace.
 pub mod namespace;
-
-/// Compiled odata
+/// Compiled odata.
 pub mod odata;
-
-/// Compiled redfish attrs
+/// Compiled Action parameter.
+pub mod parameter;
+/// Compiled properties of `ComplexType` or `EntityType`.
+pub mod properties;
+/// Qualified name.
+pub mod qualified_name;
+/// Compiled redfish attrs.
 pub mod redfish;
-
+/// Index of schemas.
+pub mod schema_index;
+/// Compilation stack.
+pub mod stack;
 /// Traits that are useful for compilation.
 pub mod traits;
-
-/// Compiled properties of `ComplexType` or `EntityType`
-pub mod properties;
-
-/// Compiled enum type
-pub mod enum_type;
-
-/// Compiled type definition
+/// Compiled type definition.
 pub mod type_definition;
 
-/// Compiled entity type
-pub mod entity_type;
-
-/// Compiled complex type
-pub mod complex_type;
-
 // Types reexport
+#[doc(inline)]
+pub use action::Action;
 #[doc(inline)]
 pub use compiled::ActionsMap;
 #[doc(inline)]
@@ -90,6 +82,10 @@ pub use namespace::Namespace;
 #[doc(inline)]
 pub use odata::OData;
 #[doc(inline)]
+pub use parameter::Parameter;
+#[doc(inline)]
+pub use parameter::ParameterType;
+#[doc(inline)]
 pub use properties::NavProperty;
 #[doc(inline)]
 pub use properties::NavPropertyExpandable;
@@ -117,17 +113,10 @@ pub use traits::MapType;
 pub use traits::PropertiesManipulation;
 
 use crate::compiler::odata::MustHaveId;
-use crate::edmx::Action as EdmxAction;
-use crate::edmx::ActionName;
 use crate::edmx::Edmx;
-use crate::edmx::ParameterName;
 use crate::edmx::Schema;
 use crate::edmx::SimpleIdentifier;
 use crate::edmx::Type;
-use crate::redfish::annotations::RedfishPropertyAnnotations as _;
-use crate::IsNullable;
-use crate::IsRequired;
-use crate::OneOrCollection;
 use schema_index::SchemaIndex;
 use stack::Stack;
 
@@ -331,7 +320,7 @@ impl SchemaBundle {
         s.actions
             .iter()
             .try_fold(stack, |stack, action| {
-                let compiled = Self::compile_action(action, ctx, &stack)
+                let compiled = action::compile_action(action, ctx, &stack)
                     .map_err(Box::new)
                     .map_err(|e| Error::Action(&action.name, e))?;
                 Ok(stack.merge(compiled))
@@ -339,99 +328,6 @@ impl SchemaBundle {
             .map_err(Box::new)
             .map_err(|e| Error::Schema(&s.namespace, e))
             .map(Stack::done)
-    }
-
-    fn compile_action<'a>(
-        action: &'a EdmxAction,
-        ctx: &Context<'a>,
-        stack: &Stack<'a, '_>,
-    ) -> Result<Compiled<'a>, Error<'a>> {
-        if !action.is_bound.into_inner() {
-            return Err(Error::NotBoundAction);
-        }
-        let mut iter = action.parameters.iter();
-        let binding_param = iter.next().ok_or(Error::NoBindingParameterForAction)?;
-        let binding = binding_param.ptype.qualified_type_name().into();
-        let binding_name = &binding_param.name;
-        // If action is bound to not compiled type, just ignore it. We
-        // will not have node to attach this action. Note: This may
-        // not be correct for common CSDL schema but Redfish always
-        // points to ComplexType (Actions).
-        if stack.complex_type_info(binding).is_none() {
-            return Ok(Compiled::default());
-        }
-        let stack = stack.new_frame();
-        // Compile ReturnType if present
-        let (compiled_rt, return_type) = action
-            .return_type
-            .as_ref()
-            .map_or_else(
-                || Ok((Compiled::default(), None)),
-                |rt| {
-                    ensure_type(rt.rtype.qualified_type_name().into(), ctx, &stack)
-                        .map(|(compiled, _)| (compiled, Some(rt.rtype.as_ref().map(Into::into))))
-                },
-            )
-            .map_err(Box::new)
-            .map_err(Error::ActionReturnType)?;
-        let stack = stack.merge(compiled_rt);
-        // Compile other parameters except first one
-        let (stack, parameters) =
-            iter.try_fold((stack, Vec::new()), |(cstack, mut params), p| {
-                // Sometime parameters refers to entity types. This is
-                // different from complex types / entity types where
-                // properties only points to complex / simple types
-                // and navigation poprerties points to entity type
-                // only. Example is AddResourceBlock in
-                // ComputerSystem schema.
-                let qtype_name = p.ptype.qualified_type_name().into();
-                let (compiled, ptype) = if is_simple_type(qtype_name) {
-                    Ok((
-                        Compiled::default(),
-                        ParameterType::Type(
-                            p.ptype
-                                .as_ref()
-                                .map(|v| (TypeInfo::simple_type(), v.into())),
-                        ),
-                    ))
-                } else if ctx.schema_index.find_type(qtype_name).is_some() {
-                    ensure_type(p.ptype.qualified_type_name().into(), ctx, &cstack).map(
-                        |(compiled, class)| {
-                            (
-                                compiled,
-                                ParameterType::Type(p.ptype.as_ref().map(|v| (class, v.into()))),
-                            )
-                        },
-                    )
-                } else {
-                    EntityType::ensure(qtype_name, ctx, &cstack).map(|compiled| {
-                        (
-                            compiled,
-                            ParameterType::Entity(p.ptype.as_ref().map(Into::into)),
-                        )
-                    })
-                }
-                .map_err(Box::new)
-                .map_err(|e| Error::ActionParameter(&p.name, e))?;
-                params.push(Parameter {
-                    name: &p.name,
-                    ptype,
-                    nullable: p.nullable.unwrap_or(IsNullable::new(false)),
-                    required: p.is_required(),
-                    odata: OData::new(MustHaveId::new(false), p),
-                });
-                Ok((cstack.merge(compiled), params))
-            })?;
-        Ok(stack
-            .merge(Compiled::new_action(Action {
-                binding,
-                binding_name,
-                name: &action.name,
-                return_type,
-                parameters,
-                odata: OData::new(MustHaveId::new(false), action),
-            }))
-            .done())
     }
 }
 
@@ -466,154 +362,12 @@ fn compile_type<'a>(
         .find_type(qtype)
         .ok_or(Error::TypeNotFound(qtype))
         .and_then(|t| match t {
-            Type::TypeDefinition(td) => {
-                let underlying_type = (&td.underlying_type).into();
-                if is_simple_type((&td.underlying_type).into()) {
-                    Ok((
-                        Compiled::new_type_definition(TypeDefinition {
-                            name: qtype,
-                            underlying_type,
-                        }),
-                        TypeInfo::type_definition(),
-                    ))
-                } else {
-                    Err(Error::TypeDefinitionOfNotPrimitiveType(underlying_type))
-                }
-            }
-            Type::EnumType(et) => {
-                let underlying_type = et.underlying_type.unwrap_or_default();
-                Ok((
-                    Compiled::new_enum_type(EnumType {
-                        name: qtype,
-                        underlying_type,
-                        members: et.members.iter().map(Into::into).collect(),
-                        odata: OData::new(MustHaveId::new(false), et),
-                    }),
-                    TypeInfo::enum_type(),
-                ))
-            }
-            Type::ComplexType(ct) => {
-                let name = qtype;
-                // Ensure that base entity type compiled if present.
-                let (base, compiled) = if let Some(base_type) = &ct.base_type {
-                    let (compiled, _) = compile_type(base_type.into(), ctx, stack)?;
-                    (Some(base_type.into()), compiled)
-                } else {
-                    (None, Compiled::default())
-                };
-
-                let stack = stack.new_frame().merge(compiled);
-
-                let (compiled, properties) =
-                    Properties::compile(&ct.properties, ctx, stack.new_frame())?;
-
-                let complex_type = ComplexType {
-                    name,
-                    base,
-                    properties,
-                    odata: OData::new(MustHaveId::new(false), ct),
-                };
-                let typeinfo = TypeInfo::complex_type(&complex_type);
-                Ok((
-                    stack
-                        .merge(compiled)
-                        .merge(Compiled::new_complex_type(complex_type))
-                        .done(),
-                    typeinfo,
-                ))
-            }
+            Type::TypeDefinition(td) => type_definition::compile(qtype, td),
+            Type::EnumType(et) => Ok(enum_type::compile(qtype, et)),
+            Type::ComplexType(ct) => complex_type::compile(qtype, ct, ctx, stack),
         })
         .map_err(Box::new)
         .map_err(|e| Error::Type(qtype, e))
-}
-
-/// Compiled parameter of the action.
-#[derive(Debug, Clone, Copy)]
-pub struct Parameter<'a> {
-    /// Name of the parameter.
-    pub name: &'a ParameterName,
-    /// Type of the parameter. Can be either entity reference or some
-    /// specific type.
-    pub ptype: ParameterType<'a>,
-    /// Flag that parameter is nullable.
-    pub nullable: IsNullable,
-    /// Flag that parameter is required.
-    pub required: IsRequired,
-    /// Odata for parameter
-    pub odata: OData<'a>,
-}
-
-/// Type of the parameter. Note we reuse `CompiledPropertyType`, it
-/// maybe not exact and may be change in future.
-#[derive(Debug, Clone, Copy)]
-pub enum ParameterType<'a> {
-    Entity(NavPropertyType<'a>),
-    Type(PropertyType<'a>),
-}
-
-impl<'a> ParameterType<'a> {
-    fn map<F>(self, f: F) -> Self
-    where
-        F: Fn(QualifiedName<'a>) -> QualifiedName<'a>,
-    {
-        match self {
-            Self::Entity(v) => Self::Entity(v.map(f)),
-            Self::Type(v) => Self::Type(v.map(|(typeclass, ptype)| (typeclass, f(ptype)))),
-        }
-    }
-}
-
-impl<'a> MapType<'a> for Parameter<'a> {
-    fn map_type<F>(self, f: F) -> Self
-    where
-        F: Fn(QualifiedName<'a>) -> QualifiedName<'a>,
-    {
-        Self {
-            name: self.name,
-            ptype: self.ptype.map(f),
-            nullable: self.nullable,
-            required: self.required,
-            odata: self.odata,
-        }
-    }
-}
-
-/// Compuled parameter of the action.
-#[derive(Debug)]
-pub struct Action<'a> {
-    /// Bound type.
-    pub binding: QualifiedName<'a>,
-    /// Bound parameter name.
-    pub binding_name: &'a ParameterName,
-    /// Name of the parameter.
-    pub name: &'a ActionName,
-    /// Type of the return value.
-    pub return_type: Option<OneOrCollection<QualifiedName<'a>>>,
-    /// Type of the parameter. Note we reuse `PropertyType`, it
-    /// maybe not exact and may be change in future.
-    pub parameters: Vec<Parameter<'a>>,
-    /// Odata of action.
-    pub odata: OData<'a>,
-}
-
-impl<'a> MapType<'a> for Action<'a> {
-    fn map_type<F>(self, f: F) -> Self
-    where
-        F: Fn(QualifiedName<'a>) -> QualifiedName<'a>,
-    {
-        Self {
-            name: self.name,
-            binding: f(self.binding),
-            binding_name: self.binding_name,
-            return_type: self.return_type.map(|rt| rt.map(&f)),
-            parameters: self
-                .parameters
-                .into_iter()
-                .map(|p| p.map_type(&f))
-                .collect(),
-            odata: self.odata,
-        }
-    }
 }
 
 #[cfg(test)]

@@ -13,13 +13,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::compiler::compile_type;
+use crate::compiler::Compiled;
+use crate::compiler::Context;
+use crate::compiler::Error;
 use crate::compiler::MapBase;
+use crate::compiler::MustHaveId;
 use crate::compiler::NavProperty;
 use crate::compiler::OData;
 use crate::compiler::Properties;
 use crate::compiler::PropertiesManipulation;
 use crate::compiler::Property;
 use crate::compiler::QualifiedName;
+use crate::compiler::Stack;
+use crate::compiler::TypeInfo;
+use crate::edmx::ComplexType as EdmxComplexType;
 
 #[derive(Debug)]
 pub struct ComplexType<'a> {
@@ -56,4 +64,39 @@ impl<'a> MapBase<'a> for ComplexType<'a> {
         self.base = self.base.map(f);
         self
     }
+}
+
+pub(crate) fn compile<'a>(
+    qtype: QualifiedName<'a>,
+    ct: &'a EdmxComplexType,
+    ctx: &Context<'a>,
+    stack: &Stack<'a, '_>,
+) -> Result<(Compiled<'a>, TypeInfo), Error<'a>> {
+    let name = qtype;
+    // Ensure that base entity type compiled if present.
+    let (base, compiled) = if let Some(base_type) = &ct.base_type {
+        let (compiled, _) = compile_type(base_type.into(), ctx, stack)?;
+        (Some(base_type.into()), compiled)
+    } else {
+        (None, Compiled::default())
+    };
+
+    let stack = stack.new_frame().merge(compiled);
+
+    let (compiled, properties) = Properties::compile(&ct.properties, ctx, stack.new_frame())?;
+
+    let complex_type = ComplexType {
+        name,
+        base,
+        properties,
+        odata: OData::new(MustHaveId::new(false), ct),
+    };
+    let typeinfo = TypeInfo::complex_type(&complex_type);
+    Ok((
+        stack
+            .merge(compiled)
+            .merge(Compiled::new_complex_type(complex_type))
+            .done(),
+        typeinfo,
+    ))
 }

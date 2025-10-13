@@ -13,7 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::compiler::is_simple_type;
+use crate::compiler::Compiled;
+use crate::compiler::Error;
 use crate::compiler::QualifiedName;
+use crate::compiler::TypeInfo;
+use crate::edmx::TypeDefinition as EdmxTypeDefinition;
 
 /// Compiled type definition.
 #[derive(Debug)]
@@ -23,4 +28,22 @@ pub struct TypeDefinition<'a> {
     /// Underlying type name. This is always primitive type in Edm
     /// namespace.
     pub underlying_type: QualifiedName<'a>,
+}
+
+pub(crate) fn compile<'a>(
+    qtype: QualifiedName<'a>,
+    td: &'a EdmxTypeDefinition,
+) -> Result<(Compiled<'a>, TypeInfo), Error<'a>> {
+    let underlying_type = (&td.underlying_type).into();
+    if is_simple_type((&td.underlying_type).into()) {
+        Ok((
+            Compiled::new_type_definition(TypeDefinition {
+                name: qtype,
+                underlying_type,
+            }),
+            TypeInfo::type_definition(),
+        ))
+    } else {
+        Err(Error::TypeDefinitionOfNotPrimitiveType(underlying_type))
+    }
 }
