@@ -129,6 +129,8 @@ mod reqwest_client_tests {
             value: None,
         };
 
+        let etag = create_odata_etag("abc123");
+
         let updated_resource = TestResource {
             id: create_odata_id(resource_path),
             etag: None,
@@ -140,6 +142,17 @@ mod reqwest_client_tests {
             .and(path(resource_path))
             .and(body_json(&update_request))
             .and(header("authorization", "Basic cm9vdDpwYXNzd29yZA=="))
+            .and(header("If-Match", "abc123"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&updated_resource))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("PATCH"))
+            .and(path(resource_path))
+            .and(body_json(&update_request))
+            .and(header("authorization", "Basic cm9vdDpwYXNzd29yZA=="))
+            .and(header("If-Match", "*"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&updated_resource))
             .expect(1)
             .mount(&mock_server)
@@ -149,13 +162,19 @@ mod reqwest_client_tests {
 
         let resource_id = create_odata_id(resource_path);
         let result = bmc
-            .update::<UpdateRequest, TestResource>(&resource_id, None, &update_request)
+            .update::<UpdateRequest, TestResource>(&resource_id, Some(&etag), &update_request)
             .await;
 
         assert!(result.is_ok());
         let updated = result.unwrap();
         assert_eq!(updated.name, "Updated System");
         assert_eq!(updated.value, 42);
+
+        let no_etag = bmc
+            .update::<UpdateRequest, TestResource>(&resource_id, None, &update_request)
+            .await;
+
+        assert!(no_etag.is_ok());
     }
 
     #[tokio::test]

@@ -322,7 +322,7 @@ pub trait HttpClient: Send + Sync {
     fn patch<B, T>(
         &self,
         url: Url,
-        etag: Option<&ODataETag>,
+        etag: ODataETag,
         body: &B,
         credentials: &BmcCredentials,
     ) -> impl Future<Output = Result<T, Self::Error>> + Send
@@ -563,6 +563,9 @@ where
         v: &V,
     ) -> Result<R, Self::Error> {
         let endpoint_url = self.redfish_endpoint.with_path(&id.to_string());
+        let etag = etag
+            .cloned()
+            .unwrap_or_else(|| ODataETag::from(String::from("*")));
         self.client
             .patch(endpoint_url, etag, v, &self.credentials)
             .await
@@ -854,28 +857,6 @@ impl ReqwestClient {
 
         response.json().await.map_err(BmcReqwestError::ReqwestError)
     }
-
-    async fn send_json_request<B, T>(
-        &self,
-        method: reqwest::Method,
-        url: Url,
-        body: &B,
-        credentials: &BmcCredentials,
-    ) -> Result<T, BmcReqwestError>
-    where
-        B: Serialize + Send + Sync,
-        T: DeserializeOwned + Send + Sync,
-    {
-        let response = self
-            .client
-            .request(method, url)
-            .basic_auth(&credentials.username, Some(credentials.password()))
-            .json(body)
-            .send()
-            .await?;
-
-        self.handle_response(response).await
-    }
 }
 
 #[cfg(feature = "reqwest")]
@@ -914,14 +895,21 @@ impl HttpClient for ReqwestClient {
         B: Serialize + Send + Sync,
         T: DeserializeOwned + Send + Sync,
     {
-        self.send_json_request(reqwest::Method::POST, url, body, credentials)
-            .await
+        let response = self
+            .client
+            .post(url)
+            .basic_auth(&credentials.username, Some(credentials.password()))
+            .json(body)
+            .send()
+            .await?;
+
+        self.handle_response(response).await
     }
 
     async fn patch<B, T>(
         &self,
         url: Url,
-        _etag: Option<&ODataETag>,
+        etag: ODataETag,
         body: &B,
         credentials: &BmcCredentials,
     ) -> Result<T, Self::Error>
@@ -929,8 +917,15 @@ impl HttpClient for ReqwestClient {
         B: Serialize + Send + Sync,
         T: DeserializeOwned + Send + Sync,
     {
-        self.send_json_request(reqwest::Method::PATCH, url, body, credentials)
-            .await
+        let mut request = self
+            .client
+            .patch(url)
+            .basic_auth(&credentials.username, Some(credentials.password()));
+
+        request = request.header("If-Match", etag.to_string());
+
+        let response = request.json(body).send().await?;
+        self.handle_response(response).await
     }
 
     async fn delete(&self, url: Url, credentials: &BmcCredentials) -> Result<Empty, Self::Error> {
