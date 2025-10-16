@@ -572,7 +572,7 @@ impl<'a> StructDef<'a> {
             NavProperty::Reference(r) => {
                 let doc = TokenStream::new();
                 let top = &config.top_module_alias;
-                let ptype = quote! { #top::Reference };
+                let ptype = quote! { #top::ReferenceLeaf };
                 let (sa, t) = Self::gen_de_struct_field(
                     r,
                     ptype,

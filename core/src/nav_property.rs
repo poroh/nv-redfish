@@ -71,6 +71,24 @@ impl From<&Self> for Reference {
     }
 }
 
+impl From<&ReferenceLeaf> for Reference {
+    fn from(v: &ReferenceLeaf) -> Self {
+        Self {
+            odata_id: v.odata_id.clone(),
+        }
+    }
+}
+
+/// `ReferenceLeaf` is special type that is used for navigation
+/// properties that if corresponding `EntityType` was not compiled to
+/// the tree.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReferenceLeaf {
+    /// `OData` identifier for of the property.
+    #[serde(rename = "@odata.id")]
+    pub odata_id: ODataId,
+}
+
 /// Container struct for the expanded property variant.
 #[derive(Debug)]
 pub struct Expanded<T>(Arc<T>);

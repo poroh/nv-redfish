@@ -177,6 +177,7 @@ impl<'a> RustGenerator<'a> {
                 Action,
                 ODataId,
                 ODataETag,
+                ReferenceLeaf,
                 AdditionalProperties,
                 de_optional_nullable,
                 de_required_nullable,
