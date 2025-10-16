@@ -604,7 +604,11 @@ async fn main() -> Result<(), Error> {
         println!("Chassis: {} (id: {})", chassis.base.name, chassis.base.id);
         println!(
             "  Model: {}",
-            chassis.model.as_ref().unwrap_or(&"unknown".to_string())
+            chassis
+                .model
+                .as_ref()
+                .and_then(Option::as_ref)
+                .unwrap_or(&"unknown".to_string())
         );
         let pcie_devices = chassis
             .pcie_devices
@@ -653,6 +657,7 @@ async fn main() -> Result<(), Error> {
         system
             .bios_version
             .as_ref()
+            .and_then(Option::as_ref)
             .unwrap_or(&"unknown".to_string())
     );
 
@@ -691,6 +696,7 @@ async fn main() -> Result<(), Error> {
         turboencabulator_service
             .service_enabled
             .as_ref()
+            .and_then(Option::as_ref)
             .map(ToString::to_string)
             .unwrap_or("unknown".to_string())
     );
@@ -699,6 +705,7 @@ async fn main() -> Result<(), Error> {
         turboencabulator_service
             .will_government_buy
             .as_ref()
+            .and_then(Option::as_ref)
             .map(ToString::to_string)
             .unwrap_or("unknown".to_string())
     );

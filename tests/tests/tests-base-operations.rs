@@ -566,7 +566,7 @@ async fn redfish_settings_update_test() -> Result<(), Error> {
         )
         .await
         .map_err(Error::Bmc)?;
-    assert_eq!(updated.setting_value, Some(new_value));
+    assert_eq!(updated.setting_value, Some(Some(new_value)));
     Ok(())
 }
 

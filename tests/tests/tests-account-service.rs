@@ -89,7 +89,7 @@ async fn list_hpe_accounts() -> Result<(), Box<dyn StdError>> {
     assert_eq!(accounts.len(), 1);
     let account = accounts.first().unwrap().raw();
     assert_eq!(account.user_name, Some("Administrator".into()));
-    assert_eq!(account.account_types, vec![AccountTypes::Redfish]);
+    assert_eq!(account.account_types, Some(vec![AccountTypes::Redfish]));
     Ok(())
 }
 
@@ -217,7 +217,7 @@ async fn create_account_standard() -> Result<(), Box<dyn StdError>> {
     assert_eq!(account.role_id, Some("Operator".into()));
     assert_eq!(account.base.id, "1");
     assert_eq!(account.base.name, "User Account");
-    assert!(account.account_types.is_empty());
+    assert!(account.account_types.as_ref().is_some_and(Vec::is_empty));
     Ok(())
 }
 
@@ -249,7 +249,7 @@ async fn create_account_hpe_patched() -> Result<(), Box<dyn StdError>> {
     let account = accounts.create_account(create_req).await?;
     let account = account.raw();
     assert_eq!(account.user_name, Some("user".into()));
-    assert_eq!(account.account_types, vec![AccountTypes::Redfish]);
+    assert_eq!(account.account_types, Some(vec![AccountTypes::Redfish]));
     Ok(())
 }
 

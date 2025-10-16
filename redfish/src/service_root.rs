@@ -84,7 +84,11 @@ impl<B: Bmc> ServiceRoot<B> {
     // `nv-redfish`.
     #[cfg(feature = "accounts")]
     pub(crate) fn bug_no_account_type_in_accounts(&self) -> bool {
-        self.root.vendor.as_ref().is_some_and(|v| v == "HPE")
+        self.root
+            .vendor
+            .as_ref()
+            .and_then(Option::as_ref)
+            .is_some_and(|v| v == "HPE")
     }
 
     // In some implementations BMC cannot create / delete Redfish
@@ -94,7 +98,13 @@ impl<B: Bmc> ServiceRoot<B> {
     // account user should just disable it.
     #[cfg(feature = "accounts")]
     pub(crate) fn slot_defined_user_accounts(&self) -> Option<SlotDefinedUserAccountsConfig> {
-        if self.root.vendor.as_ref().is_some_and(|v| v == "Dell") {
+        if self
+            .root
+            .vendor
+            .as_ref()
+            .and_then(Option::as_ref)
+            .is_some_and(|v| v == "Dell")
+        {
             Some(SlotDefinedUserAccountsConfig {
                 min_slot: Some(3),
                 hide_disabled: true,

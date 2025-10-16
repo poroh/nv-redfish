@@ -73,7 +73,7 @@ impl<'a> Properties<'a> {
                             ptype: v.ptype.as_ref().map(|t| (typeinfo, t.into())),
                             odata: OData::new(MustHaveId::new(false), v),
                             redfish: RedfishProperty::new(v),
-                            nullable: v.nullable.unwrap_or(IsNullable::new(false)),
+                            nullable: v.nullable.unwrap_or(IsNullable::new(true)),
                         });
                         stack.merge(compiled)
                     }

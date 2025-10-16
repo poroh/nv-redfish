@@ -537,11 +537,11 @@ impl<'a> StructDef<'a> {
             }
             OneOrCollection::Collection(_) => {
                 if required.into_inner() && nullable.into_inner() {
-                    quote! { Nullable<Vec<#ftype>> }
+                    quote! { Option<Vec<#ftype>> }
                 } else if required.into_inner() {
                     quote! { Vec<#ftype> }
                 } else if nullable.into_inner() {
-                    quote! { Option<Nullable<Vec<#ftype>>> }
+                    quote! { Option<Option<Vec<#ftype>>> }
                 } else {
                     quote! { Option<Vec<#ftype>>}
                 }
