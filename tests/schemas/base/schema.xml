@@ -72,6 +72,15 @@
         <NavigationProperty Name="TestActionsService" Nullable="false" Type="ServiceRoot.v1_0_0.TestActionsService"/>
 
         <NavigationProperty Name="TestSettingsService" Nullable="false" Type="ServiceRoot.v1_0_0.TestSettingsService"/>
+
+        <!-- Excerpt tests: links to excerpt target and ref entities -->
+        <NavigationProperty Name="ExcerptEntity" Nullable="false" Type="ServiceRoot.v1_0_0.ExcerptEntity">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+        </NavigationProperty>
+
+        <NavigationProperty Name="ExcerptRefEntity" Nullable="false" Type="ServiceRoot.v1_0_0.ExcerptRefEntity">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+        </NavigationProperty>
       </EntityType>
 
       <EntityType Name="TestRequiredService">
@@ -158,6 +167,48 @@
         <Member Name="Option1"/>
         <Member Name="Option2"/>
       </EnumType>
+
+      <!-- Excerpt target entity: defines properties and excerpt keys -->
+      <EntityType Name="ExcerptEntity">
+        <Property Name="Always" Type="Edm.String" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <!-- Included in all excerpt copies -->
+          <Annotation Term="Redfish.Excerpt"/>
+        </Property>
+        <Property Name="BasicProp" Type="Edm.String" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <!-- Only in keyed 'Basic' excerpt -->
+          <Annotation Term="Redfish.Excerpt" String="Basic"/>
+        </Property>
+        <Property Name="DetailsProp" Type="Edm.String" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <!-- Only in keyed 'Details' excerpt -->
+          <Annotation Term="Redfish.Excerpt" String="Details"/>
+        </Property>
+        <!-- Not part of any excerpt (control) -->
+        <Property Name="Hidden" Type="Edm.String" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+        </Property>
+      </EntityType>
+
+      <!-- Ref entity: three inline excerpt views to ExcerptEntity -->
+      <EntityType Name="ExcerptRefEntity">
+        <NavigationProperty Name="ExcerptAll" Type="ServiceRoot.v1_0_0.ExcerptEntity" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <!-- Inline excerpt (AllKeys) -->
+          <Annotation Term="Redfish.ExcerptCopy"/>
+        </NavigationProperty>
+        <NavigationProperty Name="ExcerptBasic" Type="ServiceRoot.v1_0_0.ExcerptEntity" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <!-- Inline excerpt, keyed 'Basic' -->
+          <Annotation Term="Redfish.ExcerptCopy" String="Basic"/>
+        </NavigationProperty>
+        <NavigationProperty Name="ExcerptDetails" Type="ServiceRoot.v1_0_0.ExcerptEntity" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <!-- Inline excerpt, keyed 'Details' -->
+          <Annotation Term="Redfish.ExcerptCopy" String="Details"/>
+        </NavigationProperty>
+      </EntityType>
 
     </Schema>
 

@@ -601,3 +601,106 @@ async fn redfish_settings_absent_test() -> Result<(), Error> {
     assert!(service.settings_object().is_none());
     Ok(())
 }
+
+// Excerpt view tests: verify inline excerpt copies and direct read
+#[test]
+async fn excerpt_views_test() -> Result<(), Error> {
+    let bmc = Bmc::default();
+    let root_id = ODataId::service_root();
+
+    // Expect root with links to new services (both in a single response)
+    let data_type = "ServiceRoot.v1_0_0.ServiceRoot";
+    let excerpt_entity_id = format!("{}/ExcerptEntity", root_id);
+    let excerpt_ref_entity_id = format!("{}/ExcerptRefEntity", root_id);
+    bmc.expect(Expect::get(
+        root_id.clone(),
+        json!({
+            ODATA_ID: &root_id,
+            ODATA_TYPE: &data_type,
+            "ExcerptEntity": { ODATA_ID: &excerpt_entity_id },
+            "ExcerptRefEntity": { ODATA_ID: &excerpt_ref_entity_id },
+        }),
+    ));
+
+    let service_root = get_service_root(&bmc).await.map_err(Error::Bmc)?;
+    assert!(matches!(
+        service_root.excerpt_entity.as_ref(),
+        Some(NavProperty::Reference(_))
+    ));
+    assert!(matches!(
+        service_root.excerpt_ref_entity.as_ref(),
+        Some(NavProperty::Reference(_))
+    ));
+
+    // Fetch ExcerptRefEntity and validate inline excerpts
+    let ref_id = format!("{}/ExcerptRefEntity", root_id);
+    let ref_dt = "ServiceRoot.v1_0_0.ExcerptRefEntity";
+    let all = json!({
+      "Always": "A",
+      "BasicProp": "B",
+      "DetailsProp": "D"
+    });
+    let basic = json!({
+      "Always": "A",
+      "BasicProp": "B"
+    });
+    let details = json!({
+      "Always": "A",
+      "DetailsProp": "D"
+    });
+
+    bmc.expect(Expect::get(
+        &ref_id,
+        json!({
+          ODATA_ID: &ref_id,
+          ODATA_TYPE: ref_dt,
+          "ExcerptAll": all,
+          "ExcerptBasic": basic,
+          "ExcerptDetails": details,
+        }),
+    ));
+    let ref_svc = service_root
+        .excerpt_ref_entity
+        .as_ref()
+        .ok_or(Error::ExpectedProperty("excerpt_ref_entity"))?
+        .get(&bmc)
+        .await
+        .map_err(Error::Bmc)?;
+    assert_eq!(
+        ref_svc.excerpt_all.as_ref().unwrap().always,
+        Some("A".into())
+    );
+    assert_eq!(
+        ref_svc.excerpt_basic.as_ref().unwrap().basic_prop,
+        Some("B".into())
+    );
+    assert_eq!(
+        ref_svc.excerpt_details.as_ref().unwrap().details_prop,
+        Some("D".into())
+    );
+
+    // Fetch ExcerptEntity directly and verify full entity contains Hidden
+    let tgt_id = format!("{}/ExcerptEntity", root_id);
+    let tgt_dt = "ServiceRoot.v1_0_0.ExcerptEntity";
+    bmc.expect(Expect::get(
+        &tgt_id,
+        json!({
+          ODATA_ID: &tgt_id,
+          ODATA_TYPE: tgt_dt,
+          "Always": "A",
+          "BasicProp": "B",
+          "DetailsProp": "D",
+          "Hidden": "H"
+        }),
+    ));
+    let tgt = service_root
+        .excerpt_entity
+        .as_ref()
+        .ok_or(Error::ExpectedProperty("excerpt_entity"))?
+        .get(&bmc)
+        .await
+        .map_err(Error::Bmc)?;
+    assert_eq!(tgt.hidden, Some("H".into()));
+
+    Ok(())
+}
