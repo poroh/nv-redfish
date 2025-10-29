@@ -36,7 +36,7 @@ where
     B: Bmc + Sync + Send,
 {
     /// Create a new power supply handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<PowerSupplySchema>) -> Self {
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<PowerSupplySchema>) -> Self {
         Self { bmc, data }
     }
 

@@ -17,48 +17,48 @@ use std::sync::Arc;
 
 use nv_redfish_core::Bmc;
 
-use crate::extract_sensor_uris;
-use crate::schema::redfish::processor::Processor as ProcessorSchema;
-use crate::schema::redfish::processor_metrics::ProcessorMetrics;
+use crate::schema::redfish::memory::Memory as MemorySchema;
+use crate::schema::redfish::memory_metrics::MemoryMetrics;
+use crate::sensors::extract_environment_sensors;
 use crate::sensors::Sensor;
 use crate::Error;
 
-/// Represents a processor in a computer system.
+/// Represents a memory module (DIMM) in a computer system.
 ///
-/// Provides access to processor information and associated metrics/sensors.
-pub struct Processor<B: Bmc> {
+/// Provides access to memory module information and associated metrics/sensors.
+pub struct Memory<B: Bmc> {
     bmc: Arc<B>,
-    data: Arc<ProcessorSchema>,
+    data: Arc<MemorySchema>,
 }
 
-impl<B> Processor<B>
+impl<B> Memory<B>
 where
     B: Bmc + Sync + Send,
 {
-    /// Create a new processor handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<ProcessorSchema>) -> Self {
+    /// Create a new memory handle.
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<MemorySchema>) -> Self {
         Self { bmc, data }
     }
 
-    /// Get the raw schema data for this processor.
+    /// Get the raw schema data for this memory module.
     ///
     /// Returns an `Arc` to the underlying schema, allowing cheap cloning
     /// and sharing of the data.
     #[must_use]
-    pub fn raw(&self) -> Arc<ProcessorSchema> {
+    pub fn raw(&self) -> Arc<MemorySchema> {
         self.data.clone()
     }
 
-    /// Get processor metrics.
+    /// Get memory metrics.
     ///
-    /// Returns the processor's performance and state metrics if available.
+    /// Returns the memory module's performance and state metrics if available.
     ///
     /// # Errors
     ///
     /// Returns an error if:
-    /// - The processor does not have metrics
+    /// - The memory module does not have metrics
     /// - Fetching metrics data fails
-    pub async fn metrics(&self) -> Result<Arc<ProcessorMetrics>, Error<B>> {
+    pub async fn metrics(&self) -> Result<Arc<MemoryMetrics>, Error<B>> {
         let metrics_ref = self
             .data
             .metrics
@@ -68,37 +68,12 @@ where
         metrics_ref.get(self.bmc.as_ref()).await.map_err(Error::Bmc)
     }
 
-    /// Get the environment sensors for this processor.
+    /// Get the environment sensors for this memory.
     ///
     /// Returns a vector of `Sensor<B>` obtained from environment metrics, if available.
     pub async fn environment_sensors(&self) -> Vec<Sensor<B>> {
         let sensor_refs = if let Some(env_ref) = &self.data.environment_metrics {
-            crate::sensors::extract_environment_sensors(env_ref, self.bmc.as_ref()).await
-        } else {
-            Vec::new()
-        };
-
-        sensor_refs
-            .into_iter()
-            .map(|r| Sensor::new(r, self.bmc.clone()))
-            .collect()
-    }
-
-    /// Get the metrics sensors for this processor.
-    ///
-    /// Returns a vector of `Sensor<B>` obtained from metrics metrics, if available.
-    pub async fn metrics_sensors(&self) -> Vec<Sensor<B>> {
-        let sensor_refs = if let Some(metrics_ref) = &self.data.metrics {
-            metrics_ref
-                .get(self.bmc.as_ref())
-                .await
-                .ok()
-                .map(|m| {
-                    extract_sensor_uris!(m,
-                        single: core_voltage,
-                    )
-                })
-                .unwrap_or_default()
+            extract_environment_sensors(env_ref, self.bmc.as_ref()).await
         } else {
             Vec::new()
         };

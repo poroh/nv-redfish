@@ -73,7 +73,7 @@ pub(crate) mod schema;
 pub mod error;
 
 /// Metrics and sensor abstraction.
-#[cfg(any(feature = "chassis", feature = "system"))]
+#[cfg(any(feature = "chassis", feature = "systems"))]
 pub mod sensors;
 
 /// Service Root implementation.
@@ -96,11 +96,11 @@ pub mod events;
 #[cfg(feature = "__log_service")]
 pub mod log_service;
 /// Manager.
-#[cfg(feature = "manager")]
-pub mod manager;
+#[cfg(feature = "managers")]
+pub mod managers;
 /// Computer System.
-#[cfg(feature = "system")]
-pub mod system;
+#[cfg(feature = "systems")]
+pub mod systems;
 /// Update Service.
 #[cfg(feature = "update_service")]
 pub mod update_service;
@@ -108,7 +108,7 @@ pub mod update_service;
 #[doc(inline)]
 pub use error::Error;
 #[doc(inline)]
-#[cfg(any(feature = "chassis", feature = "system"))]
+#[cfg(any(feature = "chassis", feature = "systems"))]
 pub use sensors::Sensor;
 #[doc(inline)]
 pub use service_root::ServiceRoot;

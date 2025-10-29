@@ -19,14 +19,15 @@
 
 mod manager;
 
-pub use manager::Manager;
-
-use std::sync::Arc;
-
-use nv_redfish_core::{http::ExpandQuery, Bmc, Expandable, NavProperty};
-
 use crate::schema::redfish::manager_collection::ManagerCollection as ManagerCollectionSchema;
 use crate::Error;
+use nv_redfish_core::http::ExpandQuery;
+use nv_redfish_core::Bmc;
+use nv_redfish_core::Expandable as _;
+use nv_redfish_core::NavProperty;
+use std::sync::Arc;
+
+pub use manager::Manager;
 
 /// Manager collection.
 ///
@@ -64,12 +65,13 @@ impl<B: Bmc + Sync + Send> ManagerCollection<B> {
             .map_err(Error::Bmc)?
             .members
         {
-            let manager = manager_ref.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?;
+            let manager = manager_ref
+                .get(self.bmc.as_ref())
+                .await
+                .map_err(Error::Bmc)?;
             managers.push(Manager::new(self.bmc.clone(), manager));
         }
 
         Ok(managers)
     }
 }
-
-

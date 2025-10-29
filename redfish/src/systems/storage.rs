@@ -13,13 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
-use nv_redfish_core::Bmc;
-
 use crate::schema::redfish::storage::Storage as StorageSchema;
-use crate::system::Drive;
+use crate::systems::Drive;
 use crate::Error;
+use nv_redfish_core::Bmc;
+use std::sync::Arc;
 
 /// Represents a storage controller in a computer system.
 ///
@@ -34,7 +32,7 @@ where
     B: Bmc + Sync + Send,
 {
     /// Create a new storage handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<StorageSchema>) -> Self {
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<StorageSchema>) -> Self {
         Self { bmc, data }
     }
 

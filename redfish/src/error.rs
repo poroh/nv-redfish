@@ -36,16 +36,16 @@ pub enum Error<B: Bmc> {
     #[cfg(feature = "chassis")]
     ChassisNotSupported,
     /// Computer system not supported by BMC
-    #[cfg(feature = "system")]
+    #[cfg(feature = "systems")]
     SystemNotSupported,
     /// Processors not available for this system
-    #[cfg(feature = "system")]
+    #[cfg(feature = "systems")]
     ProcessorsNotAvailable,
     /// Storage not available for this system
-    #[cfg(feature = "system")]
+    #[cfg(feature = "systems")]
     StorageNotAvailable,
     /// Memory not available for this system
-    #[cfg(feature = "system")]
+    #[cfg(feature = "systems")]
     MemoryNotAvailable,
     /// Metrics not available for this entity
     MetricsNotAvailable,
@@ -69,7 +69,7 @@ pub enum Error<B: Bmc> {
     #[cfg(feature = "__log_service")]
     LogEntriesNotAvailable,
     /// Manager not supported by BMC
-    #[cfg(feature = "manager")]
+    #[cfg(feature = "managers")]
     ManagerNotSupported,
     /// JSON parse error.
     Json(JsonError),
@@ -92,19 +92,19 @@ impl<B: Bmc> Display for Error<B> {
             Self::ChassisNotSupported => {
                 write!(f, "Chassis is not supported by system")
             }
-            #[cfg(feature = "system")]
+            #[cfg(feature = "systems")]
             Self::SystemNotSupported => {
                 write!(f, "Computer system is not supported by system")
             }
-            #[cfg(feature = "system")]
+            #[cfg(feature = "systems")]
             Self::ProcessorsNotAvailable => {
                 write!(f, "Processors are not available for this system")
             }
-            #[cfg(feature = "system")]
+            #[cfg(feature = "systems")]
             Self::StorageNotAvailable => {
                 write!(f, "Storage is not available for this system")
             }
-            #[cfg(feature = "system")]
+            #[cfg(feature = "systems")]
             Self::MemoryNotAvailable => {
                 write!(f, "Memory is not available for this system")
             }
@@ -137,7 +137,7 @@ impl<B: Bmc> Display for Error<B> {
             Self::LogEntriesNotAvailable => {
                 write!(f, "Log entries are not available")
             }
-            #[cfg(feature = "manager")]
+            #[cfg(feature = "managers")]
             Self::ManagerNotSupported => {
                 write!(f, "Manager is not supported by system")
             }

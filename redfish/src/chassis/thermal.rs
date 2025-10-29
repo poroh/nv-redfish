@@ -23,9 +23,9 @@ use crate::schema::redfish::thermal::Thermal as ThermalSchema;
 ///
 /// This represents the deprecated `Chassis/Thermal` resource used in older
 /// Redfish implementations. For modern BMCs, prefer using direct sensor
-/// links via [`crate::metrics::HasMetrics`] or the ThermalSubsystem resource.
+/// links via `crate::metrics::HasMetrics` or the `ThermalSubsystem` resource.
 ///
-/// Note: This type intentionally does NOT implement [`crate::metrics::HasMetrics`]
+/// Note: This type intentionally does NOT implement `crate::metrics::HasMetrics`
 /// to encourage explicit handling of legacy vs modern approaches.
 pub struct Thermal<B: Bmc> {
     #[allow(dead_code)]
@@ -38,7 +38,7 @@ where
     B: Bmc + Sync + Send,
 {
     /// Create a new thermal resource handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<ThermalSchema>) -> Self {
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<ThermalSchema>) -> Self {
         Self { bmc, data }
     }
 
@@ -52,4 +52,3 @@ where
         self.data.clone()
     }
 }
-

@@ -18,13 +18,13 @@
 //! This module provides types for working with Redfish LogService resources
 //! and their log entries.
 
-use std::sync::Arc;
-
-use nv_redfish_core::{http::ExpandQuery, Bmc, Expandable};
-
 use crate::schema::redfish::log_entry::LogEntry;
 use crate::schema::redfish::log_service::LogService as LogServiceSchema;
 use crate::Error;
+use nv_redfish_core::http::ExpandQuery;
+use nv_redfish_core::Bmc;
+use nv_redfish_core::Expandable as _;
+use std::sync::Arc;
 
 /// Log service.
 ///
@@ -36,7 +36,7 @@ pub struct LogService<B: Bmc> {
 
 impl<B: Bmc + Sync + Send> LogService<B> {
     /// Create a new log service handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<LogServiceSchema>) -> Self {
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<LogServiceSchema>) -> Self {
         Self { bmc, data }
     }
 
@@ -88,7 +88,7 @@ impl<B: Bmc + Sync + Send> LogService<B> {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - The log service does not support the ClearLog action
+    /// - The log service does not support the `ClearLog` action
     /// - The action execution fails
     pub async fn clear_log(&self, log_entry_codes: Option<String>) -> Result<(), Error<B>>
     where
@@ -108,4 +108,3 @@ impl<B: Bmc + Sync + Send> LogService<B> {
         Ok(())
     }
 }
-

@@ -24,18 +24,19 @@ mod memory;
 mod processor;
 mod storage;
 
+use crate::schema::redfish::computer_system_collection::ComputerSystemCollection as ComputerSystemCollectionSchema;
+use crate::Error;
+use nv_redfish_core::http::ExpandQuery;
+use nv_redfish_core::Bmc;
+use nv_redfish_core::Expandable as _;
+use nv_redfish_core::NavProperty;
+use std::sync::Arc;
+
 pub use computer_system::ComputerSystem;
 pub use drive::Drive;
 pub use memory::Memory;
 pub use processor::Processor;
 pub use storage::Storage;
-
-use std::sync::Arc;
-
-use nv_redfish_core::{http::ExpandQuery, Bmc, Expandable, NavProperty};
-
-use crate::schema::redfish::computer_system_collection::ComputerSystemCollection as ComputerSystemCollectionSchema;
-use crate::Error;
 
 /// Computer system collection.
 ///
@@ -72,11 +73,13 @@ impl<B: Bmc + Sync + Send> SystemCollection<B> {
             .map_err(Error::Bmc)?
             .members
         {
-            let system = system_ref.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?;
+            let system = system_ref
+                .get(self.bmc.as_ref())
+                .await
+                .map_err(Error::Bmc)?;
             systems.push(ComputerSystem::new(self.bmc.clone(), system));
         }
 
         Ok(systems)
     }
 }
-

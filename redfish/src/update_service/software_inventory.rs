@@ -30,7 +30,7 @@ pub struct SoftwareInventory<B: Bmc> {
 
 impl<B: Bmc> SoftwareInventory<B> {
     /// Create a new software inventory handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<SoftwareInventorySchema>) -> Self {
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<SoftwareInventorySchema>) -> Self {
         Self { bmc, data }
     }
 
@@ -43,4 +43,3 @@ impl<B: Bmc> SoftwareInventory<B> {
         self.data.clone()
     }
 }
-

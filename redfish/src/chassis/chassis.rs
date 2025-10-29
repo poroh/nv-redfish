@@ -13,16 +13,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
-use nv_redfish_core::{http::ExpandQuery, Bmc, Expandable};
-use nv_redfish_core::{NavProperty, ODataId};
-
+use crate::chassis::Power;
 use crate::chassis::PowerSupply;
+use crate::chassis::Thermal;
 use crate::schema::redfish::chassis::Chassis as ChassisSchema;
 use crate::schema::redfish::sensor::Sensor as SchemaSensor;
+use crate::sensors::extract_environment_sensors;
 use crate::sensors::Sensor;
 use crate::Error;
+use nv_redfish_core::bmc::Bmc;
+use nv_redfish_core::http::ExpandQuery;
+use nv_redfish_core::Expandable as _;
+use nv_redfish_core::NavProperty;
+use std::sync::Arc;
+
+#[cfg(feature = "__log_service")]
+use crate::log_service::LogService;
 
 /// Represents a chassis in the BMC.
 ///
@@ -37,7 +43,7 @@ where
     B: Bmc + Sync + Send,
 {
     /// Create a new chassis handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<ChassisSchema>) -> Self {
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<ChassisSchema>) -> Self {
         Self { bmc, data }
     }
 
@@ -52,7 +58,7 @@ where
 
     /// Get power supplies from this chassis.
     ///
-    /// Attempts to fetch power supplies from PowerSubsystem (modern API)
+    /// Attempts to fetch power supplies from `PowerSubsystem` (modern API)
     /// with fallback to Power resource (deprecated API).
     ///
     /// # Errors
@@ -88,16 +94,16 @@ where
     /// Get legacy Power resource (for older BMCs).
     ///
     /// Returns the deprecated `Chassis/Power` resource if available.
-    /// For modern BMCs, prefer using direct sensor links via [`HasSensors`]
-    /// or the modern PowerSubsystem API.
+    /// For modern BMCs, prefer using direct sensor links via `HasSensors`
+    /// or the modern `PowerSubsystem` API.
     ///
     /// # Errors
     ///
     /// Returns an error if fetching power data fails.
-    pub async fn power(&self) -> Result<Option<crate::chassis::Power<B>>, Error<B>> {
+    pub async fn power(&self) -> Result<Option<Power<B>>, Error<B>> {
         if let Some(power_ref) = &self.data.power {
             let power = power_ref.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?;
-            Ok(Some(crate::chassis::Power::new(self.bmc.clone(), power)))
+            Ok(Some(Power::new(self.bmc.clone(), power)))
         } else {
             Ok(None)
         }
@@ -106,22 +112,19 @@ where
     /// Get legacy Thermal resource (for older BMCs).
     ///
     /// Returns the deprecated `Chassis/Thermal` resource if available.
-    /// For modern BMCs, prefer using direct sensor links via [`HasSensors`]
-    /// or the modern ThermalSubsystem API.
+    /// For modern BMCs, prefer using direct sensor links via `HasSensors`
+    /// or the modern `ThermalSubsystem` API.
     ///
     /// # Errors
     ///
     /// Returns an error if fetching thermal data fails.
-    pub async fn thermal(&self) -> Result<Option<crate::chassis::Thermal<B>>, Error<B>> {
+    pub async fn thermal(&self) -> Result<Option<Thermal<B>>, Error<B>> {
         if let Some(thermal_ref) = &self.data.thermal {
             let thermal = thermal_ref
                 .get(self.bmc.as_ref())
                 .await
                 .map_err(Error::Bmc)?;
-            Ok(Some(crate::chassis::Thermal::new(
-                self.bmc.clone(),
-                thermal,
-            )))
+            Ok(Some(Thermal::new(self.bmc.clone(), thermal)))
         } else {
             Ok(None)
         }
@@ -135,9 +138,7 @@ where
     /// - The chassis does not have log services
     /// - Fetching log service data fails
     #[cfg(feature = "__log_service")]
-    pub async fn list_log_services(
-        &self,
-    ) -> Result<Vec<crate::log_service::LogService<B>>, Error<B>> {
+    pub async fn list_log_services(&self) -> Result<Vec<LogService<B>>, Error<B>> {
         let log_services_ref = self
             .data
             .log_services
@@ -155,10 +156,7 @@ where
                 .get(self.bmc.as_ref())
                 .await
                 .map_err(Error::Bmc)?;
-            log_services.push(crate::log_service::LogService::new(
-                self.bmc.clone(),
-                log_service,
-            ));
+            log_services.push(LogService::new(self.bmc.clone(), log_service));
         }
 
         Ok(log_services)
@@ -169,7 +167,7 @@ where
     /// Returns a vector of `Sensor<B>` obtained from environment metrics, if available.
     pub async fn environment_sensors(&self) -> Vec<Sensor<B>> {
         let sensor_refs = if let Some(env_ref) = &self.data.environment_metrics {
-            crate::sensors::extract_environment_sensors(env_ref, self.bmc.as_ref()).await
+            extract_environment_sensors(env_ref, self.bmc.as_ref()).await
         } else {
             Vec::new()
         };
@@ -198,7 +196,7 @@ where
             let mut sensor_data = Vec::with_capacity(sc.members.len());
             for sensor in &sc.members {
                 sensor_data.push(Sensor::new(
-                    NavProperty::<SchemaSensor>::new_reference(ODataId::from(sensor.id().clone())),
+                    NavProperty::<SchemaSensor>::new_reference(sensor.id().clone()),
                     self.bmc.clone(),
                 ));
             }

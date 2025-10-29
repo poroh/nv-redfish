@@ -23,9 +23,9 @@ use crate::schema::redfish::power::Power as PowerSchema;
 ///
 /// This represents the deprecated `Chassis/Power` resource used in older
 /// Redfish implementations. For modern BMCs, prefer using direct sensor
-/// links via [`crate::metrics::HasMetrics`] or the PowerSubsystem resource.
+/// links via `crate::metrics::HasMetrics` or the `PowerSubsystem` resource.
 ///
-/// Note: This type intentionally does NOT implement [`crate::metrics::HasMetrics`]
+/// Note: This type intentionally does NOT implement `crate::metrics::HasMetrics`
 /// to encourage explicit handling of legacy vs modern approaches.
 pub struct Power<B: Bmc> {
     #[allow(dead_code)]
@@ -38,7 +38,7 @@ where
     B: Bmc + Sync + Send,
 {
     /// Create a new power resource handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<PowerSchema>) -> Self {
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<PowerSchema>) -> Self {
         Self { bmc, data }
     }
 
@@ -52,4 +52,3 @@ where
         self.data.clone()
     }
 }
-

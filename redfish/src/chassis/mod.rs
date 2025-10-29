@@ -13,22 +13,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[allow(clippy::module_inception)]
 mod chassis;
 mod power;
 mod power_supply;
 mod thermal;
 
-pub use chassis::Chassis;
-pub use power::Power;
-pub use power_supply::PowerSupply;
-pub use thermal::Thermal;
-
-use std::sync::Arc;
-
 use crate::schema::redfish::chassis_collection::ChassisCollection as ChassisCollectionSchema;
 use crate::Error;
 use nv_redfish_core::http::ExpandQuery;
-use nv_redfish_core::{Bmc, Expandable, NavProperty};
+use nv_redfish_core::Bmc;
+use nv_redfish_core::Expandable as _;
+use nv_redfish_core::NavProperty;
+use std::sync::Arc;
+
+#[doc(inline)]
+pub use chassis::Chassis;
+#[doc(inline)]
+pub use power::Power;
+#[doc(inline)]
+pub use power_supply::PowerSupply;
+#[doc(inline)]
+pub use thermal::Thermal;
 
 /// Chassis collection.
 ///
@@ -52,6 +58,10 @@ impl<B: Bmc + Sync + Send> ChassisCollection<B> {
     }
 
     /// List all chassis avaiable in this BMC
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if fetching collection data fails.
     pub async fn list_chassis(&self) -> Result<Vec<Chassis<B>>, Error<B>> {
         let mut chassis_members = Vec::new();
         for chassis in &self

@@ -13,13 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::schema::redfish::computer_system::ComputerSystem as ComputerSystemSchema;
+use crate::systems::Memory;
+use crate::systems::Processor;
+use crate::systems::Storage;
+use crate::Error;
+use nv_redfish_core::http::ExpandQuery;
+use nv_redfish_core::Bmc;
+use nv_redfish_core::Expandable as _;
 use std::sync::Arc;
 
-use nv_redfish_core::{http::ExpandQuery, Bmc, Expandable};
-
-use crate::schema::redfish::computer_system::ComputerSystem as ComputerSystemSchema;
-use crate::system::{Memory, Processor, Storage};
-use crate::Error;
+#[cfg(feature = "__log_service")]
+use crate::log_service::LogService;
 
 /// Represents a computer system in the BMC.
 ///
@@ -34,7 +39,7 @@ where
     B: Bmc + Sync + Send,
 {
     /// Create a new computer system handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<ComputerSystemSchema>) -> Self {
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<ComputerSystemSchema>) -> Self {
         Self { bmc, data }
     }
 
@@ -73,7 +78,10 @@ where
 
         let mut processors = Vec::new();
         for processor_ref in &processors_collection.members {
-            let processor = processor_ref.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?;
+            let processor = processor_ref
+                .get(self.bmc.as_ref())
+                .await
+                .map_err(Error::Bmc)?;
             processors.push(Processor::new(self.bmc.clone(), processor));
         }
 
@@ -126,11 +134,7 @@ where
     /// - The system does not have a memory collection
     /// - Fetching memory data fails
     pub async fn get_memory_modules(&self) -> Result<Vec<Memory<B>>, Error<B>> {
-        let memory_ref = self
-            .data
-            .memory
-            .as_ref()
-            .ok_or(Error::MemoryNotAvailable)?;
+        let memory_ref = self.data.memory.as_ref().ok_or(Error::MemoryNotAvailable)?;
 
         let memory_collection = memory_ref
             .expand(self.bmc.as_ref(), ExpandQuery::all())
@@ -142,7 +146,10 @@ where
 
         let mut memory_modules = Vec::new();
         for memory_ref in &memory_collection.members {
-            let memory = memory_ref.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?;
+            let memory = memory_ref
+                .get(self.bmc.as_ref())
+                .await
+                .map_err(Error::Bmc)?;
             memory_modules.push(Memory::new(self.bmc.clone(), memory));
         }
 
@@ -157,7 +164,7 @@ where
     /// - The computer system does not have log services
     /// - Fetching log service data fails
     #[cfg(feature = "__log_service")]
-    pub async fn list_log_services(&self) -> Result<Vec<crate::log_service::LogService<B>>, Error<B>> {
+    pub async fn list_log_services(&self) -> Result<Vec<LogService<B>>, Error<B>> {
         let log_services_ref = self
             .data
             .log_services
@@ -175,10 +182,7 @@ where
                 .get(self.bmc.as_ref())
                 .await
                 .map_err(Error::Bmc)?;
-            log_services.push(crate::log_service::LogService::new(
-                self.bmc.clone(),
-                log_service,
-            ));
+            log_services.push(LogService::new(self.bmc.clone(), log_service));
         }
 
         Ok(log_services)

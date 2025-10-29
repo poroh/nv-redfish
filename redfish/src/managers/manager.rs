@@ -32,7 +32,7 @@ pub struct Manager<B: Bmc> {
 
 impl<B: Bmc + Sync + Send> Manager<B> {
     /// Create a new manager handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<ManagerSchema>) -> Self {
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<ManagerSchema>) -> Self {
         Self { bmc, data }
     }
 
@@ -77,4 +77,3 @@ impl<B: Bmc + Sync + Send> Manager<B> {
         Ok(log_services)
     }
 }
-

@@ -20,19 +20,17 @@
 
 mod software_inventory;
 
-pub use software_inventory::SoftwareInventory;
-
-// Re-export types needed for actions
-pub use crate::schema::redfish::update_service::TransferProtocolType;
-
+use crate::schema::redfish::update_service::UpdateService as UpdateServiceSchema;
+use crate::schema::redfish::update_service::UpdateServiceSimpleUpdateAction;
+use crate::Error;
+use nv_redfish_core::http::ExpandQuery;
+use nv_redfish_core::Bmc;
+use nv_redfish_core::Expandable as _;
 use std::sync::Arc;
 
-use nv_redfish_core::{http::ExpandQuery, Bmc, Expandable};
-
-use crate::schema::redfish::update_service::{
-    UpdateService as UpdateServiceSchema, UpdateServiceSimpleUpdateAction,
-};
-use crate::Error;
+pub use software_inventory::SoftwareInventory;
+// Re-export types needed for actions
+pub use crate::schema::redfish::update_service::TransferProtocolType;
 
 /// Update service.
 ///
@@ -44,7 +42,7 @@ pub struct UpdateService<B: Bmc> {
 
 impl<B: Bmc + Sync + Send> UpdateService<B> {
     /// Create a new update service handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<UpdateServiceSchema>) -> Self {
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<UpdateServiceSchema>) -> Self {
         Self { bmc, data }
     }
 
@@ -135,8 +133,9 @@ impl<B: Bmc + Sync + Send> UpdateService<B> {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - The update service does not support the SimpleUpdate action
+    /// - The update service does not support the `SimpleUpdate` action
     /// - The action execution fails
+    #[allow(clippy::too_many_arguments)]
     pub async fn simple_update(
         &self,
         image_uri: String,
@@ -180,7 +179,7 @@ impl<B: Bmc + Sync + Send> UpdateService<B> {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - The update service does not support the StartUpdate action
+    /// - The update service does not support the `StartUpdate` action
     /// - The action execution fails
     pub async fn start_update(&self) -> Result<(), Error<B>>
     where
@@ -200,4 +199,3 @@ impl<B: Bmc + Sync + Send> UpdateService<B> {
         Ok(())
     }
 }
-

@@ -16,7 +16,7 @@
 //! Sensor abstraction for Redfish entities.
 //!
 //! This module provides a unified interface for accessing sensor data from
-//! Redfish entities that support modern sensor links. The [`HasSensors`] trait
+//! Redfish entities that support modern sensor links. The `HasSensors` trait
 //! is implemented by entities that have associated sensors, and provides access
 //! to a [`Sensor`] handle for sensor data retrieval.
 //!
@@ -31,7 +31,7 @@ use std::sync::Arc;
 use nv_redfish_core::{Bmc, NavProperty, ODataId};
 
 use crate::schema::redfish::environment_metrics::EnvironmentMetrics;
-use crate::schema::redfish::sensor::{Sensor as SchemaSensor};
+use crate::schema::redfish::sensor::Sensor as SchemaSensor;
 use crate::Error;
 
 /// Extracts sensor URIs from metric fields and creates sensor navigation properties.
@@ -73,7 +73,6 @@ macro_rules! extract_sensor_uris {
     }};
 }
 
-
 /// Handle for accessing sensor.
 ///
 /// This struct provides methods to fetch sensor data from the BMC.
@@ -91,7 +90,7 @@ impl<B: Bmc> Sensor<B> {
     /// * `sensor_ref` - Navigation properties pointing to sensor
     /// * `bmc` - BMC client for fetching sensor data
     #[must_use]
-    pub fn new(sensor_ref: NavProperty<SchemaSensor>, bmc: Arc<B>) -> Self {
+    pub const fn new(sensor_ref: NavProperty<SchemaSensor>, bmc: Arc<B>) -> Self {
         Self { sensor_ref, bmc }
     }
 

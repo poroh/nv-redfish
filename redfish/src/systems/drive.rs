@@ -13,14 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
-use nv_redfish_core::Bmc;
-
 use crate::schema::redfish::drive::Drive as DriveSchema;
 use crate::schema::redfish::drive_metrics::DriveMetrics;
+use crate::sensors::extract_environment_sensors;
 use crate::sensors::Sensor;
 use crate::Error;
+use nv_redfish_core::Bmc;
+use std::sync::Arc;
 
 /// Represents a drive (disk) in a storage controller.
 ///
@@ -35,7 +34,7 @@ where
     B: Bmc + Sync + Send,
 {
     /// Create a new drive handle.
-    pub(crate) fn new(bmc: Arc<B>, data: Arc<DriveSchema>) -> Self {
+    pub(crate) const fn new(bmc: Arc<B>, data: Arc<DriveSchema>) -> Self {
         Self { bmc, data }
     }
 
@@ -72,7 +71,7 @@ where
     /// Returns a vector of `Sensor<B>` obtained from environment metrics, if available.
     pub async fn environment_sensors(&self) -> Vec<Sensor<B>> {
         let sensor_refs = if let Some(env_ref) = &self.data.environment_metrics {
-            crate::sensors::extract_environment_sensors(env_ref, self.bmc.as_ref()).await
+            extract_environment_sensors(env_ref, self.bmc.as_ref()).await
         } else {
             Vec::new()
         };
