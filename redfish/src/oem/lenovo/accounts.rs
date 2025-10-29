@@ -16,6 +16,7 @@
 use crate::oem::lenovo::schema::redfish::lenovo_account_service::LenovoAccountServicePropertiesUpdate;
 use crate::oem::lenovo::Product;
 use crate::schema::redfish::account_service::AccountServiceUpdate;
+use crate::schema::redfish::resource::ItemUpdate;
 use crate::schema::redfish::resource::OemUpdate;
 use crate::schema::redfish::resource::ResourceUpdate;
 use serde::Serialize;
@@ -41,10 +42,16 @@ pub fn best_bmaas_password_policy(_product: &Product) -> AccountServiceUpdate {
         .with_account_lockout_threshold(60) // 60 secs is the shortest Lenovo allows. The docs say 0 disables it, but tests show that Lenovo rejects 0.
         .with_base(
             ResourceUpdate::builder()
-                .with_oem(OemUpdate {
-                    additional_properties: serde_json::to_value(LenovoOemUpdate { oem_root })
-                        .expect("Lenovo schema is serializable"),
-                })
+                .with_base(
+                    ItemUpdate::builder()
+                        .with_oem(OemUpdate {
+                            additional_properties: serde_json::to_value(LenovoOemUpdate {
+                                oem_root,
+                            })
+                            .expect("Lenovo schema is serializable"),
+                        })
+                        .build(),
+                )
                 .build(),
         )
         .build()

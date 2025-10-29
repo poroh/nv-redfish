@@ -16,6 +16,7 @@
 use crate::oem::hpe::schema::redfish::hpei_lo_account_service::HpeiLoAccountServiceUpdate;
 use crate::oem::hpe::Product;
 use crate::oem::AccountServiceUpdate;
+use crate::schema::redfish::resource::ItemUpdate;
 use crate::schema::redfish::resource::OemUpdate;
 use crate::schema::redfish::resource::ResourceUpdate;
 use serde::Serialize;
@@ -37,10 +38,14 @@ pub fn best_bmaas_password_policy(_product: &Product) -> AccountServiceUpdate {
     AccountServiceUpdate::builder()
         .with_base(
             ResourceUpdate::builder()
-                .with_oem(OemUpdate {
-                    additional_properties: serde_json::to_value(HpeOemUpdate { oem_root })
-                        .expect("HPE schema is serializable"),
-                })
+                .with_base(
+                    ItemUpdate::builder()
+                        .with_oem(OemUpdate {
+                            additional_properties: serde_json::to_value(HpeOemUpdate { oem_root })
+                                .expect("HPE schema is serializable"),
+                        })
+                        .build(),
+                )
                 .build(),
         )
         .build()
