@@ -28,11 +28,12 @@ use crate::compiler::Property;
 use crate::compiler::QualifiedName;
 use crate::optimizer::map_types_in_actions;
 use crate::optimizer::replace;
+use crate::optimizer::Config;
 use std::collections::HashMap;
 
 type Replacements<'a> = HashMap<QualifiedName<'a>, QualifiedName<'a>>;
 
-pub fn remove_empty_complex_types<'a>(input: Compiled<'a>) -> Compiled<'a> {
+pub fn remove_empty_complex_types<'a>(input: Compiled<'a>, _config: &Config) -> Compiled<'a> {
     let ct_replacements = collect_ct_replacements(&input);
     let map_prop = |p: Property<'a>| p.map_type(|t| replace(&t, &ct_replacements));
     Compiled {

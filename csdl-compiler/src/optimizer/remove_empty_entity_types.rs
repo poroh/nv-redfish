@@ -29,12 +29,13 @@ use crate::compiler::PropertiesManipulation as _;
 use crate::compiler::QualifiedName;
 use crate::optimizer::map_types_in_actions;
 use crate::optimizer::replace;
+use crate::optimizer::Config;
 use crate::optimizer::Replacements;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
-pub fn remove_empty_entity_types<'a>(input: Compiled<'a>) -> Compiled<'a> {
-    let et_replacements = collect_et_replacements(&input);
+pub fn remove_empty_entity_types<'a>(input: Compiled<'a>, config: &Config) -> Compiled<'a> {
+    let et_replacements = collect_et_replacements(&input, config);
     let map_nav_prop = |p: NavProperty<'a>| p.map_type(|t| replace(&t, &et_replacements));
     Compiled {
         entity_types: input
@@ -88,12 +89,12 @@ const fn et_is_empty(et: &EntityType<'_>) -> bool {
     et.properties.is_empty() && et.key.is_none() && et.odata.is_empty()
 }
 
-fn collect_et_replacements<'a>(input: &Compiled<'a>) -> Replacements<'a> {
+fn collect_et_replacements<'a>(input: &Compiled<'a>, config: &Config) -> Replacements<'a> {
     input
         .entity_types
         .values()
         .filter_map(|v| {
-            if et_is_empty(v) {
+            if !config.never_prune.matches(&v.name) && et_is_empty(v) {
                 find_non_empty_parent(input, v.name).map(|parent| (v.name, parent))
             } else {
                 None

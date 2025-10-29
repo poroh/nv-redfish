@@ -21,6 +21,7 @@ use csdl_compiler::edmx::ValidateError;
 use csdl_compiler::generator::rust::Config as GeneratorConfig;
 use csdl_compiler::generator::rust::RustGenerator;
 use csdl_compiler::optimizer::optimize;
+use csdl_compiler::optimizer::Config as OptimizerConfig;
 use std::io::Error as IoError;
 use std::io::Read;
 
@@ -62,7 +63,7 @@ fn main() -> Result<(), Error> {
         .compile(&[root_service], CompilerConfig::default())
         .inspect_err(|e| println!("{e}"))
         .map_err(|_| Error::Compile("compilation error".into()))?;
-    let compiled = optimize(compiled);
+    let compiled = optimize(compiled, &OptimizerConfig::default());
     let generator = RustGenerator::new(compiled, GeneratorConfig::default())
         .inspect_err(|e| println!("{e}"))
         .map_err(|_| Error::Generate("generation error".into()))?;

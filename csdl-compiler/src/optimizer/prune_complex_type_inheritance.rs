@@ -32,9 +32,10 @@ use crate::compiler::QualifiedName;
 use crate::compiler::TypeInfo;
 use crate::optimizer::map_types_in_actions;
 use crate::optimizer::replace;
+use crate::optimizer::Config;
 use std::collections::HashMap;
 
-pub fn prune_complex_type_inheritance<'a>(input: Compiled<'a>) -> Compiled<'a> {
+pub fn prune_complex_type_inheritance<'a>(input: Compiled<'a>, _config: &Config) -> Compiled<'a> {
     // 1. Create parent -> child map where parent have only one child.
     let single_child_parents = input
         .complex_types

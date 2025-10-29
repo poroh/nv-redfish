@@ -35,6 +35,7 @@ use crate::edmx::Edmx;
 use crate::generator::rust::Config as GeneratorConfig;
 use crate::generator::rust::RustGenerator;
 use crate::optimizer::optimize;
+use crate::optimizer::Config as OptimizerConfig;
 use crate::Error;
 use clap::Subcommand;
 use std::fs::write;
@@ -124,7 +125,7 @@ pub fn process_command(command: &Commands) -> Result<Vec<String>, Error> {
                     },
                 )
                 .map_err(Error::compile_error)?;
-            let compiled = optimize(compiled);
+            let compiled = optimize(compiled, &OptimizerConfig::default());
             let generator = RustGenerator::new(compiled, GeneratorConfig::default())
                 .map_err(Error::generate_error)?;
 
@@ -150,7 +151,7 @@ pub fn process_command(command: &Commands) -> Result<Vec<String>, Error> {
                     entity_type_filter: EntityTypeFilter::new(entity_type_patterns.clone()),
                 })
                 .map_err(Error::compile_error)?;
-            let compiled = optimize(compiled);
+            let compiled = optimize(compiled, &OptimizerConfig::default());
             let generator = RustGenerator::new(compiled, GeneratorConfig::default())
                 .map_err(Error::generate_error)?;
             let result = generator.generate().to_string();

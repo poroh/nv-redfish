@@ -27,6 +27,7 @@ mod remove_empty_complex_types;
 mod remove_empty_entity_types;
 
 use crate::compiler::Compiled;
+use crate::compiler::EntityTypeFilter;
 use crate::compiler::MapType as _;
 use crate::compiler::QualifiedName;
 use crate::compiler::TypeActions;
@@ -37,9 +38,26 @@ use remove_empty_complex_types::remove_empty_complex_types;
 use remove_empty_entity_types::remove_empty_entity_types;
 use std::collections::HashMap;
 
+pub struct Config {
+    pub never_prune: EntityTypeFilter,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            never_prune: EntityTypeFilter::new(
+                ["Resource.Item", "Resource.ItemOrCollection"]
+                    .iter()
+                    .map(|f| f.parse().expect("must be correct filter"))
+                    .collect(),
+            ),
+        }
+    }
+}
+
 /// Apply all known optimizations to compiled data structures.
 #[must_use]
-pub fn optimize(input: Compiled<'_>) -> Compiled<'_> {
+pub fn optimize<'a>(input: Compiled<'a>, config: &Config) -> Compiled<'a> {
     [
         remove_empty_complex_types,
         remove_empty_entity_types,
@@ -48,7 +66,7 @@ pub fn optimize(input: Compiled<'_>) -> Compiled<'_> {
         prune_namespaces,
     ]
     .iter()
-    .fold(input, |input, f| f(input))
+    .fold(input, |input, f| f(input, config))
 }
 
 type Replacements<'a> = HashMap<QualifiedName<'a>, QualifiedName<'a>>;

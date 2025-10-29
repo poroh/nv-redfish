@@ -23,6 +23,7 @@ use csdl_compiler::edmx::attribute_values::Error as AttributeValuesError;
 use csdl_compiler::edmx::Edmx;
 use csdl_compiler::edmx::ValidateError;
 use csdl_compiler::optimizer::optimize;
+use csdl_compiler::optimizer::Config as OptimizerConfig;
 use csdl_compiler::OneOrCollection;
 use std::io::Error as IoError;
 use std::io::Read;
@@ -63,7 +64,7 @@ fn main() -> Result<(), Error> {
         .compile(&[root_service], Config::default())
         .inspect_err(|e| println!("{e}"))
         .map_err(|_| Error::Compile("compilation error".into()))?;
-    let compiled = optimize(compiled);
+    let compiled = optimize(compiled, &OptimizerConfig::default());
 
     println!("Enum types:");
     for t in compiled.enum_types.values() {

@@ -10,7 +10,8 @@ categories.workspace = true
 documentation.workspace = true
 
 [features]
-default = ["accounts", "chassis", "systems", "update-service", "managers"]
+default = []
+std-redfish = ["accounts", "chassis", "systems", "update-service", "managers"]
 accounts = []
 chassis = ["__log-service"]
 systems = ["__log-service"]

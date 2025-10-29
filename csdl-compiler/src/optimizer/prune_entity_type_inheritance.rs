@@ -33,9 +33,10 @@ use crate::compiler::PropertiesManipulation as _;
 use crate::compiler::QualifiedName;
 use crate::optimizer::map_types_in_actions;
 use crate::optimizer::replace;
+use crate::optimizer::Config;
 use std::collections::HashMap;
 
-pub fn prune_entity_type_inheritance<'a>(input: Compiled<'a>) -> Compiled<'a> {
+pub fn prune_entity_type_inheritance<'a>(input: Compiled<'a>, config: &Config) -> Compiled<'a> {
     // 1. Create parent -> child map where parent have only one child.
     let single_child_parents = input
         .entity_types
@@ -51,9 +52,11 @@ pub fn prune_entity_type_inheritance<'a>(input: Compiled<'a>) -> Compiled<'a> {
         )
         .into_iter()
         .filter_map(|(parent, (child, cnt))| {
-            // Check that parent doesn't have key and only one child:
             input.entity_types.get(&parent).and_then(|parent_et| {
-                if parent_et.key.is_none() && cnt == 1 {
+                if !config.never_prune.matches(&parent_et.name)
+                    && parent_et.key.is_none()
+                    && cnt == 1
+                {
                     Some((parent, child))
                 } else {
                     None

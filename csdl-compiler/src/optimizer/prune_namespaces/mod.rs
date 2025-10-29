@@ -34,11 +34,12 @@ use crate::compiler::Compiled;
 use crate::compiler::Namespace;
 use crate::compiler::QualifiedName;
 use crate::edmx::attribute_values::SimpleIdentifier;
+use crate::optimizer::Config;
 use crate::optimizer::Replacements;
 use std::collections::HashMap;
 
 #[must_use]
-pub fn prune_namespaces(input: Compiled<'_>) -> Compiled<'_> {
+pub fn prune_namespaces<'a>(input: Compiled<'a>, config: &Config) -> Compiled<'a> {
     [
         enum_types::prune,
         type_definitions::prune,
@@ -46,7 +47,7 @@ pub fn prune_namespaces(input: Compiled<'_>) -> Compiled<'_> {
         entity_types::prune,
     ]
     .iter()
-    .fold(input, |input, f| f(input))
+    .fold(input, |input, f| f(input, config))
 }
 
 type NamespaceMatches<'a> = HashMap<Namespace<'a>, u64>;
