@@ -138,7 +138,7 @@ impl<B: Bmc> ServiceRoot<B> {
     ///
     /// Returns error if manager list is not available in BMC
     #[cfg(feature = "managers")]
-    pub async fn list_managers(&self) -> Result<ManagerCollection<B>, Error<B>> {
+    pub async fn managers(&self) -> Result<ManagerCollection<B>, Error<B>> {
         let managers = self
             .root
             .managers

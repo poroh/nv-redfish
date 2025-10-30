@@ -53,7 +53,7 @@ impl<B: Bmc + Sync + Send> Manager<B> {
     /// - The manager does not have log services
     /// - Fetching log service data fails
     #[cfg(feature = "log-services")]
-    pub async fn list_log_services(&self) -> Result<Vec<LogService<B>>, crate::Error<B>> {
+    pub async fn log_services(&self) -> Result<Vec<LogService<B>>, crate::Error<B>> {
         let log_services_ref = self
             .data
             .log_services

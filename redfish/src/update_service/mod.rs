@@ -62,7 +62,7 @@ impl<B: Bmc + Sync + Send> UpdateService<B> {
     /// Returns an error if:
     /// - The update service does not have a firmware inventory collection
     /// - Fetching firmware inventory data fails
-    pub async fn list_firmware_inventory(&self) -> Result<Vec<SoftwareInventory<B>>, Error<B>> {
+    pub async fn firmware_inventories(&self) -> Result<Vec<SoftwareInventory<B>>, Error<B>> {
         let collection_ref = self
             .data
             .firmware_inventory
@@ -92,7 +92,7 @@ impl<B: Bmc + Sync + Send> UpdateService<B> {
     /// Returns an error if:
     /// - The update service does not have a software inventory collection
     /// - Fetching software inventory data fails
-    pub async fn list_software_inventory(&self) -> Result<Vec<SoftwareInventory<B>>, Error<B>> {
+    pub async fn software_inventories(&self) -> Result<Vec<SoftwareInventory<B>>, Error<B>> {
         let collection_ref = self
             .data
             .software_inventory

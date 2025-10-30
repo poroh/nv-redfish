@@ -54,7 +54,7 @@ where
     /// Returns an error if:
     /// - The storage controller does not have drives
     /// - Fetching drive data fails
-    pub async fn get_drives(&self) -> Result<Vec<Drive<B>>, Error<B>> {
+    pub async fn drives(&self) -> Result<Vec<Drive<B>>, Error<B>> {
         let drives_ref = self
             .data
             .drives

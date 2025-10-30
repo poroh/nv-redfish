@@ -73,7 +73,7 @@ where
     ///
     /// Returns an error if fetching power supply data fails.
     #[cfg(feature = "power-supplies")]
-    pub async fn get_power_supplies(&self) -> Result<Vec<PowerSupply<B>>, Error<B>> {
+    pub async fn power_supplies(&self) -> Result<Vec<PowerSupply<B>>, Error<B>> {
         if let Some(ps) = &self.data.power_subsystem {
             let ps = ps.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?;
             if let Some(supplies) = &ps.power_supplies {
@@ -147,7 +147,7 @@ where
     /// - The chassis does not have log services
     /// - Fetching log service data fails
     #[cfg(feature = "log-services")]
-    pub async fn list_log_services(&self) -> Result<Vec<LogService<B>>, Error<B>> {
+    pub async fn log_services(&self) -> Result<Vec<LogService<B>>, Error<B>> {
         let log_services_ref = self
             .data
             .log_services

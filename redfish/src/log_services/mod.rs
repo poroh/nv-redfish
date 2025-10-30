@@ -25,6 +25,7 @@ use nv_redfish_core::query::ExpandQuery;
 use nv_redfish_core::Bmc;
 use nv_redfish_core::EntityTypeRef as _;
 use nv_redfish_core::Expandable as _;
+use nv_redfish_core::NavProperty;
 use nv_redfish_core::ODataId;
 use std::sync::Arc;
 
@@ -58,7 +59,7 @@ impl<B: Bmc + Sync + Send> LogService<B> {
     /// Returns an error if:
     /// - The log service does not have a log entries collection
     /// - Fetching log entries data fails
-    pub async fn list_entries(&self) -> Result<Vec<Arc<LogEntry>>, Error<B>> {
+    pub async fn entries(&self) -> Result<Vec<Arc<LogEntry>>, Error<B>> {
         let entries_ref = self
             .data
             .entries
@@ -73,7 +74,7 @@ impl<B: Bmc + Sync + Send> LogService<B> {
             .await
             .map_err(Error::Bmc)?;
 
-        self.get_entries(&entries_collection.members).await
+        self.expand_entries(&entries_collection.members).await
     }
 
     /// Filter log entries using `OData` filter query.
@@ -98,7 +99,7 @@ impl<B: Bmc + Sync + Send> LogService<B> {
             .await
             .map_err(Error::Bmc)?;
 
-        self.get_entries(&entries_collection.members).await
+        self.expand_entries(&entries_collection.members).await
     }
 
     /// `OData` identifier of the `AccountService` in Redfish.
@@ -139,9 +140,9 @@ impl<B: Bmc + Sync + Send> LogService<B> {
     }
 
     /// This unwraps `NavProperty`, usually all BMC already have them expanded, so we do not expect network IO here
-    async fn get_entries(
+    async fn expand_entries(
         &self,
-        entry_refs: &[nv_redfish_core::NavProperty<LogEntry>],
+        entry_refs: &[NavProperty<LogEntry>],
     ) -> Result<Vec<Arc<LogEntry>>, Error<B>> {
         let mut entries = Vec::new();
         for entry_ref in entry_refs {

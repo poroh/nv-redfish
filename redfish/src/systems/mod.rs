@@ -69,7 +69,7 @@ impl<B: Bmc + Sync + Send> SystemCollection<B> {
     /// # Errors
     ///
     /// Returns an error if fetching system data fails.
-    pub async fn list_systems(&self) -> Result<Vec<ComputerSystem<B>>, Error<B>> {
+    pub async fn systems(&self) -> Result<Vec<ComputerSystem<B>>, Error<B>> {
         let mut systems = Vec::new();
         for system_ref in &self
             .collection

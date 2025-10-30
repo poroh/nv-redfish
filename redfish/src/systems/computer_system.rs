@@ -61,7 +61,7 @@ where
     /// Returns an error if:
     /// - The system does not have a processors collection
     /// - Fetching processor data fails
-    pub async fn get_processors(&self) -> Result<Vec<Processor<B>>, Error<B>> {
+    pub async fn processors(&self) -> Result<Vec<Processor<B>>, Error<B>> {
         let processors_ref = self
             .data
             .processors
@@ -97,7 +97,7 @@ where
     /// Returns an error if:
     /// - The system does not have a storage collection
     /// - Fetching storage data fails
-    pub async fn get_storage(&self) -> Result<Vec<Storage<B>>, Error<B>> {
+    pub async fn storage_controllers(&self) -> Result<Vec<Storage<B>>, Error<B>> {
         let storage_ref = self
             .data
             .storage
@@ -133,7 +133,7 @@ where
     /// Returns an error if:
     /// - The system does not have a memory collection
     /// - Fetching memory data fails
-    pub async fn get_memory_modules(&self) -> Result<Vec<Memory<B>>, Error<B>> {
+    pub async fn memory_modules(&self) -> Result<Vec<Memory<B>>, Error<B>> {
         let memory_ref = self.data.memory.as_ref().ok_or(Error::MemoryNotAvailable)?;
 
         let memory_collection = memory_ref
@@ -164,7 +164,7 @@ where
     /// - The computer system does not have log services
     /// - Fetching log service data fails
     #[cfg(feature = "log-services")]
-    pub async fn list_log_services(&self) -> Result<Vec<LogService<B>>, Error<B>> {
+    pub async fn log_services(&self) -> Result<Vec<LogService<B>>, Error<B>> {
         let log_services_ref = self
             .data
             .log_services

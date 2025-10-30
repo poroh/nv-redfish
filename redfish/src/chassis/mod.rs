@@ -65,7 +65,7 @@ impl<B: Bmc + Sync + Send> ChassisCollection<B> {
     /// # Errors
     ///
     /// Returns an error if fetching collection data fails.
-    pub async fn list_chassis(&self) -> Result<Vec<Chassis<B>>, Error<B>> {
+    pub async fn chassis(&self) -> Result<Vec<Chassis<B>>, Error<B>> {
         let mut chassis_members = Vec::new();
         for chassis in &self
             .collection

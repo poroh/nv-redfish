@@ -56,7 +56,7 @@ impl<B: Bmc + Sync + Send> ManagerCollection<B> {
     /// # Errors
     ///
     /// Returns an error if fetching manager data fails.
-    pub async fn list_managers(&self) -> Result<Vec<Manager<B>>, Error<B>> {
+    pub async fn managers(&self) -> Result<Vec<Manager<B>>, Error<B>> {
         let mut managers = Vec::new();
         for manager_ref in &self
             .collection
