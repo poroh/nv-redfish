@@ -27,7 +27,7 @@
 //! - Arc-based sharing: Read operations return `Arc<T>` to enable cheap sharing
 //!   and caching while keeping values immutable.
 //! - Expansion: [`crate::Expandable`] entities can request inline expansion using
-//!   [`crate::http::ExpandQuery`], matching Redfish DSP0266 semantics for `$expand`.
+//!   [`crate::query::ExpandQuery`], matching Redfish DSP0266 semantics for `$expand`.
 //! - Actions: Actions are described by [`crate::Action<T, R>`] and are invoked via
 //!   the `action` method.
 //!
@@ -52,12 +52,12 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::FilterQuery;
 use crate::query::ExpandQuery;
 use crate::Action;
 use crate::Empty;
 use crate::EntityTypeRef;
 use crate::Expandable;
+use crate::FilterQuery;
 use crate::ODataETag;
 use crate::ODataId;
 use std::error::Error as StdError;

@@ -13,16 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
-use nv_redfish_core::Bmc;
-
-use crate::extract_sensor_uris;
 use crate::schema::redfish::processor::Processor as ProcessorSchema;
 use crate::schema::redfish::processor_metrics::ProcessorMetrics;
-use crate::sensors::extract_environment_sensors;
-use crate::sensors::Sensor;
 use crate::Error;
+use nv_redfish_core::Bmc;
+use std::sync::Arc;
+
+#[cfg(feature = "sensors")]
+use crate::extract_sensor_uris;
+#[cfg(feature = "sensors")]
+use crate::sensors::extract_environment_sensors;
+#[cfg(feature = "sensors")]
+use crate::sensors::Sensor;
 
 /// Represents a processor in a computer system.
 ///
@@ -72,6 +74,7 @@ where
     /// Get the environment sensors for this processor.
     ///
     /// Returns a vector of `Sensor<B>` obtained from environment metrics, if available.
+    #[cfg(feature = "sensors")]
     pub async fn environment_sensors(&self) -> Vec<Sensor<B>> {
         let sensor_refs = if let Some(env_ref) = &self.data.environment_metrics {
             extract_environment_sensors(env_ref, self.bmc.as_ref()).await
@@ -88,6 +91,7 @@ where
     /// Get the metrics sensors for this processor.
     ///
     /// Returns a vector of `Sensor<B>` obtained from metrics metrics, if available.
+    #[cfg(feature = "sensors")]
     pub async fn metrics_sensors(&self) -> Vec<Sensor<B>> {
         let sensor_refs = if let Some(metrics_ref) = &self.data.metrics {
             metrics_ref

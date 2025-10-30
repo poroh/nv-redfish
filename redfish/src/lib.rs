@@ -64,23 +64,11 @@
 )]
 #![deny(missing_docs)]
 
-#[cfg(feature = "accounts")]
-pub(crate) mod patch_support;
-pub(crate) mod schema;
-
 /// Errors defined by the crate.
 pub mod error;
 
-/// Metrics and sensor abstraction.
-#[cfg(any(feature = "chassis", feature = "systems"))]
-pub mod sensors;
-
 /// Service Root implementation.
 pub mod service_root;
-
-/// Individual OEM support.
-#[cfg(feature = "oem")]
-pub mod oem;
 
 /// Accounts Service.
 #[cfg(feature = "accounts")]
@@ -101,11 +89,21 @@ pub mod update_service;
 /// Log Service.
 #[cfg(feature = "log-services")]
 pub mod log_services;
+/// Metrics and sensor abstraction.
+#[cfg(feature = "sensors")]
+pub mod sensors;
+
+/// Individual OEM support.
+#[cfg(feature = "oem")]
+pub mod oem;
+
+/// Compiled Redfish schema.
+pub(crate) mod schema;
+
+#[cfg(feature = "accounts")]
+pub(crate) mod patch_support;
 
 #[doc(inline)]
 pub use error::Error;
-#[doc(inline)]
-#[cfg(any(feature = "chassis", feature = "systems"))]
-pub use sensors::Sensor;
 #[doc(inline)]
 pub use service_root::ServiceRoot;

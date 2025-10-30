@@ -21,20 +21,13 @@ csdl_files = [
     "Circuit_v1.xml",
     "CircuitCollection_v1.xml",
     "EnvironmentMetrics_v1.xml",
-    "Fan_v1.xml",
-    "FanCollection_v1.xml",
     "LeakDetection_v1.xml",
     "LeakDetector_v1.xml",
     "LeakDetectorCollection_v1.xml",
     "PhysicalContext_v1.xml",
     "Power_v1.xml",
     "PowerSubsystem_v1.xml",
-    "PowerSupply_v1.xml",
-    "PowerSupplyCollection_v1.xml",
-    "PowerSupplyMetrics_v1.xml",
     "Redundancy_v1.xml",
-    "Sensor_v1.xml",
-    "SensorCollection_v1.xml",
     "SoftwareInventory_v1.xml",
     "Thermal_v1.xml",
     "ThermalMetrics_v1.xml",
@@ -44,8 +37,6 @@ patterns = [
     "ChassisCollection.*",
     "Chassis.*",
     "EnvironmentMetrics.*",
-    "Fan.*",
-    "FanCollection.*",
     "LeakDetection.*",
     "LeakDetector.*",
     "LeakDetectorCollection.*",
@@ -53,11 +44,6 @@ patterns = [
     "Power.*",
     "Power.*.*",
     "PowerSubsystem.*",
-    "PowerSupply.*",
-    "PowerSupplyCollection.*",
-    "PowerSupplyMetrics.*",
-    "Sensor.*",
-    "SensorCollection.*",
     "Thermal.*",
     "Thermal.*.*",
     "ThermalMetrics.*",
@@ -87,8 +73,6 @@ csdl_files = [
     "Redundancy_v1.xml",
     "ResourceBlock_v1.xml",
     "ResourceBlockCollection_v1.xml",
-    "Sensor_v1.xml",
-    "SensorCollection_v1.xml",
     "SoftwareInventory_v1.xml",
     "Storage_v1.xml",
     "StorageCollection_v1.xml",
@@ -117,8 +101,6 @@ patterns = [
     "Processor.*",
     "ProcessorCollection.*",
     "ProcessorMetrics.*",
-    "Sensor.*",
-    "SensorCollection.*",
     "Storage.*",
     "StorageCollection.*",
     "StorageController.*",
@@ -168,6 +150,34 @@ csdl_files = [
 patterns = [
     "Manager.*",
     "ManagerCollection.*",
+]
+
+[[features]]
+name = "power-supplies"
+csdl_files = [
+    "PowerSupply_v1.xml",
+    "PowerSupplyCollection_v1.xml",
+    "PowerSupplyMetrics_v1.xml",
+]
+patterns = [
+    "PowerSupply.*",
+    "PowerSupplyCollection.*",
+    "PowerSupplyMetrics.*",
+]
+
+[[features]]
+name = "sensors"
+csdl_files = [
+    "Fan_v1.xml",
+    "FanCollection_v1.xml",
+    "Sensor_v1.xml",
+    "SensorCollection_v1.xml",
+]
+patterns = [
+    "Sensor.*",
+    "SensorCollection.*",
+    "Fan.*",
+    "FanCollection.*",
 ]
 
 [[oem-features]]

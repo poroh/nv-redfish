@@ -15,11 +15,14 @@
 
 use crate::schema::redfish::drive::Drive as DriveSchema;
 use crate::schema::redfish::drive_metrics::DriveMetrics;
-use crate::sensors::extract_environment_sensors;
-use crate::sensors::Sensor;
 use crate::Error;
 use nv_redfish_core::Bmc;
 use std::sync::Arc;
+
+#[cfg(feature = "sensors")]
+use crate::sensors::extract_environment_sensors;
+#[cfg(feature = "sensors")]
+use crate::sensors::Sensor;
 
 /// Represents a drive (disk) in a storage controller.
 ///
@@ -69,6 +72,7 @@ where
     /// Get the environment sensors for this drive.
     ///
     /// Returns a vector of `Sensor<B>` obtained from environment metrics, if available.
+    #[cfg(feature = "sensors")]
     pub async fn environment_sensors(&self) -> Vec<Sensor<B>> {
         let sensor_refs = if let Some(env_ref) = &self.data.environment_metrics {
             extract_environment_sensors(env_ref, self.bmc.as_ref()).await

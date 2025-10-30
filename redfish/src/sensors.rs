@@ -18,7 +18,7 @@
 //! This module provides a unified interface for accessing sensor data from
 //! Redfish entities that support modern sensor links. The `HasSensors` trait
 //! is implemented by entities that have associated sensors, and provides access
-//! to a [`Sensor`] handle for sensor data retrieval.
+//! to a `Sensor` handle for sensor data retrieval.
 //!
 //! # Modern vs Legacy Approach
 //!
@@ -90,7 +90,7 @@ impl<B: Bmc> Sensor<B> {
     /// * `sensor_ref` - Navigation properties pointing to sensor
     /// * `bmc` - BMC client for fetching sensor data
     #[must_use]
-    pub const fn new(sensor_ref: NavProperty<SchemaSensor>, bmc: Arc<B>) -> Self {
+    pub(crate) const fn new(sensor_ref: NavProperty<SchemaSensor>, bmc: Arc<B>) -> Self {
         Self { sensor_ref, bmc }
     }
 

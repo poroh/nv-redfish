@@ -16,8 +16,10 @@
 #[allow(clippy::module_inception)]
 mod chassis;
 mod power;
-mod power_supply;
 mod thermal;
+
+#[cfg(feature = "power-supplies")]
+mod power_supply;
 
 use crate::schema::redfish::chassis_collection::ChassisCollection as ChassisCollectionSchema;
 use crate::Error;
@@ -32,6 +34,7 @@ pub use chassis::Chassis;
 #[doc(inline)]
 pub use power::Power;
 #[doc(inline)]
+#[cfg(feature = "power-supplies")]
 pub use power_supply::PowerSupply;
 #[doc(inline)]
 pub use thermal::Thermal;

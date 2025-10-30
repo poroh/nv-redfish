@@ -32,10 +32,15 @@ use nv_redfish_core::Expandable as _;
 use nv_redfish_core::NavProperty;
 use std::sync::Arc;
 
+#[doc(inline)]
 pub use computer_system::ComputerSystem;
+#[doc(inline)]
 pub use drive::Drive;
+#[doc(inline)]
 pub use memory::Memory;
+#[doc(inline)]
 pub use processor::Processor;
+#[doc(inline)]
 pub use storage::Storage;
 
 /// Computer system collection.

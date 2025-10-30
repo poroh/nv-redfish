@@ -13,15 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::Arc;
-
-use nv_redfish_core::Bmc;
-
 use crate::schema::redfish::memory::Memory as MemorySchema;
 use crate::schema::redfish::memory_metrics::MemoryMetrics;
-use crate::sensors::extract_environment_sensors;
-use crate::sensors::Sensor;
 use crate::Error;
+use nv_redfish_core::Bmc;
+use std::sync::Arc;
+
+#[cfg(feature = "sensors")]
+use crate::sensors::extract_environment_sensors;
+#[cfg(feature = "sensors")]
+use crate::sensors::Sensor;
 
 /// Represents a memory module (DIMM) in a computer system.
 ///
@@ -71,6 +72,7 @@ where
     /// Get the environment sensors for this memory.
     ///
     /// Returns a vector of `Sensor<B>` obtained from environment metrics, if available.
+    #[cfg(feature = "sensors")]
     pub async fn environment_sensors(&self) -> Vec<Sensor<B>> {
         let sensor_refs = if let Some(env_ref) = &self.data.environment_metrics {
             extract_environment_sensors(env_ref, self.bmc.as_ref()).await

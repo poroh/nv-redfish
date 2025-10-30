@@ -14,21 +14,29 @@
 // limitations under the License.
 
 use crate::chassis::Power;
-use crate::chassis::PowerSupply;
 use crate::chassis::Thermal;
 use crate::schema::redfish::chassis::Chassis as ChassisSchema;
-use crate::schema::redfish::sensor::Sensor as SchemaSensor;
-use crate::sensors::extract_environment_sensors;
-use crate::sensors::Sensor;
 use crate::Error;
 use nv_redfish_core::bmc::Bmc;
-use nv_redfish_core::query::ExpandQuery;
-use nv_redfish_core::Expandable as _;
-use nv_redfish_core::NavProperty;
 use std::sync::Arc;
 
+#[cfg(feature = "power-supplies")]
+use nv_redfish_core::query::ExpandQuery;
+#[cfg(feature = "power-supplies")]
+use nv_redfish_core::Expandable as _;
+#[cfg(feature = "sensors")]
+use nv_redfish_core::NavProperty;
+
+#[cfg(feature = "power-supplies")]
+use crate::chassis::PowerSupply;
 #[cfg(feature = "log-services")]
 use crate::log_services::LogService;
+#[cfg(feature = "sensors")]
+use crate::schema::redfish::sensor::Sensor as SchemaSensor;
+#[cfg(feature = "sensors")]
+use crate::sensors::extract_environment_sensors;
+#[cfg(feature = "sensors")]
+use crate::sensors::Sensor;
 
 /// Represents a chassis in the BMC.
 ///
@@ -64,6 +72,7 @@ where
     /// # Errors
     ///
     /// Returns an error if fetching power supply data fails.
+    #[cfg(feature = "power-supplies")]
     pub async fn get_power_supplies(&self) -> Result<Vec<PowerSupply<B>>, Error<B>> {
         if let Some(ps) = &self.data.power_subsystem {
             let ps = ps.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?;
@@ -165,6 +174,7 @@ where
     /// Get the environment sensors for this chassis.
     ///
     /// Returns a vector of `Sensor<B>` obtained from environment metrics, if available.
+    #[cfg(feature = "sensors")]
     pub async fn environment_sensors(&self) -> Vec<Sensor<B>> {
         let sensor_refs = if let Some(env_ref) = &self.data.environment_metrics {
             extract_environment_sensors(env_ref, self.bmc.as_ref()).await
@@ -187,6 +197,7 @@ where
     /// Returns an error if:
     /// - The chassis does not have sensors
     /// - Fetching sensors data fails
+    #[cfg(feature = "sensors")]
     pub async fn sensors(&self) -> Result<Vec<Sensor<B>>, Error<B>> {
         if let Some(sensors_collection) = &self.data.sensors {
             let sc = sensors_collection

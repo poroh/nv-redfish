@@ -15,7 +15,9 @@ all-std-features = accounts \
                    chassis \
                    systems \
                    update-service \
-                   log-services
+                   log-services \
+                   power-supplies \
+                   sensors
 
 ci-features-list := $(subst $(space),$(comma),$(all-std-features))
 
@@ -49,8 +51,6 @@ ci: rust-install
 
 rust-install:
 	rustup component add clippy
-
-
 
 clean:
 	rm -rf $(schema-dir)

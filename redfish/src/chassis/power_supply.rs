@@ -13,13 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::extract_sensor_uris;
 use crate::schema::redfish::power_supply::PowerSupply as PowerSupplySchema;
 use crate::schema::redfish::power_supply_metrics::PowerSupplyMetrics;
-use crate::sensors::Sensor;
 use crate::Error;
 use nv_redfish_core::Bmc;
 use std::sync::Arc;
+
+#[cfg(feature = "sensors")]
+use crate::extract_sensor_uris;
+#[cfg(feature = "sensors")]
+use crate::sensors::Sensor;
 
 /// Represents a power supply in a chassis.
 ///
@@ -69,6 +72,7 @@ where
     /// Get the metrics sensors for this power supply.
     ///
     /// Returns a vector of `Sensor<B>` obtained from metrics metrics, if available.
+    #[cfg(feature = "sensors")]
     pub async fn metrics_sensors(&self) -> Vec<Sensor<B>> {
         let sensor_refs = if let Some(metrics_ref) = &self.data.metrics {
             metrics_ref

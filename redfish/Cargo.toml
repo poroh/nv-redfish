@@ -11,20 +11,26 @@ documentation.workspace = true
 
 [features]
 default = []
+
 std-redfish = [
     "accounts",
     "chassis",
+    "log-services",
+    "managers",
+    "power-supplies",
+    "sensors",
     "systems",
     "update-service",
-    "managers",
-    "log-services"
 ]
+
 accounts = []
 chassis = []
-systems = []
-update-service = []
-managers = []
 log-services = []
+managers = []
+update-service = []
+sensors = []
+systems = []
+power-supplies = []
 
 # OEM features support
 oem-lenovo = ["oem"]
