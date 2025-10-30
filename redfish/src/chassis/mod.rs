@@ -15,11 +15,13 @@
 
 #[allow(clippy::module_inception)]
 mod chassis;
-mod power;
-mod thermal;
 
+#[cfg(feature = "power")]
+mod power;
 #[cfg(feature = "power-supplies")]
 mod power_supply;
+#[cfg(feature = "thermal")]
+mod thermal;
 
 use crate::schema::redfish::chassis_collection::ChassisCollection as ChassisCollectionSchema;
 use crate::Error;
@@ -31,12 +33,15 @@ use std::sync::Arc;
 
 #[doc(inline)]
 pub use chassis::Chassis;
+
 #[doc(inline)]
+#[cfg(feature = "power")]
 pub use power::Power;
 #[doc(inline)]
 #[cfg(feature = "power-supplies")]
 pub use power_supply::PowerSupply;
 #[doc(inline)]
+#[cfg(feature = "thermal")]
 pub use thermal::Thermal;
 
 /// Chassis collection.

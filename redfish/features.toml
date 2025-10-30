@@ -20,33 +20,14 @@ csdl_files = [
     "ChassisCollection_v1.xml",
     "Circuit_v1.xml",
     "CircuitCollection_v1.xml",
-    "LeakDetection_v1.xml",
-    "LeakDetector_v1.xml",
-    "LeakDetectorCollection_v1.xml",
     "PhysicalContext_v1.xml",
-    "Power_v1.xml",
-    "PowerSubsystem_v1.xml",
     "Redundancy_v1.xml",
     "SoftwareInventory_v1.xml",
-    "Thermal_v1.xml",
-    "ThermalMetrics_v1.xml",
-    "ThermalSubsystem_v1.xml",
 ]
 patterns = [
     "ChassisCollection.*",
     "Chassis.*",
-    "LeakDetection.*",
-    "LeakDetector.*",
-    "LeakDetectorCollection.*",
     "PhysicalContext.*",
-    "Power.*",
-    "Power.*.*",
-    "PowerSubsystem.*",
-    "Thermal.*",
-    "Thermal.*.*",
-    "ThermalMetrics.*",
-    "ThermalSubsystem.*",
-    "ThermalSubsystem.*.*",
 ]
 
 [[features]]
@@ -136,6 +117,18 @@ patterns = [
 ]
 
 [[features]]
+name = "power"
+csdl_files = [
+    "Power_v1.xml",
+    "PowerSubsystem_v1.xml",
+]
+patterns = [
+    "Power.*",
+    "Power.*.*",
+    "PowerSubsystem.*",
+]
+
+[[features]]
 name = "power-supplies"
 csdl_files = [
     "PowerSupply_v1.xml",
@@ -199,6 +192,28 @@ patterns = [
     "DriveCollection.*",
     "DriveMetrics.*",
 ]
+
+[[features]]
+name = "thermal"
+csdl_files = [
+    "LeakDetection_v1.xml",
+    "LeakDetector_v1.xml",
+    "LeakDetectorCollection_v1.xml",
+    "Thermal_v1.xml",
+    "ThermalMetrics_v1.xml",
+    "ThermalSubsystem_v1.xml",
+]
+patterns = [
+    "LeakDetection.*",
+    "LeakDetector.*",
+    "LeakDetectorCollection.*",
+    "Thermal.*",
+    "Thermal.*.*",
+    "ThermalMetrics.*",
+    "ThermalSubsystem.*",
+    "ThermalSubsystem.*.*",
+]
+
 
 [[oem-features]]
 vendor = "lenovo"

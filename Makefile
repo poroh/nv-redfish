@@ -20,11 +20,13 @@ all-std-features = accounts \
                    chassis \
                    log-services \
                    memory \
+                   power \
                    power-supplies \
                    processors \
                    sensors \
                    storages \
                    systems \
+                   thermal \
                    update-service \
 # Features that cannot be compiled standalone (no references from the tree).
 std-not-standalone-features = log-services sensors

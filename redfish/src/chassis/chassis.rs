@@ -13,9 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::chassis::Power;
-use crate::chassis::Thermal;
 use crate::schema::redfish::chassis::Chassis as ChassisSchema;
+#[allow(unused_imports)] // enabled by any feature
 use crate::Error;
 use nv_redfish_core::bmc::Bmc;
 use std::sync::Arc;
@@ -27,8 +26,12 @@ use nv_redfish_core::Expandable as _;
 #[cfg(feature = "sensors")]
 use nv_redfish_core::NavProperty;
 
+#[cfg(feature = "power")]
+use crate::chassis::Power;
 #[cfg(feature = "power-supplies")]
 use crate::chassis::PowerSupply;
+#[cfg(feature = "thermal")]
+use crate::chassis::Thermal;
 #[cfg(feature = "log-services")]
 use crate::log_services::LogService;
 #[cfg(feature = "sensors")]
@@ -42,6 +45,7 @@ use crate::sensors::Sensor;
 ///
 /// Provides access to chassis information and sub-resources such as power supplies.
 pub struct Chassis<B: Bmc> {
+    #[allow(dead_code)] // enabled by any feature
     bmc: Arc<B>,
     data: Arc<ChassisSchema>,
 }
@@ -109,6 +113,7 @@ where
     /// # Errors
     ///
     /// Returns an error if fetching power data fails.
+    #[cfg(feature = "power")]
     pub async fn power(&self) -> Result<Option<Power<B>>, Error<B>> {
         if let Some(power_ref) = &self.data.power {
             let power = power_ref.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?;
@@ -127,6 +132,7 @@ where
     /// # Errors
     ///
     /// Returns an error if fetching thermal data fails.
+    #[cfg(feature = "thermal")]
     pub async fn thermal(&self) -> Result<Option<Thermal<B>>, Error<B>> {
         if let Some(thermal_ref) = &self.data.thermal {
             let thermal = thermal_ref

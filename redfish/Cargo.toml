@@ -18,11 +18,13 @@ std-redfish = [
     "log-services",
     "managers",
     "memory",
+    "power",
     "power-supplies",
     "processors",
     "sensors",
     "storages",
     "systems",
+    "thermal",
     "update-service",
 ]
 
@@ -31,11 +33,13 @@ chassis = []
 log-services = []
 managers = []
 memory = []
+power = [] # Support of legacy PowerSubsystem
 power-supplies = []
 processors = []
 sensors = []
 storages = []
 systems = []
+thermal = []  # Support of legacy ThermalSubsystem
 update-service = []
 
 # OEM features support
