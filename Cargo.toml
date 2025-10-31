@@ -15,6 +15,7 @@ members = [
 version = "0.1.0"
 license-file = "LICENSE"
 repository = "https://github.com/NVIDIA/nv-redfish"
+description = "Rust implementation of Redfish API for BMC management"
 readme = "README.md"
 edition = "2018"
 keywords = ["rust", "redfish", "bmc"]
