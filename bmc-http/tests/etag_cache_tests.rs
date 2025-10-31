@@ -19,7 +19,7 @@ mod common;
 mod cache_integration_tests {
     use crate::common::test_utils::*;
 
-    use nv_redfish_bmc_http::BmcReqwestError;
+    use nv_redfish_bmc_http::reqwest::BmcError;
     use nv_redfish_core::Bmc;
     use std::sync::Arc;
     use wiremock::{
@@ -195,7 +195,7 @@ mod cache_integration_tests {
 
         assert!(result.is_err());
         let error = result.unwrap_err();
-        assert!(matches!(error, BmcReqwestError::CacheMiss));
+        assert!(matches!(error, BmcError::CacheMiss));
     }
 
     #[tokio::test]

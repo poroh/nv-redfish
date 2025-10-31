@@ -17,7 +17,7 @@ mod common;
 
 #[cfg(feature = "reqwest")]
 mod reqwest_client_tests {
-    use nv_redfish_bmc_http::BmcReqwestError;
+    use nv_redfish_bmc_http::reqwest::BmcError;
     use nv_redfish_core::{
         query::{ExpandQuery, FilterQuery},
         Bmc,
@@ -281,7 +281,7 @@ mod reqwest_client_tests {
 
         assert!(result.is_err());
         let error = result.unwrap_err();
-        assert!(matches!(error, BmcReqwestError::InvalidResponse(_)));
+        assert!(matches!(error, BmcError::InvalidResponse(_)));
     }
 
     #[tokio::test]
@@ -308,6 +308,6 @@ mod reqwest_client_tests {
 
         assert!(result.is_err());
         let error = result.unwrap_err();
-        assert!(matches!(error, BmcReqwestError::InvalidResponse(_)));
+        assert!(matches!(error, BmcError::InvalidResponse(_)));
     }
 }

@@ -13,11 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use nv_redfish_bmc_http::reqwest::BmcError;
+use nv_redfish_bmc_http::reqwest::Client;
+use nv_redfish_bmc_http::reqwest::ClientParams;
 use nv_redfish_bmc_http::BmcCredentials;
-use nv_redfish_bmc_http::BmcReqwestError;
 use nv_redfish_bmc_http::HttpBmc;
-use nv_redfish_bmc_http::ReqwestClient;
-use nv_redfish_bmc_http::ReqwestClientParams;
 use nv_redfish_core::query::ExpandQuery;
 use nv_redfish_core::Creatable;
 use nv_redfish_core::Deletable;
@@ -31,9 +31,9 @@ use redfish_std::redfish::service_root::ServiceRoot;
 use url::Url;
 
 #[tokio::main]
-async fn main() -> Result<(), BmcReqwestError> {
-    let client = ReqwestClient::with_params(ReqwestClientParams::new().accept_invalid_certs(true))
-        .map_err(BmcReqwestError::ReqwestError)?;
+async fn main() -> Result<(), BmcError> {
+    let client = Client::with_params(ClientParams::new().accept_invalid_certs(true))
+        .map_err(BmcError::ReqwestError)?;
 
     let creds = BmcCredentials::new("username".into(), "password".into());
     let bmc = HttpBmc::new(client, Url::parse("https://192.168.2.2").unwrap(), creds);

@@ -1,0 +1,408 @@
+// SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use crate::BmcCredentials;
+use crate::CacheableError;
+use crate::HttpClient;
+use nv_redfish_core::Empty;
+use nv_redfish_core::ODataETag;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use std::time::Duration;
+use url::Url;
+
+#[derive(Debug)]
+pub enum BmcError {
+    ReqwestError(reqwest::Error),
+    JsonError(serde_json::Error),
+    InvalidResponse(Box<reqwest::Response>),
+    CacheMiss,
+    CacheError(String),
+}
+
+impl From<reqwest::Error> for BmcError {
+    fn from(value: reqwest::Error) -> Self {
+        Self::ReqwestError(value)
+    }
+}
+
+impl CacheableError for BmcError {
+    fn is_cached(&self) -> bool {
+        match self {
+            Self::InvalidResponse(response) => {
+                response.status() == reqwest::StatusCode::NOT_MODIFIED
+            }
+            _ => false,
+        }
+    }
+
+    fn cache_miss() -> Self {
+        Self::CacheMiss
+    }
+
+    fn cache_error(reason: String) -> Self {
+        Self::CacheError(reason)
+    }
+}
+
+#[allow(clippy::absolute_paths)]
+impl std::fmt::Display for BmcError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ReqwestError(e) => write!(f, "HTTP client error: {e}"),
+            Self::InvalidResponse(response) => {
+                write!(f, "Invalid HTTP response: {}", response.status())
+            }
+            Self::CacheMiss => write!(f, "Resource not found in cache"),
+            Self::CacheError(r) => write!(f, "Error occurred in cache {r}"),
+            Self::JsonError(e) => write!(f, "JSON conversion error error: {e}"),
+        }
+    }
+}
+
+#[allow(clippy::absolute_paths)]
+impl std::error::Error for BmcError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::ReqwestError(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+/// Configuration parameters for the reqwest HTTP client.
+///
+/// This struct allows customizing various aspects of the reqwest client behavior,
+/// including timeouts, TLS settings, and connection pooling.
+///
+/// # Examples
+///
+/// ```rust
+/// use nv_redfish_bmc_http::reqwest::ClientParams;
+/// use std::time::Duration;
+///
+/// let params = ClientParams::new()
+///     .timeout(Duration::from_secs(30))
+///     .connect_timeout(Duration::from_secs(10))
+///     .user_agent("MyApp/1.0")
+///     .accept_invalid_certs(true);
+/// ```
+#[derive(Debug, Clone)]
+pub struct ClientParams {
+    /// HTTP request timeout
+    pub timeout: Option<Duration>,
+    /// TCP connection timeout
+    pub connect_timeout: Option<Duration>,
+    /// User-Agent header value
+    pub user_agent: Option<String>,
+    /// Whether to accept invalid TLS certificates
+    pub accept_invalid_certs: bool,
+    /// Maximum number of HTTP redirects to follow
+    pub max_redirects: Option<usize>,
+    /// TCP keep-alive timeout
+    pub tcp_keepalive: Option<Duration>,
+    /// Connection pool idle timeout
+    pub pool_idle_timeout: Option<Duration>,
+    /// Maximum idle connections per host
+    pub pool_max_idle_per_host: Option<usize>,
+}
+
+impl Default for ClientParams {
+    fn default() -> Self {
+        Self {
+            timeout: Some(Duration::from_secs(30)),
+            connect_timeout: Some(Duration::from_secs(10)),
+            user_agent: Some("nv-redfish/0.1.0".to_string()),
+            accept_invalid_certs: false,
+            max_redirects: Some(10),
+            tcp_keepalive: Some(Duration::from_secs(60)),
+            pool_idle_timeout: Some(Duration::from_secs(90)),
+            pool_max_idle_per_host: Some(10),
+        }
+    }
+}
+
+impl ClientParams {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub const fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    #[must_use]
+    pub const fn connect_timeout(mut self, timeout: Duration) -> Self {
+        self.connect_timeout = Some(timeout);
+        self
+    }
+
+    #[must_use]
+    pub fn user_agent<S: Into<String>>(mut self, user_agent: S) -> Self {
+        self.user_agent = Some(user_agent.into());
+        self
+    }
+
+    #[must_use]
+    pub const fn accept_invalid_certs(mut self, accept: bool) -> Self {
+        self.accept_invalid_certs = accept;
+        self
+    }
+
+    #[must_use]
+    pub const fn max_redirects(mut self, max: usize) -> Self {
+        self.max_redirects = Some(max);
+        self
+    }
+
+    #[must_use]
+    pub const fn tcp_keepalive(mut self, keepalive: Duration) -> Self {
+        self.tcp_keepalive = Some(keepalive);
+        self
+    }
+
+    #[must_use]
+    pub const fn no_timeout(mut self) -> Self {
+        self.timeout = None;
+        self
+    }
+}
+
+/// HTTP client implementation using the reqwest library.
+///
+/// This provides a concrete implementation of [`HttpClient`] using the popular
+/// reqwest HTTP client library. It supports all standard HTTP features including
+/// TLS, authentication, and connection pooling.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use nv_redfish_bmc_http::HttpBmc;
+/// use nv_redfish_bmc_http::reqwest::Client;
+/// use nv_redfish_bmc_http::BmcCredentials;
+/// use nv_redfish_bmc_http::reqwest::ClientParams;
+/// use std::time::Duration;
+/// use url::Url;
+///
+/// # fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// // Create with default settings
+/// let client = Client::new()?;
+///
+/// // Or with custom parameters
+/// let params = ClientParams::new().timeout(Duration::from_secs(60));
+/// let client = Client::with_params(params)?;
+///
+/// // Use with HttpBmc
+/// let credentials = BmcCredentials::new("admin".to_string(), "password".to_string());
+/// let endpoint = Url::parse("https://192.168.1.100")?;
+/// let bmc = HttpBmc::new(client, endpoint, credentials);
+/// # Ok(())
+/// # }
+/// ```
+pub struct Client {
+    client: reqwest::Client,
+}
+
+#[allow(clippy::missing_errors_doc)]
+#[allow(clippy::absolute_paths)]
+impl Client {
+    pub fn new() -> Result<Self, reqwest::Error> {
+        Self::with_params(ClientParams::default())
+    }
+
+    pub fn with_params(params: ClientParams) -> Result<Self, reqwest::Error> {
+        let mut builder = reqwest::Client::builder();
+
+        if let Some(timeout) = params.timeout {
+            builder = builder.timeout(timeout);
+        }
+
+        if let Some(connect_timeout) = params.connect_timeout {
+            builder = builder.connect_timeout(connect_timeout);
+        }
+
+        if let Some(user_agent) = params.user_agent {
+            builder = builder.user_agent(user_agent);
+        }
+
+        if params.accept_invalid_certs {
+            builder = builder.danger_accept_invalid_certs(true);
+        }
+
+        if let Some(max_redirects) = params.max_redirects {
+            builder = builder.redirect(reqwest::redirect::Policy::limited(max_redirects));
+        }
+
+        if let Some(keepalive) = params.tcp_keepalive {
+            builder = builder.tcp_keepalive(keepalive);
+        }
+
+        if let Some(idle_timeout) = params.pool_idle_timeout {
+            builder = builder.pool_idle_timeout(idle_timeout);
+        }
+
+        if let Some(max_idle) = params.pool_max_idle_per_host {
+            builder = builder.pool_max_idle_per_host(max_idle);
+        }
+
+        Ok(Self {
+            client: builder.build()?,
+        })
+    }
+
+    #[must_use]
+    pub const fn with_client(client: reqwest::Client) -> Self {
+        Self { client }
+    }
+}
+
+impl Client {
+    async fn handle_response<T>(&self, response: reqwest::Response) -> Result<T, BmcError>
+    where
+        T: DeserializeOwned,
+    {
+        if !response.status().is_success() {
+            return Err(BmcError::InvalidResponse(Box::new(response)));
+        }
+
+        let etag_header = response.headers().get("etag").cloned();
+
+        let mut value: serde_json::Value = response.json().await.map_err(BmcError::ReqwestError)?;
+
+        if let Some(header) = etag_header {
+            if let Ok(etag_value) = header.to_str() {
+                if let Some(obj) = value.as_object_mut() {
+                    let etag_value = serde_json::Value::String(etag_value.to_string());
+
+                    // Handles both absent and null values
+                    obj.entry("@odata.etag")
+                        .and_modify(|v| *v = etag_value.clone())
+                        .or_insert(etag_value);
+                }
+            }
+        }
+
+        serde_json::from_value(value).map_err(BmcError::JsonError)
+    }
+}
+
+impl HttpClient for Client {
+    type Error = BmcError;
+
+    async fn get<T>(
+        &self,
+        url: Url,
+        credentials: &BmcCredentials,
+        etag: Option<ODataETag>,
+    ) -> Result<T, Self::Error>
+    where
+        T: DeserializeOwned,
+    {
+        let mut request = self
+            .client
+            .get(url)
+            .basic_auth(&credentials.username, Some(credentials.password()));
+
+        if let Some(etag) = etag {
+            request = request.header("If-None-Match", etag.to_string());
+        }
+
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    async fn post<B, T>(
+        &self,
+        url: Url,
+        body: &B,
+        credentials: &BmcCredentials,
+    ) -> Result<T, Self::Error>
+    where
+        B: Serialize + Send + Sync,
+        T: DeserializeOwned + Send + Sync,
+    {
+        let response = self
+            .client
+            .post(url)
+            .basic_auth(&credentials.username, Some(credentials.password()))
+            .json(body)
+            .send()
+            .await?;
+
+        self.handle_response(response).await
+    }
+
+    async fn patch<B, T>(
+        &self,
+        url: Url,
+        etag: ODataETag,
+        body: &B,
+        credentials: &BmcCredentials,
+    ) -> Result<T, Self::Error>
+    where
+        B: Serialize + Send + Sync,
+        T: DeserializeOwned + Send + Sync,
+    {
+        let mut request = self
+            .client
+            .patch(url)
+            .basic_auth(&credentials.username, Some(credentials.password()));
+
+        request = request.header("If-Match", etag.to_string());
+
+        let response = request.json(body).send().await?;
+        self.handle_response(response).await
+    }
+
+    async fn delete(&self, url: Url, credentials: &BmcCredentials) -> Result<Empty, Self::Error> {
+        let response = self
+            .client
+            .delete(url)
+            .basic_auth(&credentials.username, Some(credentials.password()))
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(BmcError::InvalidResponse(Box::new(response)));
+        }
+
+        Ok(Empty {})
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_cacheable_error_trait() {
+        let mock_response = reqwest::Response::from(
+            http::Response::builder()
+                .status(304)
+                .body("")
+                .expect("Valid empty body"),
+        );
+        let error = BmcError::InvalidResponse(Box::new(mock_response));
+        assert!(error.is_cached());
+
+        let cache_miss = BmcError::CacheMiss;
+        assert!(!cache_miss.is_cached());
+
+        let created_miss = BmcError::cache_miss();
+        assert!(matches!(created_miss, BmcError::CacheMiss));
+    }
+}

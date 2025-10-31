@@ -28,12 +28,11 @@
 //! - Entity contracts: [`EntityTypeRef`], [`Expandable`]
 //! - Action envelope: [`Action<T, R>`]
 //! - Client abstraction: [`Bmc`] (transport-agnostic interface used by generated code)
-//! - Optional client implementation: behind the `reqwest` feature, the [`http`] module
-//!   provides a concrete HTTP client usable as a [`Bmc`] implementation.
 //!
 //! Non-goals
 //! - No service- or schema-specific models are defined here.
 //! - No business logic or policy decisions are embedded here.
+//! - No transport specification
 //!
 //! How generated code uses these primitives
 //! - Each generated entity struct implements [`EntityTypeRef`].
@@ -101,10 +100,6 @@ pub use edm_date_time_offset::EdmDateTimeOffset;
 #[doc(inline)]
 pub use edm_duration::EdmDuration;
 #[doc(inline)]
-pub use query::FilterQuery;
-#[doc(inline)]
-pub use query::ToFilterLiteral;
-#[doc(inline)]
 pub use nav_property::NavProperty;
 #[doc(inline)]
 pub use nav_property::Reference;
@@ -114,6 +109,10 @@ pub use nav_property::ReferenceLeaf;
 pub use odata::ODataETag;
 #[doc(inline)]
 pub use odata::ODataId;
+#[doc(inline)]
+pub use query::FilterQuery;
+#[doc(inline)]
+pub use query::ToFilterLiteral;
 #[doc(inline)]
 pub use serde_json::Value as AdditionalProperties;
 #[doc(inline)]
@@ -139,7 +138,9 @@ pub trait EntityTypeRef {
 }
 
 /// Defines entity types that support `$expand` via query parameters.
-pub trait Expandable: EntityTypeRef + Send + Sync + Sized + 'static + for<'a> Deserialize<'a> {
+pub trait Expandable:
+    EntityTypeRef + Send + Sync + Sized + 'static + for<'a> Deserialize<'a>
+{
     /// Expand the entity according to the provided query.
     fn expand<B: Bmc>(
         &self,

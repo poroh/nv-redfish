@@ -16,8 +16,9 @@
 #[cfg(feature = "reqwest")]
 #[allow(dead_code)]
 pub mod test_utils {
+    use nv_redfish_bmc_http::reqwest::Client;
     use nv_redfish_bmc_http::BmcCredentials;
-    use nv_redfish_bmc_http::{HttpBmc, ReqwestClient};
+    use nv_redfish_bmc_http::HttpBmc;
     use nv_redfish_core::{action::Action, EntityTypeRef, Expandable, ODataETag, ODataId};
     use serde::{Deserialize, Serialize};
     use url::Url;
@@ -101,8 +102,8 @@ pub mod test_utils {
         BmcCredentials::new("root".to_string(), "password".to_string())
     }
 
-    pub fn create_test_bmc(mock_server: &MockServer) -> HttpBmc<ReqwestClient> {
-        let client = ReqwestClient::new().unwrap();
+    pub fn create_test_bmc(mock_server: &MockServer) -> HttpBmc<Client> {
+        let client = Client::new().unwrap();
         let credentials = create_test_credentials();
         HttpBmc::new(client, Url::parse(&mock_server.uri()).unwrap(), credentials)
     }
@@ -110,8 +111,8 @@ pub mod test_utils {
     pub fn create_test_bmc_with_credentials(
         mock_server: &MockServer,
         credentials: BmcCredentials,
-    ) -> HttpBmc<ReqwestClient> {
-        let client = ReqwestClient::new().unwrap();
+    ) -> HttpBmc<Client> {
+        let client = Client::new().unwrap();
         HttpBmc::new(client, Url::parse(&mock_server.uri()).unwrap(), credentials)
     }
 
