@@ -13,7 +13,7 @@ documentation.workspace = true
 default = ["reqwest"]
 
 # HTTP client implementations with reqwest
-reqwest = ["dep:reqwest"]
+reqwest = ["dep:reqwest", "dep:serde_path_to_error"]
 
 [dependencies]
 nv-redfish-core = { workspace = true }
@@ -21,6 +21,7 @@ http = { workspace = true }
 reqwest = { workspace = true, optional = true, features = ["json"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_path_to_error = { workspace = true, optional = true }
 url = { workspace = true }
 uuid = { workspace = true, features = [ "serde" ] }
 time = { workspace = true, features = [ "serde", "formatting", "parsing" ] }

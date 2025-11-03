@@ -27,7 +27,7 @@ use url::Url;
 #[derive(Debug)]
 pub enum BmcError {
     ReqwestError(reqwest::Error),
-    JsonError(serde_json::Error),
+    JsonError(serde_path_to_error::Error<serde_json::Error>),
     InvalidResponse(Box<reqwest::Response>),
     CacheMiss,
     CacheError(String),
@@ -68,7 +68,13 @@ impl std::fmt::Display for BmcError {
             }
             Self::CacheMiss => write!(f, "Resource not found in cache"),
             Self::CacheError(r) => write!(f, "Error occurred in cache {r}"),
-            Self::JsonError(e) => write!(f, "JSON conversion error error: {e}"),
+            Self::JsonError(e) => write!(
+                f,
+                "JSON deserialization error at line {} column {} path {}: {e}",
+                e.inner().line(),
+                e.inner().column(),
+                e.path(),
+            ),
         }
     }
 }
@@ -125,14 +131,14 @@ pub struct ClientParams {
 impl Default for ClientParams {
     fn default() -> Self {
         Self {
-            timeout: Some(Duration::from_secs(30)),
-            connect_timeout: Some(Duration::from_secs(10)),
-            user_agent: Some("nv-redfish/0.1".to_string()),
+            timeout: Some(Duration::from_secs(120)),
+            connect_timeout: Some(Duration::from_secs(5)),
+            user_agent: Some("nv-redfish/v1".to_string()),
             accept_invalid_certs: false,
             max_redirects: Some(10),
             tcp_keepalive: Some(Duration::from_secs(60)),
             pool_idle_timeout: Some(Duration::from_secs(90)),
-            pool_max_idle_per_host: Some(10),
+            pool_max_idle_per_host: Some(1),
             default_headers: None,
         }
     }
@@ -177,6 +183,12 @@ impl ClientParams {
     #[must_use]
     pub const fn tcp_keepalive(mut self, keepalive: Duration) -> Self {
         self.tcp_keepalive = Some(keepalive);
+        self
+    }
+
+    #[must_use]
+    pub const fn pool_max_idle_per_host(mut self, pool_max_idle_per_host: usize) -> Self {
+        self.pool_max_idle_per_host = Some(pool_max_idle_per_host);
         self
     }
 
@@ -239,6 +251,7 @@ impl Client {
 
     pub fn with_params(params: ClientParams) -> Result<Self, reqwest::Error> {
         let mut builder = reqwest::Client::builder();
+        builder = builder.http2_prior_knowledge();
 
         if let Some(timeout) = params.timeout {
             builder = builder.timeout(timeout);
@@ -313,7 +326,7 @@ impl Client {
             }
         }
 
-        serde_json::from_value(value).map_err(BmcError::JsonError)
+        serde_path_to_error::deserialize(value).map_err(BmcError::JsonError)
     }
 }
 
