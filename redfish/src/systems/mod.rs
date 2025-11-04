@@ -82,7 +82,7 @@ impl<B: Bmc + Sync + Send> SystemCollection<B> {
         let mut systems = Vec::new();
         for system_ref in &self
             .collection
-            .expand(self.bmc.as_ref(), ExpandQuery::all())
+            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
             .await
             .map_err(Error::Bmc)?
             .members

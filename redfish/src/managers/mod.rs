@@ -60,7 +60,7 @@ impl<B: Bmc + Sync + Send> ManagerCollection<B> {
         let mut managers = Vec::new();
         for manager_ref in &self
             .collection
-            .expand(self.bmc.as_ref(), ExpandQuery::all())
+            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
             .await
             .map_err(Error::Bmc)?
             .members

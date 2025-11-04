@@ -82,7 +82,7 @@ where
             let ps = ps.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?;
             if let Some(supplies) = &ps.power_supplies {
                 let supplies = &supplies
-                    .expand(self.bmc.as_ref(), ExpandQuery::all())
+                    .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
                     .await
                     .map_err(Error::Bmc)?
                     .get(self.bmc.as_ref())

@@ -78,7 +78,7 @@ where
             .ok_or(Error::ProcessorsNotAvailable)?;
 
         let processors_collection = processors_ref
-            .expand(self.bmc.as_ref(), ExpandQuery::all())
+            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
             .await
             .map_err(Error::Bmc)?
             .get(self.bmc.as_ref())
@@ -115,7 +115,7 @@ where
             .ok_or(Error::StorageNotAvailable)?;
 
         let storage_collection = storage_ref
-            .expand(self.bmc.as_ref(), ExpandQuery::all())
+            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
             .await
             .map_err(Error::Bmc)?
             .get(self.bmc.as_ref())
@@ -148,7 +148,7 @@ where
         let memory_ref = self.data.memory.as_ref().ok_or(Error::MemoryNotAvailable)?;
 
         let memory_collection = memory_ref
-            .expand(self.bmc.as_ref(), ExpandQuery::all())
+            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
             .await
             .map_err(Error::Bmc)?
             .get(self.bmc.as_ref())

@@ -73,7 +73,7 @@ impl<B: Bmc> SoftwareInventoryCollection<B> {
         collection_ref: &NavProperty<SoftwareInventoryCollectionSchema>,
         read_patch_fn: Option<ReadPatchFn>,
     ) -> Result<Self, Error<B>> {
-        let query = ExpandQuery::all();
+        let query = ExpandQuery::default().levels(1);
         let collection =
             Self::read_collection(bmc.as_ref(), collection_ref, read_patch_fn.as_ref(), query)
                 .await?;

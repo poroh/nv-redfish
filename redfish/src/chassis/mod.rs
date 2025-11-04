@@ -74,7 +74,7 @@ impl<B: Bmc + Sync + Send> ChassisCollection<B> {
         let mut chassis_members = Vec::new();
         for chassis in &self
             .collection
-            .expand(self.bmc.as_ref(), ExpandQuery::all())
+            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
             .await
             .map_err(Error::Bmc)?
             .members

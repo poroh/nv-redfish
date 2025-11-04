@@ -67,7 +67,7 @@ impl<B: Bmc + Sync + Send> LogService<B> {
             .ok_or(Error::LogEntriesNotAvailable)?;
 
         let entries_collection = entries_ref
-            .expand(self.bmc.as_ref(), ExpandQuery::all())
+            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
             .await
             .map_err(Error::Bmc)?
             .get(self.bmc.as_ref())

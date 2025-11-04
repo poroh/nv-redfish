@@ -115,7 +115,7 @@ impl<B: Bmc + Sync + Send> UpdateService<B> {
             .as_ref()
             .ok_or(Error::SoftwareInventoryNotAvailable)?;
         let collection = collection_ref
-            .expand(self.bmc.as_ref(), ExpandQuery::all())
+            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
             .await
             .map_err(Error::Bmc)?
             .get(self.bmc.as_ref())
