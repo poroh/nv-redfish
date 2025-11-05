@@ -21,10 +21,9 @@ mod manager;
 
 use crate::schema::redfish::manager_collection::ManagerCollection as ManagerCollectionSchema;
 use crate::Error;
-use nv_redfish_core::query::ExpandQuery;
+use crate::ProtocolFeatures;
+use crate::ServiceRoot;
 use nv_redfish_core::Bmc;
-use nv_redfish_core::Expandable as _;
-use nv_redfish_core::NavProperty;
 use std::sync::Arc;
 
 pub use manager::Manager;
@@ -35,19 +34,27 @@ pub use manager::Manager;
 pub struct ManagerCollection<B: Bmc> {
     bmc: Arc<B>,
     collection: Arc<ManagerCollectionSchema>,
+    protocol_features: Arc<ProtocolFeatures>,
 }
 
 impl<B: Bmc + Sync + Send> ManagerCollection<B> {
     /// Create a new manager collection handle.
-    pub(crate) async fn new(
-        bmc: Arc<B>,
-        collection_ref: &NavProperty<ManagerCollectionSchema>,
-    ) -> Result<Self, Error<B>> {
-        let collection = collection_ref.get(bmc.as_ref()).await.map_err(Error::Bmc)?;
+    pub(crate) async fn new(bmc: Arc<B>, root: &ServiceRoot<B>) -> Result<Self, Error<B>> {
+        let collection_ref = root
+            .root
+            .managers
+            .as_ref()
+            .ok_or(Error::ManagerNotSupported)?;
+
+        let collection = root
+            .protocol_features()
+            .expand_property(bmc.as_ref(), collection_ref)
+            .await?;
 
         Ok(Self {
             bmc: bmc.clone(),
             collection,
+            protocol_features: root.protocol_features_clone(),
         })
     }
 
@@ -58,18 +65,16 @@ impl<B: Bmc + Sync + Send> ManagerCollection<B> {
     /// Returns an error if fetching manager data fails.
     pub async fn managers(&self) -> Result<Vec<Manager<B>>, Error<B>> {
         let mut managers = Vec::new();
-        for manager_ref in &self
-            .collection
-            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
-            .await
-            .map_err(Error::Bmc)?
-            .members
-        {
+        for manager_ref in &self.collection.members {
             let manager = manager_ref
                 .get(self.bmc.as_ref())
                 .await
                 .map_err(Error::Bmc)?;
-            managers.push(Manager::new(self.bmc.clone(), manager));
+            managers.push(Manager::new(
+                self.bmc.clone(),
+                manager,
+                self.protocol_features.clone(),
+            ));
         }
 
         Ok(managers)

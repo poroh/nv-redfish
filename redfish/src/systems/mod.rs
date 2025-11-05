@@ -31,10 +31,9 @@ mod storage;
 
 use crate::schema::redfish::computer_system_collection::ComputerSystemCollection as ComputerSystemCollectionSchema;
 use crate::Error;
-use nv_redfish_core::query::ExpandQuery;
+use crate::ProtocolFeatures;
+use crate::ServiceRoot;
 use nv_redfish_core::Bmc;
-use nv_redfish_core::Expandable as _;
-use nv_redfish_core::NavProperty;
 use std::sync::Arc;
 
 #[doc(inline)]
@@ -58,18 +57,24 @@ pub use storage::Storage;
 pub struct SystemCollection<B: Bmc> {
     bmc: Arc<B>,
     collection: Arc<ComputerSystemCollectionSchema>,
+    protocol_features: Arc<ProtocolFeatures>,
 }
 
 impl<B: Bmc + Sync + Send> SystemCollection<B> {
-    pub(crate) async fn new(
-        bmc: Arc<B>,
-        collection_ref: &NavProperty<ComputerSystemCollectionSchema>,
-    ) -> Result<Self, Error<B>> {
-        let collection = collection_ref.get(bmc.as_ref()).await.map_err(Error::Bmc)?;
-
+    pub(crate) async fn new(bmc: Arc<B>, root: &ServiceRoot<B>) -> Result<Self, Error<B>> {
+        let collection_ref = root
+            .root
+            .systems
+            .as_ref()
+            .ok_or(Error::SystemNotSupported)?;
+        let collection = root
+            .protocol_features()
+            .expand_property(bmc.as_ref(), collection_ref)
+            .await?;
         Ok(Self {
             bmc: bmc.clone(),
             collection,
+            protocol_features: root.protocol_features_clone(),
         })
     }
 
@@ -80,18 +85,16 @@ impl<B: Bmc + Sync + Send> SystemCollection<B> {
     /// Returns an error if fetching system data fails.
     pub async fn systems(&self) -> Result<Vec<ComputerSystem<B>>, Error<B>> {
         let mut systems = Vec::new();
-        for system_ref in &self
-            .collection
-            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
-            .await
-            .map_err(Error::Bmc)?
-            .members
-        {
+        for system_ref in &self.collection.members {
             let system = system_ref
                 .get(self.bmc.as_ref())
                 .await
                 .map_err(Error::Bmc)?;
-            systems.push(ComputerSystem::new(self.bmc.clone(), system));
+            systems.push(ComputerSystem::new(
+                self.bmc.clone(),
+                system,
+                self.protocol_features.clone(),
+            ));
         }
 
         Ok(systems)

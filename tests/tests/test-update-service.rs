@@ -88,6 +88,11 @@ async fn get_update_service(
             ODATA_TYPE: &data_type,
             "Id": "RootService",
             "Name": "RootService",
+            "ProtocolFeaturesSupported": {
+                "ExpandQuery": {
+                    "NoLinks": true
+                }
+            },
             "UpdateService": {
                 ODATA_ID: &update_service_id,
             },

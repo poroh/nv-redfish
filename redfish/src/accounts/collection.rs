@@ -50,7 +50,7 @@ use crate::schema::redfish::manager_account::ManagerAccount;
 use crate::schema::redfish::manager_account_collection::ManagerAccountCollection;
 use crate::schema::redfish::resource::ResourceCollection;
 use crate::Error;
-use nv_redfish_core::query::ExpandQuery;
+use crate::ProtocolFeatures;
 use nv_redfish_core::Bmc;
 use nv_redfish_core::EntityTypeRef as _;
 use nv_redfish_core::NavProperty;
@@ -80,6 +80,8 @@ pub struct SlotDefinedConfig {
 /// how accounts are created, listed, and deleted.
 #[derive(Clone)]
 pub struct Config {
+    /// Supported Redfish protocol features
+    pub protocol_features: Arc<ProtocolFeatures>,
     /// Configuration of `Account` objects.
     pub account: AccountConfig,
     /// Configuration for slot-defined user accounts.
@@ -126,12 +128,11 @@ impl<B: Bmc> AccountCollection<B> {
         collection_ref: &NavProperty<ManagerAccountCollection>,
         config: Config,
     ) -> Result<Self, Error<B>> {
-        let query = ExpandQuery::default().levels(1);
-        let collection = Self::read_collection(
+        let collection = Self::expand_collection(
             bmc.as_ref(),
             collection_ref,
             config.account.read_patch_fn.as_ref(),
-            query,
+            config.protocol_features.as_ref(),
         )
         .await?;
         Ok(Self {

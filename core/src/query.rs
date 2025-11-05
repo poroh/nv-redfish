@@ -145,6 +145,24 @@ impl ExpandQuery {
         Self::default()
     }
 
+    /// Expand all hyperlinks excluding links.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use nv_redfish_core::query::ExpandQuery;
+    ///
+    /// let query = ExpandQuery::no_links();
+    /// assert_eq!(query.to_query_string(), "$expand=.");
+    /// ```
+    #[must_use]
+    pub fn no_links() -> Self {
+        Self {
+            expand_expression: ".".to_string(),
+            levels: None,
+        }
+    }
+
     /// Expand all hyperlinks, including those in payload annotations.
     ///
     /// This expands all hyperlinks found in the resource, including those in payload

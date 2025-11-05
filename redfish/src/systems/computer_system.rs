@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::schema::redfish::computer_system::ComputerSystem as ComputerSystemSchema;
+use crate::ProtocolFeatures;
 use nv_redfish_core::Bmc;
 use std::sync::Arc;
 
@@ -28,10 +29,6 @@ use crate::systems::Storage;
 
 #[cfg(any(feature = "memory", feature = "processors", feature = "storages"))]
 use crate::Error;
-#[cfg(any(feature = "memory", feature = "processors", feature = "storages"))]
-use nv_redfish_core::query::ExpandQuery;
-#[cfg(any(feature = "memory", feature = "processors", feature = "storages"))]
-use nv_redfish_core::Expandable as _;
 
 /// Represents a computer system in the BMC.
 ///
@@ -40,6 +37,8 @@ pub struct ComputerSystem<B: Bmc> {
     #[allow(dead_code)] // feature-enabled...
     bmc: Arc<B>,
     data: Arc<ComputerSystemSchema>,
+    #[allow(dead_code)] // feature-enabled...
+    protocol_features: Arc<ProtocolFeatures>,
 }
 
 impl<B> ComputerSystem<B>
@@ -47,8 +46,16 @@ where
     B: Bmc + Sync + Send,
 {
     /// Create a new computer system handle.
-    pub(crate) const fn new(bmc: Arc<B>, data: Arc<ComputerSystemSchema>) -> Self {
-        Self { bmc, data }
+    pub(crate) const fn new(
+        bmc: Arc<B>,
+        data: Arc<ComputerSystemSchema>,
+        protocol_features: Arc<ProtocolFeatures>,
+    ) -> Self {
+        Self {
+            bmc,
+            data,
+            protocol_features,
+        }
     }
 
     /// Get the raw schema data for this computer system.
@@ -77,13 +84,10 @@ where
             .as_ref()
             .ok_or(Error::ProcessorsNotAvailable)?;
 
-        let processors_collection = processors_ref
-            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
-            .await
-            .map_err(Error::Bmc)?
-            .get(self.bmc.as_ref())
-            .await
-            .map_err(Error::Bmc)?;
+        let processors_collection = self
+            .protocol_features
+            .expand_property(self.bmc.as_ref(), processors_ref)
+            .await?;
 
         let mut processors = Vec::new();
         for processor_ref in &processors_collection.members {
@@ -114,13 +118,10 @@ where
             .as_ref()
             .ok_or(Error::StorageNotAvailable)?;
 
-        let storage_collection = storage_ref
-            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
-            .await
-            .map_err(Error::Bmc)?
-            .get(self.bmc.as_ref())
-            .await
-            .map_err(Error::Bmc)?;
+        let storage_collection = self
+            .protocol_features
+            .expand_property(self.bmc.as_ref(), storage_ref)
+            .await?;
 
         let mut storage_controllers = Vec::new();
         for storage_controller_ref in &storage_collection.members {
@@ -147,13 +148,10 @@ where
     pub async fn memory_modules(&self) -> Result<Vec<Memory<B>>, Error<B>> {
         let memory_ref = self.data.memory.as_ref().ok_or(Error::MemoryNotAvailable)?;
 
-        let memory_collection = memory_ref
-            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
-            .await
-            .map_err(Error::Bmc)?
-            .get(self.bmc.as_ref())
-            .await
-            .map_err(Error::Bmc)?;
+        let memory_collection = self
+            .protocol_features
+            .expand_property(self.bmc.as_ref(), memory_ref)
+            .await?;
 
         let mut memory_modules = Vec::new();
         for memory_ref in &memory_collection.members {
@@ -193,7 +191,11 @@ where
                 .get(self.bmc.as_ref())
                 .await
                 .map_err(Error::Bmc)?;
-            log_services.push(LogService::new(self.bmc.clone(), log_service));
+            log_services.push(LogService::new(
+                self.bmc.clone(),
+                log_service,
+                self.protocol_features.clone(),
+            ));
         }
 
         Ok(log_services)

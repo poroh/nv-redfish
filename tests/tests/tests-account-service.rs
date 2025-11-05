@@ -132,6 +132,11 @@ async fn get_account_service(
             ODATA_TYPE: &data_type,
             "Id": "RootService",
             "Name": "RootService",
+            "ProtocolFeaturesSupported": {
+                "ExpandQuery": {
+                    "NoLinks": true
+                }
+            },
             "AccountService": {
                 ODATA_ID: &account_service_id,
             },

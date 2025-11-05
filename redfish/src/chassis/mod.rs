@@ -25,10 +25,9 @@ mod thermal;
 
 use crate::schema::redfish::chassis_collection::ChassisCollection as ChassisCollectionSchema;
 use crate::Error;
-use nv_redfish_core::query::ExpandQuery;
+use crate::ProtocolFeatures;
+use crate::ServiceRoot;
 use nv_redfish_core::Bmc;
-use nv_redfish_core::Expandable as _;
-use nv_redfish_core::NavProperty;
 use std::sync::Arc;
 
 #[doc(inline)]
@@ -50,18 +49,25 @@ pub use thermal::Thermal;
 pub struct ChassisCollection<B: Bmc> {
     bmc: Arc<B>,
     collection: Arc<ChassisCollectionSchema>,
+    protocol_features: Arc<ProtocolFeatures>,
 }
 
 impl<B: Bmc + Sync + Send> ChassisCollection<B> {
-    pub(crate) async fn new(
-        bmc: Arc<B>,
-        collection_ref: &NavProperty<ChassisCollectionSchema>,
-    ) -> Result<Self, Error<B>> {
-        let collection = collection_ref.get(bmc.as_ref()).await.map_err(Error::Bmc)?;
+    pub(crate) async fn new(bmc: Arc<B>, root: &ServiceRoot<B>) -> Result<Self, Error<B>> {
+        let collection_ref = root
+            .root
+            .chassis
+            .as_ref()
+            .ok_or(Error::ChassisNotSupported)?;
+        let collection = root
+            .protocol_features()
+            .expand_property(bmc.as_ref(), collection_ref)
+            .await?;
 
         Ok(Self {
             bmc: bmc.clone(),
             collection,
+            protocol_features: root.protocol_features_clone(),
         })
     }
 
@@ -72,15 +78,13 @@ impl<B: Bmc + Sync + Send> ChassisCollection<B> {
     /// Returns an error if fetching collection data fails.
     pub async fn chassis(&self) -> Result<Vec<Chassis<B>>, Error<B>> {
         let mut chassis_members = Vec::new();
-        for chassis in &self
-            .collection
-            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
-            .await
-            .map_err(Error::Bmc)?
-            .members
-        {
+        for chassis in &self.collection.members {
             let chassis = chassis.get(self.bmc.as_ref()).await.map_err(Error::Bmc)?;
-            chassis_members.push(Chassis::new(self.bmc.clone(), chassis));
+            chassis_members.push(Chassis::new(
+                self.bmc.clone(),
+                chassis,
+                self.protocol_features.clone(),
+            ));
         }
 
         Ok(chassis_members)

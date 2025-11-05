@@ -24,10 +24,9 @@ use crate::patch_support::ReadPatchFn;
 use crate::schema::redfish::update_service::UpdateService as UpdateServiceSchema;
 use crate::schema::redfish::update_service::UpdateServiceSimpleUpdateAction;
 use crate::Error;
+use crate::ProtocolFeatures;
 use crate::ServiceRoot;
-use nv_redfish_core::query::ExpandQuery;
 use nv_redfish_core::Bmc;
-use nv_redfish_core::Expandable as _;
 use serde_json::Value as JsonValue;
 use software_inventory::SoftwareInventoryCollection;
 use std::sync::Arc;
@@ -45,6 +44,7 @@ pub struct UpdateService<B: Bmc> {
     bmc: Arc<B>,
     data: Arc<UpdateServiceSchema>,
     fw_inventory_read_patch_fn: Option<ReadPatchFn>,
+    protocol_features: Arc<ProtocolFeatures>,
 }
 
 impl<B: Bmc + Sync + Send> UpdateService<B> {
@@ -65,6 +65,7 @@ impl<B: Bmc + Sync + Send> UpdateService<B> {
             bmc,
             data,
             fw_inventory_read_patch_fn,
+            protocol_features: root.protocol_features_clone(),
         }
     }
 
@@ -95,6 +96,7 @@ impl<B: Bmc + Sync + Send> UpdateService<B> {
             self.bmc.clone(),
             collection_ref,
             self.fw_inventory_read_patch_fn.clone(),
+            self.protocol_features.clone(),
         )
         .await?
         .members()
@@ -114,13 +116,10 @@ impl<B: Bmc + Sync + Send> UpdateService<B> {
             .software_inventory
             .as_ref()
             .ok_or(Error::SoftwareInventoryNotAvailable)?;
-        let collection = collection_ref
-            .expand(self.bmc.as_ref(), ExpandQuery::default().levels(1))
-            .await
-            .map_err(Error::Bmc)?
-            .get(self.bmc.as_ref())
-            .await
-            .map_err(Error::Bmc)?;
+        let collection = self
+            .protocol_features
+            .expand_property(self.bmc.as_ref(), collection_ref)
+            .await?;
 
         let mut items = Vec::new();
         for item_ref in &collection.members {

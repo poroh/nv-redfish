@@ -70,11 +70,16 @@ pub struct AccountService<B: Bmc> {
 impl<B: Bmc> AccountService<B> {
     /// Create a new account service. This is always done by
     /// `ServiceRoot` object.
-    pub(crate) fn new(
-        root: &ServiceRoot<B>,
-        service: Arc<SchemaAccountService>,
-        bmc: Arc<B>,
-    ) -> Self {
+    pub(crate) async fn new(bmc: Arc<B>, root: &ServiceRoot<B>) -> Result<Self, Error<B>> {
+        let service = root
+            .root
+            .account_service
+            .as_ref()
+            .ok_or(Error::AccountServiceNotSupported)?
+            .get(bmc.as_ref())
+            .await
+            .map_err(Error::Bmc)?;
+
         let mut patches = Vec::new();
         if root.bug_no_account_type_in_accounts() {
             patches.push(append_default_account_type);
@@ -87,8 +92,9 @@ impl<B: Bmc> AccountService<B> {
             Some(account_read_patch_fn)
         };
         let slot_defined_user_accounts = root.slot_defined_user_accounts();
-        Self {
+        Ok(Self {
             collection_config: collection::Config {
+                protocol_features: root.protocol_features_clone(),
                 account: AccountConfig {
                     read_patch_fn: account_read_patch_fn,
                     disable_account_on_delete: slot_defined_user_accounts
@@ -99,7 +105,7 @@ impl<B: Bmc> AccountService<B> {
             },
             service,
             bmc,
-        }
+        })
     }
 
     /// `OData` identifier of the `AccountService` in Redfish.

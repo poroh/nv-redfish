@@ -15,6 +15,7 @@
 
 use crate::schema::redfish::service_root::ServiceRoot as SchemaServiceRoot;
 use crate::Error;
+use crate::ProtocolFeatures;
 use nv_redfish_core::Bmc;
 use nv_redfish_core::NavProperty;
 use nv_redfish_core::ODataId;
@@ -34,18 +35,12 @@ use crate::systems::SystemCollection;
 use crate::update_service::UpdateService;
 
 /// Represents `ServiceRoot` in the BMC model.
+#[derive(Clone)]
 pub struct ServiceRoot<B: Bmc> {
-    root: Arc<SchemaServiceRoot>,
+    /// Content of the root.
+    pub root: Arc<SchemaServiceRoot>,
     bmc: Arc<B>,
-}
-
-impl<B: Bmc> Clone for ServiceRoot<B> {
-    fn clone(&self) -> Self {
-        Self {
-            root: self.root.clone(),
-            bmc: self.bmc.clone(),
-        }
-    }
+    protocol_features: Arc<ProtocolFeatures>,
 }
 
 impl<B: Bmc> ServiceRoot<B> {
@@ -60,9 +55,21 @@ impl<B: Bmc> ServiceRoot<B> {
             .await
             .map_err(Error::Bmc)?;
         Ok(Self {
+            protocol_features: root
+                .protocol_features_supported
+                .as_ref()
+                .map(ProtocolFeatures::new)
+                .unwrap_or_default()
+                .into(),
             root,
             bmc: bmc.clone(),
         })
+    }
+
+    /// Get supported protocol features.
+    #[must_use]
+    pub fn protocol_features(&self) -> &ProtocolFeatures {
+        self.protocol_features.as_ref()
     }
 
     /// Get the account service belonging to the BMC.
@@ -72,15 +79,7 @@ impl<B: Bmc> ServiceRoot<B> {
     /// Returns error if retrieving account service data fails.
     #[cfg(feature = "accounts")]
     pub async fn account_service(&self) -> Result<AccountService<B>, Error<B>> {
-        let service = self
-            .root
-            .account_service
-            .as_ref()
-            .ok_or(Error::AccountServiceNotSupported)?
-            .get(self.bmc.as_ref())
-            .await
-            .map_err(Error::Bmc)?;
-        Ok(AccountService::new(self, service, self.bmc.clone()))
+        AccountService::new(self.bmc.clone(), self).await
     }
 
     /// Get chassis collection in BMC
@@ -90,12 +89,7 @@ impl<B: Bmc> ServiceRoot<B> {
     /// Returns error if chassis list is not avaiable in BMC
     #[cfg(feature = "chassis")]
     pub async fn chassis_collection(&self) -> Result<ChassisCollection<B>, Error<B>> {
-        let chassis = self
-            .root
-            .chassis
-            .as_ref()
-            .ok_or(Error::ChassisNotSupported)?;
-        ChassisCollection::new(self.bmc.clone(), chassis).await
+        ChassisCollection::new(self.bmc.clone(), self).await
     }
 
     /// Get computer system collection in BMC
@@ -105,12 +99,7 @@ impl<B: Bmc> ServiceRoot<B> {
     /// Returns error if system list is not available in BMC
     #[cfg(feature = "systems")]
     pub async fn system_collection(&self) -> Result<SystemCollection<B>, Error<B>> {
-        let systems = self
-            .root
-            .systems
-            .as_ref()
-            .ok_or(Error::SystemNotSupported)?;
-        SystemCollection::new(self.bmc.clone(), systems).await
+        SystemCollection::new(self.bmc.clone(), self).await
     }
 
     /// Get update service in BMC
@@ -139,12 +128,15 @@ impl<B: Bmc> ServiceRoot<B> {
     /// Returns error if manager list is not available in BMC
     #[cfg(feature = "managers")]
     pub async fn managers(&self) -> Result<ManagerCollection<B>, Error<B>> {
-        let managers = self
-            .root
-            .managers
-            .as_ref()
-            .ok_or(Error::ManagerNotSupported)?;
-        ManagerCollection::new(self.bmc.clone(), managers).await
+        ManagerCollection::new(self.bmc.clone(), self).await
+    }
+}
+
+// Internal implementation available inside crate
+impl<B: Bmc> ServiceRoot<B> {
+    /// Get copy of protocol features.
+    pub(crate) fn protocol_features_clone(&self) -> Arc<ProtocolFeatures> {
+        self.protocol_features.clone()
     }
 }
 

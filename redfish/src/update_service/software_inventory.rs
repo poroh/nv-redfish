@@ -20,7 +20,7 @@ use crate::schema::redfish::resource::ResourceCollection;
 use crate::schema::redfish::software_inventory::SoftwareInventory as SoftwareInventorySchema;
 use crate::schema::redfish::software_inventory_collection::SoftwareInventoryCollection as SoftwareInventoryCollectionSchema;
 use crate::Error;
-use nv_redfish_core::query::ExpandQuery;
+use crate::ProtocolFeatures;
 use nv_redfish_core::Bmc;
 use nv_redfish_core::NavProperty;
 use std::sync::Arc;
@@ -72,11 +72,15 @@ impl<B: Bmc> SoftwareInventoryCollection<B> {
         bmc: Arc<B>,
         collection_ref: &NavProperty<SoftwareInventoryCollectionSchema>,
         read_patch_fn: Option<ReadPatchFn>,
+        protocol_features: Arc<ProtocolFeatures>,
     ) -> Result<Self, Error<B>> {
-        let query = ExpandQuery::default().levels(1);
-        let collection =
-            Self::read_collection(bmc.as_ref(), collection_ref, read_patch_fn.as_ref(), query)
-                .await?;
+        let collection = Self::expand_collection(
+            bmc.as_ref(),
+            collection_ref,
+            read_patch_fn.as_ref(),
+            protocol_features.as_ref(),
+        )
+        .await?;
         Ok(Self {
             bmc: bmc.clone(),
             collection,

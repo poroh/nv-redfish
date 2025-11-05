@@ -103,7 +103,12 @@ pub(crate) mod schema;
 #[cfg(feature = "accounts")]
 pub(crate) mod patch_support;
 
+/// Redfish protocol features.
+pub(crate) mod protocol_features;
+
 #[doc(inline)]
 pub use error::Error;
+#[doc(inline)]
+pub use protocol_features::ProtocolFeatures;
 #[doc(inline)]
 pub use service_root::ServiceRoot;
