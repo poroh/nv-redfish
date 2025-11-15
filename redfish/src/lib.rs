@@ -89,6 +89,8 @@ pub mod systems;
 #[cfg(feature = "update-service")]
 pub mod update_service;
 
+#[cfg(feature = "assembly")]
+pub mod assembly;
 /// Ethernet interfaces
 #[cfg(feature = "ethernet-interfaces")]
 pub mod ethernet_interfaces;

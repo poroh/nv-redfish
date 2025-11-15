@@ -14,6 +14,16 @@ patterns = [
 ]
 
 [[features]]
+name = "assembly"
+csdl_files = [
+    "Assembly_v1.xml",
+]
+patterns = [
+    "Assembly.*",
+    "Assembly.*.*",
+]
+
+[[features]]
 name = "chassis"
 csdl_files = [
     "Chassis_v1.xml",

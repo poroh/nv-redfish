@@ -17,6 +17,7 @@ endef
 # We cannot use --all-features because they depends on oem files that
 # are not distributed by the repo.
 all-std-features = accounts \
+                   assembly \
                    chassis \
                    ethernet-interfaces \
                    log-services \
@@ -29,12 +30,15 @@ all-std-features = accounts \
                    storages \
                    systems \
                    thermal \
-                   update-service \
+                   update-service
+
 # Features that cannot be compiled standalone (no references from the tree).
-std-not-standalone-features = log-services \
-             sensors \
+std-not-standalone-features = assembly \
              ethernet-interfaces \
-             network-adapters
+             log-services \
+             network-adapters \
+             sensors
+
 std-standalone-features = $(filter-out $(std-not-standalone-features),$(all-std-features))
 
 ci-features-list := $(subst $(space),$(comma),$(all-std-features))

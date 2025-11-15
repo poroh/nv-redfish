@@ -1,0 +1,108 @@
+// SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Assembly
+//!
+
+use crate::schema::redfish::assembly::Assembly as AssemblySchema;
+use crate::schema::redfish::assembly::AssemblyData as AssemblyDataSchema;
+use crate::Error;
+use crate::NvBmc;
+use crate::Resource;
+use crate::ResourceSchema;
+use nv_redfish_core::Bmc;
+use nv_redfish_core::NavProperty;
+use std::marker::PhantomData;
+use std::sync::Arc;
+
+/// Assembly.
+///
+/// Provides functions to access assembly.
+pub struct Assembly<B: Bmc> {
+    bmc: NvBmc<B>,
+    data: Arc<AssemblySchema>,
+}
+
+impl<B: Bmc> Assembly<B> {
+    /// Create a new log service handle.
+    pub(crate) async fn new(
+        bmc: &NvBmc<B>,
+        nav: &NavProperty<AssemblySchema>,
+    ) -> Result<Self, Error<B>> {
+        // We use expand here becuase Assembly/Assemblies are
+        // navigation properties, so we want to take them using one
+        // get.
+        bmc.expand_property(nav).await.map(|data| Self {
+            bmc: bmc.clone(),
+            data,
+        })
+    }
+
+    /// Get the raw schema data for this assembly.
+    #[must_use]
+    pub fn raw(&self) -> Arc<AssemblySchema> {
+        self.data.clone()
+    }
+
+    /// Get assemblies.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if this assembly was not expanded by initial get
+    /// and then function failed to get data of the assembly.
+    pub async fn assemblies(&self) -> Result<Vec<AssemblyData<B>>, Error<B>> {
+        let mut result = Vec::new();
+        if let Some(assemblies) = &self.data.assemblies {
+            for m in assemblies {
+                result.push(AssemblyData::new(&self.bmc, m).await?);
+            }
+        }
+        Ok(result)
+    }
+}
+
+impl<B: Bmc> Resource for Assembly<B> {
+    fn resource_ref(&self) -> &ResourceSchema {
+        &self.data.as_ref().base
+    }
+}
+
+/// Assembly data.
+pub struct AssemblyData<B: Bmc> {
+    data: Arc<AssemblyDataSchema>,
+    _marker: PhantomData<B>,
+}
+
+impl<B: Bmc> AssemblyData<B> {
+    /// Create a new log service handle.
+    pub(crate) async fn new(
+        bmc: &NvBmc<B>,
+        nav: &NavProperty<AssemblyDataSchema>,
+    ) -> Result<Self, Error<B>> {
+        nav.get(bmc.as_ref())
+            .await
+            .map_err(crate::Error::Bmc)
+            .map(|data| Self {
+                data,
+                _marker: PhantomData,
+            })
+    }
+
+    /// Get the raw schema data for this assembly.
+    #[must_use]
+    pub fn raw(&self) -> Arc<AssemblyDataSchema> {
+        self.data.clone()
+    }
+}

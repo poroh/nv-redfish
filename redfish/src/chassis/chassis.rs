@@ -22,6 +22,8 @@ use nv_redfish_core::bmc::Bmc;
 use nv_redfish_core::NavProperty;
 use std::sync::Arc;
 
+#[cfg(feature = "assembly")]
+use crate::assembly::Assembly;
 #[cfg(feature = "network-adapters")]
 use crate::chassis::NetworkAdapter;
 #[cfg(feature = "network-adapters")]
@@ -72,6 +74,20 @@ impl<B: Bmc> Chassis<B> {
     #[must_use]
     pub fn raw(&self) -> Arc<ChassisSchema> {
         self.data.clone()
+    }
+
+    /// Get assembly of this chassis
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if fetching assembly data fails.
+    #[cfg(feature = "assembly")]
+    pub async fn assembly(&self) -> Result<Option<Assembly<B>>, Error<B>> {
+        if let Some(assembly_ref) = &self.data.assembly {
+            Assembly::new(&self.bmc, assembly_ref).await.map(Some)
+        } else {
+            Ok(None)
+        }
     }
 
     /// Get power supplies from this chassis.
@@ -137,24 +153,22 @@ impl<B: Bmc> Chassis<B> {
 
     /// Get network adapter resources
     ///
-    /// Returns the deprecated `Chassis/NetworkAdapte` resources if available.
+    /// Returns the `Chassis/NetworkAdapter` resources if available.
     ///
     /// # Errors
     ///
     /// Returns an error if fetching network adapters data fails.
-    /// `Error::NetworkAdaptersNotAvailable` is returned if BMC doesn't
-    /// provide network adapters collection.
     #[cfg(feature = "network-adapters")]
-    pub async fn network_adapters(&self) -> Result<Vec<NetworkAdapter<B>>, Error<B>> {
-        let network_adapters_collection_ref = &self
-            .data
-            .network_adapters
-            .as_ref()
-            .ok_or(Error::NetworkAdaptersNotAvailable)?;
-        NetworkAdapterCollection::new(&self.bmc, network_adapters_collection_ref)
-            .await?
-            .members()
-            .await
+    pub async fn network_adapters(&self) -> Result<Option<Vec<NetworkAdapter<B>>>, Error<B>> {
+        if let Some(network_adapters_collection_ref) = &self.data.network_adapters.as_ref() {
+            NetworkAdapterCollection::new(&self.bmc, network_adapters_collection_ref)
+                .await?
+                .members()
+                .await
+                .map(Some)
+        } else {
+            Ok(None)
+        }
     }
 
     /// Get log services for this chassis.

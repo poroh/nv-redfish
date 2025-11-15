@@ -64,7 +64,7 @@ impl<B: Bmc> EthernetInterfaceCollection<B> {
 
 /// Ethernet Interface.
 ///
-/// Provides functions to access log entries and perform log operations.
+/// Provides functions to access ethernet interface.
 pub struct EthernetInterface<B: Bmc> {
     data: Arc<EthernetInterfaceSchema>,
     _marker: PhantomData<B>,
