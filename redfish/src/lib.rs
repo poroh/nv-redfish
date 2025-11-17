@@ -73,6 +73,10 @@ pub mod service_root;
 /// Redfish resource common functions.
 pub mod resource;
 
+/// Hardware identifier (Manufacturer + Model + Part Number + Serial
+/// Number).
+pub mod hardware_id;
+
 /// Accounts Service.
 #[cfg(feature = "accounts")]
 pub mod accounts;

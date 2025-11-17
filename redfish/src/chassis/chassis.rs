@@ -13,6 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::hardware_id::HardwareIdRef;
+use crate::hardware_id::Manufacturer as HardwareIdManufacturer;
+use crate::hardware_id::Model as HardwareIdModel;
+use crate::hardware_id::PartNumber as HardwareIdPartNumber;
+use crate::hardware_id::SerialNumber as HardwareIdSerialNumber;
 use crate::schema::redfish::chassis::Chassis as ChassisSchema;
 use crate::Error;
 use crate::NvBmc;
@@ -21,7 +26,6 @@ use crate::ResourceSchema;
 use nv_redfish_core::bmc::Bmc;
 use nv_redfish_core::NavProperty;
 use std::sync::Arc;
-use tagged_types::TaggedType;
 
 #[cfg(feature = "assembly")]
 use crate::assembly::Assembly;
@@ -44,40 +48,20 @@ use crate::sensors::extract_environment_sensors;
 #[cfg(feature = "sensors")]
 use crate::sensors::SensorRef;
 
-/// Chassis Manufacturer.
-///
-/// Nv-redfish keeps open underlying type for manufacturer because user
-/// can introduce known manufacturer and use it as T.
-pub type Manufacturer<T> = TaggedType<T, ManufacturerTag>;
 #[doc(hidden)]
-#[derive(tagged_types::Tag)]
-#[implement(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-#[transparent(Debug, Display, FromStr, Serialize, Deserialize)]
-#[capability(inner_access)]
-pub enum ManufacturerTag {}
+pub enum ChassisTag {}
+
+/// Chassis manufacturer.
+pub type Manufacturer<T> = HardwareIdManufacturer<T, ChassisTag>;
 
 /// Chassis model.
-///
-/// Nv-redfish keeps open underlying type for manufacturer because user
-/// can introduce known manufacturer and use it as T.
-pub type Model<T> = TaggedType<T, ModelTag>;
-#[doc(hidden)]
-#[derive(tagged_types::Tag)]
-#[implement(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-#[transparent(Debug, Display, FromStr, Serialize, Deserialize)]
-#[capability(inner_access)]
-pub enum ModelTag {}
+pub type Model<T> = HardwareIdModel<T, ChassisTag>;
 
 /// Chassis part number.
-pub type PartNumber = TaggedType<String, PartNumberTag>;
-/// Reference to chassis part number.
-pub type PartNumberRef<'a> = TaggedType<&'a String, PartNumberTag>;
-#[doc(hidden)]
-#[derive(tagged_types::Tag)]
-#[implement(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-#[transparent(Debug, Display, FromStr, Serialize, Deserialize)]
-#[capability(inner_access)]
-pub enum PartNumberTag {}
+pub type PartNumber<T> = HardwareIdPartNumber<T, ChassisTag>;
+
+/// Chassis serial number.
+pub type SerialNumber<T> = HardwareIdSerialNumber<T, ChassisTag>;
 
 /// Represents a chassis in the BMC.
 ///
@@ -112,43 +96,35 @@ impl<B: Bmc> Chassis<B> {
         self.data.clone()
     }
 
-    /// Get manufacturer of the chassis.
-    ///
-    /// None means that BMC hasn't reported manufacturer or reported
-    /// it as null.
+    /// Get hardware identifier of the network adpater.
     #[must_use]
-    pub fn manufacturer(&self) -> Option<Manufacturer<&String>> {
-        self.data
-            .manufacturer
-            .as_ref()
-            .and_then(Option::as_ref)
-            .map(Manufacturer::new)
-    }
-
-    /// Get model of the chassis.
-    ///
-    /// None means that BMC hasn't reported model or reported
-    /// it as null.
-    #[must_use]
-    pub fn model(&self) -> Option<Model<&String>> {
-        self.data
-            .manufacturer
-            .as_ref()
-            .and_then(Option::as_ref)
-            .map(Model::new)
-    }
-
-    /// Get assigned part number of the chassis.
-    ///
-    /// None means that BMC hasn't reported part number or reported
-    /// it as null.
-    #[must_use]
-    pub fn part_number(&self) -> Option<PartNumberRef<'_>> {
-        self.data
-            .part_number
-            .as_ref()
-            .and_then(Option::as_ref)
-            .map(PartNumberRef::new)
+    pub fn hardware_id(&self) -> HardwareIdRef<'_, ChassisTag> {
+        HardwareIdRef {
+            manufacturer: self
+                .data
+                .manufacturer
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(Manufacturer::new),
+            model: self
+                .data
+                .model
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(Model::new),
+            part_number: self
+                .data
+                .part_number
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(PartNumber::new),
+            serial_number: self
+                .data
+                .serial_number
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(SerialNumber::new),
+        }
     }
 
     /// Get assembly of this chassis

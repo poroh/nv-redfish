@@ -36,12 +36,26 @@ pub use chassis::Manufacturer;
 pub use chassis::Model;
 #[doc(inline)]
 pub use chassis::PartNumber;
+#[doc(inline)]
+pub use chassis::SerialNumber;
 
+#[doc(inline)]
+#[cfg(feature = "network-adapters")]
+pub use network_adapters::Manufacturer as NetworkAdapterManufacturer;
+#[doc(inline)]
+#[cfg(feature = "network-adapters")]
+pub use network_adapters::Model as NetworkAdapterModel;
 #[doc(inline)]
 #[cfg(feature = "network-adapters")]
 pub use network_adapters::NetworkAdapter;
 #[cfg(feature = "network-adapters")]
 pub use network_adapters::NetworkAdapterCollection;
+#[doc(inline)]
+#[cfg(feature = "network-adapters")]
+pub use network_adapters::PartNumber as NetworkAdapterPartNumber;
+#[doc(inline)]
+#[cfg(feature = "network-adapters")]
+pub use network_adapters::SerialNumber as NetworkAdapterSerialNumber;
 #[doc(inline)]
 #[cfg(feature = "power")]
 pub use power::Power;

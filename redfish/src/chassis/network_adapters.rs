@@ -16,6 +16,11 @@
 //! Network adapters
 //!
 
+use crate::hardware_id::HardwareIdRef;
+use crate::hardware_id::Manufacturer as HardwareIdManufacturer;
+use crate::hardware_id::Model as HardwareIdModel;
+use crate::hardware_id::PartNumber as HardwareIdPartNumber;
+use crate::hardware_id::SerialNumber as HardwareIdSerialNumber;
 use crate::schema::redfish::network_adapter::NetworkAdapter as NetworkAdapterSchema;
 use crate::schema::redfish::network_adapter_collection::NetworkAdapterCollection as NetworkAdapterCollectionSchema;
 use crate::Error;
@@ -62,6 +67,21 @@ impl<B: Bmc> NetworkAdapterCollection<B> {
     }
 }
 
+#[doc(hidden)]
+pub enum NetworkAdapterTag {}
+
+/// Network adapter manufacturer.
+pub type Manufacturer<T> = HardwareIdManufacturer<T, NetworkAdapterTag>;
+
+/// Network adapter model.
+pub type Model<T> = HardwareIdModel<T, NetworkAdapterTag>;
+
+/// Network adapter part number.
+pub type PartNumber<T> = HardwareIdPartNumber<T, NetworkAdapterTag>;
+
+/// Network adapter serial number.
+pub type SerialNumber<T> = HardwareIdSerialNumber<T, NetworkAdapterTag>;
+
 /// Network Adapter.
 ///
 /// Provides functions to access log entries and perform log operations.
@@ -89,6 +109,37 @@ impl<B: Bmc> NetworkAdapter<B> {
     #[must_use]
     pub fn raw(&self) -> Arc<NetworkAdapterSchema> {
         self.data.clone()
+    }
+
+    /// Get hardware identifier of the network adpater.
+    #[must_use]
+    pub fn hardware_id(&self) -> HardwareIdRef<'_, NetworkAdapterTag> {
+        HardwareIdRef {
+            manufacturer: self
+                .data
+                .manufacturer
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(Manufacturer::new),
+            model: self
+                .data
+                .model
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(Model::new),
+            part_number: self
+                .data
+                .part_number
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(PartNumber::new),
+            serial_number: self
+                .data
+                .serial_number
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(SerialNumber::new),
+        }
     }
 }
 
