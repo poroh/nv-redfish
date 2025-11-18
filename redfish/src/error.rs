@@ -32,6 +32,9 @@ pub enum Error<B: Bmc> {
     /// `slot_defined_user_accounts` feature.
     #[cfg(feature = "accounts")]
     AccountSlotNotAvailable,
+    /// Assembly is not available on BMC.
+    #[cfg(feature = "assembly")]
+    AssemblyNotAvailable,
     /// Chassis not supported by BMC
     #[cfg(feature = "chassis")]
     ChassisNotSupported,
@@ -74,6 +77,12 @@ pub enum Error<B: Bmc> {
     /// Ethernet interfaces not available for this resource
     #[cfg(feature = "ethernet-interfaces")]
     EthernetInterfacesNotAvailable,
+    /// Network adapters not available for this resource
+    #[cfg(feature = "network-adapters")]
+    NetworkAdaptersNotAvailable,
+    /// Boot options not available for this resource
+    #[cfg(feature = "boot-options")]
+    BootOptionsNotAvailable,
     /// JSON parse error.
     Json(JsonError),
 }
@@ -90,6 +99,10 @@ impl<B: Bmc> Display for Error<B> {
             #[cfg(feature = "accounts")]
             Self::AccountSlotNotAvailable => {
                 write!(f, "Free account slot is not found")
+            }
+            #[cfg(feature = "assembly")]
+            Self::AssemblyNotAvailable => {
+                write!(f, "Assembly is not available")
             }
             #[cfg(feature = "chassis")]
             Self::ChassisNotSupported => {
@@ -147,6 +160,14 @@ impl<B: Bmc> Display for Error<B> {
             #[cfg(feature = "managers")]
             Self::ManagerNotSupported => {
                 write!(f, "Manager is not supported by system")
+            }
+            #[cfg(feature = "network-adapters")]
+            Self::NetworkAdaptersNotAvailable => {
+                write!(f, "Network adpaters are not available")
+            }
+            #[cfg(feature = "boot-options")]
+            Self::BootOptionsNotAvailable => {
+                write!(f, "Boot options are not available")
             }
         }
     }

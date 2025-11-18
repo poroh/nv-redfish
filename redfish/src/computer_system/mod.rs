@@ -39,10 +39,17 @@ use nv_redfish_core::Bmc;
 use std::sync::Arc;
 
 #[doc(inline)]
+pub use item::ComputerSystem;
+
+#[doc(inline)]
+#[cfg(feature = "boot-options")]
+pub use boot_option::BootOption;
+#[doc(inline)]
+#[cfg(feature = "boot-options")]
+pub use boot_option::BootOptionCollection;
+#[doc(inline)]
 #[cfg(feature = "storages")]
 pub use drive::Drive;
-#[doc(inline)]
-pub use item::ComputerSystem;
 #[doc(inline)]
 #[cfg(feature = "memory")]
 pub use memory::Memory;

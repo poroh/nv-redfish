@@ -133,12 +133,13 @@ impl<B: Bmc> Chassis<B> {
     ///
     /// Returns an error if fetching assembly data fails.
     #[cfg(feature = "assembly")]
-    pub async fn assembly(&self) -> Result<Option<Assembly<B>>, Error<B>> {
-        if let Some(assembly_ref) = &self.data.assembly {
-            Assembly::new(&self.bmc, assembly_ref).await.map(Some)
-        } else {
-            Ok(None)
-        }
+    pub async fn assembly(&self) -> Result<Assembly<B>, Error<B>> {
+        let assembly_ref = self
+            .data
+            .assembly
+            .as_ref()
+            .ok_or(Error::AssemblyNotAvailable)?;
+        Assembly::new(&self.bmc, assembly_ref).await
     }
 
     /// Get power supplies from this chassis.
@@ -210,16 +211,16 @@ impl<B: Bmc> Chassis<B> {
     ///
     /// Returns an error if fetching network adapters data fails.
     #[cfg(feature = "network-adapters")]
-    pub async fn network_adapters(&self) -> Result<Option<Vec<NetworkAdapter<B>>>, Error<B>> {
-        if let Some(network_adapters_collection_ref) = &self.data.network_adapters.as_ref() {
-            NetworkAdapterCollection::new(&self.bmc, network_adapters_collection_ref)
-                .await?
-                .members()
-                .await
-                .map(Some)
-        } else {
-            Ok(None)
-        }
+    pub async fn network_adapters(&self) -> Result<Vec<NetworkAdapter<B>>, Error<B>> {
+        let network_adapters_collection_ref = &self
+            .data
+            .network_adapters
+            .as_ref()
+            .ok_or(Error::NetworkAdaptersNotAvailable)?;
+        NetworkAdapterCollection::new(&self.bmc, network_adapters_collection_ref)
+            .await?
+            .members()
+            .await
     }
 
     /// Get log services for this chassis.

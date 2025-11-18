@@ -18,6 +18,10 @@
 use crate::ResourceSchema;
 use tagged_types::TaggedType;
 
+#[doc(inline)]
+#[cfg(feature = "computer-systems")]
+pub use crate::schema::redfish::resource::PowerState;
+
 /// Redfish resource identifier.
 pub type ResourceId = TaggedType<String, ResourceIdTag>;
 /// Reference to Redfish resource identifier.

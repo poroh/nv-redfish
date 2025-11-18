@@ -12,3 +12,117 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//! Boot options
+//!
+
+use crate::schema::redfish::boot_option::BootOption as BootOptionSchema;
+use crate::schema::redfish::boot_option_collection::BootOptionCollection as BootOptionCollectionSchema;
+use crate::Error;
+use crate::NvBmc;
+use crate::Resource;
+use crate::ResourceSchema;
+use nv_redfish_core::Bmc;
+use nv_redfish_core::NavProperty;
+use std::marker::PhantomData;
+use std::sync::Arc;
+use tagged_types::TaggedType;
+
+/// Boot options collection.
+///
+/// Provides functions to access collection members.
+pub struct BootOptionCollection<B: Bmc> {
+    bmc: NvBmc<B>,
+    collection: Arc<BootOptionCollectionSchema>,
+}
+
+impl<B: Bmc> BootOptionCollection<B> {
+    /// Create a new manager collection handle.
+    pub(crate) async fn new(
+        bmc: &NvBmc<B>,
+        nav: &NavProperty<BootOptionCollectionSchema>,
+    ) -> Result<Self, Error<B>> {
+        let collection = bmc.expand_property(nav).await?;
+        Ok(Self {
+            bmc: bmc.clone(),
+            collection,
+        })
+    }
+
+    /// List all managers available in this BMC.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if fetching manager data fails.
+    pub async fn members(&self) -> Result<Vec<BootOption<B>>, Error<B>> {
+        let mut members = Vec::new();
+        for m in &self.collection.members {
+            members.push(BootOption::new(&self.bmc, m).await?);
+        }
+        Ok(members)
+    }
+}
+
+/// The UEFI device path to access this UEFI boot option.
+///
+/// Nv-redfish keeps open underlying type for `UefiDevicePath` because it
+/// can really be represented by any implementation of UEFI's device path.
+pub type UefiDevicePath<T> = TaggedType<T, UefiDevicePathTag>;
+#[doc(hidden)]
+#[derive(tagged_types::Tag)]
+#[implement(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[transparent(Debug, Display, FromStr, Serialize, Deserialize)]
+#[capability(inner_access)]
+pub enum UefiDevicePathTag {}
+
+/// Boot option.
+///
+/// Provides functions to access boot option.
+pub struct BootOption<B: Bmc> {
+    data: Arc<BootOptionSchema>,
+    _marker: PhantomData<B>,
+}
+
+impl<B: Bmc> BootOption<B> {
+    /// Create a new log service handle.
+    pub(crate) async fn new(
+        bmc: &NvBmc<B>,
+        nav: &NavProperty<BootOptionSchema>,
+    ) -> Result<Self, Error<B>> {
+        nav.get(bmc.as_ref())
+            .await
+            .map_err(crate::Error::Bmc)
+            .map(|data| Self {
+                data,
+                _marker: PhantomData,
+            })
+    }
+
+    /// Get the raw schema data for this boot option.
+    #[must_use]
+    pub fn raw(&self) -> Arc<BootOptionSchema> {
+        self.data.clone()
+    }
+
+    /// The user-readable display name of the boot option that appears
+    /// in the boot order list in the user interface.
+    #[must_use]
+    pub fn display_name(&self) -> Option<&String> {
+        self.data.display_name.as_ref().and_then(Option::as_ref)
+    }
+
+    /// The UEFI device path to access this UEFI boot option.
+    #[must_use]
+    pub fn uefi_device_path(&self) -> Option<UefiDevicePath<&String>> {
+        self.data
+            .uefi_device_path
+            .as_ref()
+            .and_then(Option::as_ref)
+            .map(UefiDevicePath::new)
+    }
+}
+
+impl<B: Bmc> Resource for BootOption<B> {
+    fn resource_ref(&self) -> &ResourceSchema {
+        &self.data.as_ref().base
+    }
+}

@@ -13,6 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::hardware_id::HardwareIdRef;
+use crate::hardware_id::Manufacturer as HardwareIdManufacturer;
+use crate::hardware_id::Model as HardwareIdModel;
+use crate::hardware_id::PartNumber as HardwareIdPartNumber;
+use crate::hardware_id::SerialNumber as HardwareIdSerialNumber;
+use crate::resource::PowerState;
 use crate::schema::redfish::computer_system::ComputerSystem as ComputerSystemSchema;
 use crate::Error;
 use crate::NvBmc;
@@ -20,8 +26,12 @@ use crate::Resource;
 use crate::ResourceSchema;
 use nv_redfish_core::Bmc;
 use nv_redfish_core::NavProperty;
+use std::convert::identity;
 use std::sync::Arc;
+use tagged_types::TaggedType;
 
+#[cfg(feature = "boot-options")]
+use crate::computer_system::BootOptionCollection;
 #[cfg(feature = "memory")]
 use crate::computer_system::Memory;
 #[cfg(feature = "processors")]
@@ -32,6 +42,30 @@ use crate::computer_system::Storage;
 use crate::ethernet_interface::EthernetInterfaceCollection;
 #[cfg(feature = "log-services")]
 use crate::log_service::LogService;
+
+#[doc(hidden)]
+pub enum ComputerSystemTag {}
+
+/// Computer system manufacturer.
+pub type Manufacturer<T> = HardwareIdManufacturer<T, ComputerSystemTag>;
+
+/// Computer system model.
+pub type Model<T> = HardwareIdModel<T, ComputerSystemTag>;
+
+/// Computer system part number.
+pub type PartNumber<T> = HardwareIdPartNumber<T, ComputerSystemTag>;
+
+/// Computer system serial number.
+pub type SerialNumber<T> = HardwareIdSerialNumber<T, ComputerSystemTag>;
+
+/// Computer system SKU.
+pub type Sku<T> = TaggedType<T, ComputerSystemSkuTag>;
+#[doc(hidden)]
+#[derive(tagged_types::Tag)]
+#[implement(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[transparent(Debug, Display, FromStr, Serialize, Deserialize)]
+#[capability(inner_access, cloned)]
+pub enum ComputerSystemSkuTag {}
 
 /// Represents a computer system in the BMC.
 ///
@@ -64,6 +98,50 @@ impl<B: Bmc> ComputerSystem<B> {
     #[must_use]
     pub fn raw(&self) -> Arc<ComputerSystemSchema> {
         self.data.clone()
+    }
+    /// Get hardware identifier of the network adpater.
+    #[must_use]
+    pub fn hardware_id(&self) -> HardwareIdRef<'_, ComputerSystemTag> {
+        HardwareIdRef {
+            manufacturer: self
+                .data
+                .manufacturer
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(Manufacturer::new),
+            model: self
+                .data
+                .model
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(Model::new),
+            part_number: self
+                .data
+                .part_number
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(PartNumber::new),
+            serial_number: self
+                .data
+                .serial_number
+                .as_ref()
+                .and_then(Option::as_ref)
+                .map(SerialNumber::new),
+        }
+    }
+
+    /// The manufacturer SKU for this system.
+    pub fn sku(&self) -> Option<Sku<&String>> {
+        self.data
+            .sku
+            .as_ref()
+            .and_then(Option::as_ref)
+            .map(Sku::new)
+    }
+
+    /// Power state of this system.
+    pub fn power_state(&self) -> Option<PowerState> {
+        self.data.power_state.and_then(identity)
     }
 
     /// Get processors associated with this system.
@@ -177,7 +255,7 @@ impl<B: Bmc> ComputerSystem<B> {
     ///
     /// Returns an error if:
     /// - The sytems does not have / provide ethernet interfaces
-    /// - Fetching log ethernet internet data fails
+    /// - Fetching ethernet internet data fails
     #[cfg(feature = "ethernet-interfaces")]
     pub async fn ethernet_interfaces(
         &self,
@@ -188,6 +266,26 @@ impl<B: Bmc> ComputerSystem<B> {
             .as_ref()
             .ok_or(crate::Error::EthernetInterfacesNotAvailable)?;
         EthernetInterfaceCollection::new(&self.bmc, p).await
+    }
+
+    /// Get collection of the UEFI boot options associated with this computer system.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The sytems does not have / provide boot options
+    /// - Fetching boot options data fails
+    #[cfg(feature = "boot-options")]
+    pub async fn boot_options(&self) -> Result<BootOptionCollection<B>, crate::Error<B>> {
+        let p = self
+            .data
+            .boot
+            .as_ref()
+            .ok_or(crate::Error::BootOptionsNotAvailable)?
+            .boot_options
+            .as_ref()
+            .ok_or(crate::Error::BootOptionsNotAvailable)?;
+        BootOptionCollection::new(&self.bmc, p).await
     }
 }
 
