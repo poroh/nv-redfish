@@ -104,7 +104,13 @@ fn main() -> Result<(), Box<dyn StdError>> {
     let vendors = manifest
         .all_vendors()
         .into_iter()
-        .filter(|v| var(format!("CARGO_FEATURE_OEM_{}", v.to_uppercase())).is_ok())
+        .filter(|v| {
+            var(format!(
+                "CARGO_FEATURE_OEM_{}",
+                v.to_uppercase().replace('-', "_")
+            ))
+            .is_ok()
+        })
         .collect::<Vec<_>>();
 
     for v in vendors {

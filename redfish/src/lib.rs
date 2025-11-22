@@ -109,7 +109,7 @@ pub mod pcie_device;
 #[cfg(feature = "sensors")]
 pub mod sensor;
 
-/// Individual OEM support.
+/// Individual OEM extensions support.
 #[cfg(feature = "oem")]
 pub mod oem;
 
@@ -140,6 +140,8 @@ pub use service_root::ServiceRoot;
 #[cfg(feature = "resource-status")]
 pub use resource::ResourceProvidesStatus;
 
+#[cfg(feature = "oem")]
+pub(crate) use crate::schema::redfish::resource::Oem as ResourceOemSchema;
 pub(crate) use crate::schema::redfish::resource::Resource as ResourceSchema;
 #[cfg(feature = "resource-status")]
 pub(crate) use crate::schema::redfish::resource::Status as ResourceStatusSchema;

@@ -89,6 +89,9 @@ pub enum Error<B: Bmc> {
     /// BIOS settings not available for the computer system.
     #[cfg(feature = "bios")]
     BiosNotAvailable,
+    /// NVIDIA OEM extension is not availvle for the computer system.
+    #[cfg(feature = "oem-nvidia-bluefield")]
+    NvidiaComputerSystemNotAvailable,
     /// JSON parse error.
     Json(JsonError),
 }
@@ -182,6 +185,13 @@ impl<B: Bmc> Display for Error<B> {
             #[cfg(feature = "bios")]
             Self::BiosNotAvailable => {
                 write!(f, "Bios settings are not available")
+            }
+            #[cfg(feature = "oem-nvidia-bluefield")]
+            Self::NvidiaComputerSystemNotAvailable => {
+                write!(
+                    f,
+                    "NVIDIA OEM extension for computer system is not available"
+                )
             }
         }
     }

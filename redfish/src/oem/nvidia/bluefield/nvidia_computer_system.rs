@@ -1,0 +1,66 @@
+// SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Support NVIDIA Bluefield ComputerSystem OEM extension.
+
+use crate::oem::nvidia::bluefield::schema::redfish::nvidia_computer_system::NvidiaComputerSystem as NvidiaComputerSystemSchema;
+use crate::Error;
+use crate::NvBmc;
+use crate::ResourceOemSchema;
+use nv_redfish_core::Bmc;
+use nv_redfish_core::NavProperty;
+use serde::Deserialize;
+use std::marker::PhantomData;
+use std::sync::Arc;
+
+#[derive(Deserialize)]
+struct Oem {
+    #[serde(rename = "Nvidia")]
+    nvidia: Option<NavProperty<NvidiaComputerSystemSchema>>,
+}
+
+/// Represents a NVIDIA extension of computer system in the BMC.
+///
+/// Provides access to system information and sub-resources such as processors.
+pub struct NvidiaComputerSystem<B: Bmc> {
+    data: Arc<NvidiaComputerSystemSchema>,
+    _marker: PhantomData<B>,
+}
+
+impl<B: Bmc> NvidiaComputerSystem<B> {
+    /// Create a new computer system handle.
+    pub(crate) async fn new(bmc: &NvBmc<B>, oem: &ResourceOemSchema) -> Result<Self, Error<B>> {
+        let oem: Oem =
+            serde_json::from_value(oem.additional_properties.clone()).map_err(Error::Json)?;
+        oem.nvidia
+            .ok_or(Error::NvidiaComputerSystemNotAvailable)?
+            .get(bmc.as_ref())
+            .await
+            .map_err(Error::Bmc)
+            .map(|data| Self {
+                data,
+                _marker: PhantomData,
+            })
+    }
+
+    /// Get the raw schema data for this NVIDIA computer system.
+    ///
+    /// Returns an `Arc` to the underlying schema, allowing cheap cloning
+    /// and sharing of the data.
+    #[must_use]
+    pub fn raw(&self) -> Arc<NvidiaComputerSystemSchema> {
+        self.data.clone()
+    }
+}

@@ -44,6 +44,8 @@ use crate::computer_system::Storage;
 use crate::ethernet_interface::EthernetInterfaceCollection;
 #[cfg(feature = "log-services")]
 use crate::log_service::LogService;
+#[cfg(feature = "oem-nvidia-bluefield")]
+use crate::oem::nvidia::bluefield::nvidia_computer_system::NvidiaComputerSystem;
 
 #[doc(hidden)]
 pub enum ComputerSystemTag {}
@@ -95,7 +97,7 @@ impl<B: Bmc> ComputerSystem<B> {
     ) -> Result<Self, Error<B>> {
         nav.get(bmc.as_ref())
             .await
-            .map_err(crate::Error::Bmc)
+            .map_err(Error::Bmc)
             .map(|data| Self {
                 bmc: bmc.clone(),
                 data,
@@ -297,14 +299,12 @@ impl<B: Bmc> ComputerSystem<B> {
     /// - The sytems does not have / provide ethernet interfaces
     /// - Fetching ethernet internet data fails
     #[cfg(feature = "ethernet-interfaces")]
-    pub async fn ethernet_interfaces(
-        &self,
-    ) -> Result<EthernetInterfaceCollection<B>, crate::Error<B>> {
+    pub async fn ethernet_interfaces(&self) -> Result<EthernetInterfaceCollection<B>, Error<B>> {
         let p = self
             .data
             .ethernet_interfaces
             .as_ref()
-            .ok_or(crate::Error::EthernetInterfacesNotAvailable)?;
+            .ok_or(Error::EthernetInterfacesNotAvailable)?;
         EthernetInterfaceCollection::new(&self.bmc, p).await
     }
 
@@ -316,16 +316,29 @@ impl<B: Bmc> ComputerSystem<B> {
     /// - The sytems does not have / provide boot options
     /// - Fetching boot options data fails
     #[cfg(feature = "boot-options")]
-    pub async fn boot_options(&self) -> Result<BootOptionCollection<B>, crate::Error<B>> {
+    pub async fn boot_options(&self) -> Result<BootOptionCollection<B>, Error<B>> {
         let p = self
             .data
             .boot
             .as_ref()
-            .ok_or(crate::Error::BootOptionsNotAvailable)?
+            .ok_or(Error::BootOptionsNotAvailable)?
             .boot_options
             .as_ref()
-            .ok_or(crate::Error::BootOptionsNotAvailable)?;
+            .ok_or(Error::BootOptionsNotAvailable)?;
         BootOptionCollection::new(&self.bmc, p).await
+    }
+
+    /// NVIDIA Bluefield OEM extension
+    #[cfg(feature = "oem-nvidia-bluefield")]
+    pub async fn oem_nvidia_bluefield(&self) -> Result<NvidiaComputerSystem<B>, Error<B>> {
+        let oem = self
+            .data
+            .base
+            .base
+            .oem
+            .as_ref()
+            .ok_or(Error::NvidiaComputerSystemNotAvailable)?;
+        NvidiaComputerSystem::new(&self.bmc, &oem).await
     }
 }
 

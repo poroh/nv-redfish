@@ -13,11 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This file defines product / product lines that are managed in the
-//! same way.
-
-/// Lenovo products.
-pub enum Product {
-    /// Generic Lenovo server.
-    Generic,
+#[allow(dead_code)]
+#[allow(clippy::doc_markdown)]
+#[allow(clippy::absolute_paths)]
+#[allow(clippy::option_option)]
+#[allow(clippy::missing_const_for_fn)]
+#[allow(clippy::struct_field_names)]
+#[allow(missing_docs)]
+pub mod redfish {
+    include!(concat!(env!("OUT_DIR"), "/oem-nvidia-bluefield.rs"));
 }

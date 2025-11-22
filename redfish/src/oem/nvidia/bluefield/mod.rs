@@ -13,11 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This file defines product / product lines that are managed in the
-//! same way.
+/// NVIDIA Bluefield OEM Schema.
+pub(crate) mod schema;
 
-/// AMI products
-pub enum Product {
-    /// DGX H100
-    Viking,
-}
+/// NVIDIA Bluefield OEM computer system support.
+#[cfg(feature = "computer-systems")]
+pub mod nvidia_computer_system;

@@ -65,6 +65,7 @@ define build-and-test
 	$(maybe-lenovo-build)
 	cargo build --features oem-hpe
 	cargo build --features oem-nvidia
+	cargo build --features computer-systems,oem-nvidia-bluefield
 	cargo build --features oem-dell
 	cargo build --features oem-ami
 	$(foreach f,$(std-standalone-features),$(call compile-one-feature,$f))

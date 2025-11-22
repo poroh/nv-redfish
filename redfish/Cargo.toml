@@ -73,6 +73,10 @@ oem-ami = ["oem"]
 oem-nvidia = ["oem"]
 oem = []
 
+# OEM product features support
+oem-nvidia-bluefield = ["oem-nvidia"]
+
+
 [dependencies]
 nv-redfish-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

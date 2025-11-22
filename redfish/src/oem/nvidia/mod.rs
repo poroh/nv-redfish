@@ -13,12 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// NVIDIA product types.
-pub mod product;
-
-pub use product::Product;
-
-#[cfg(feature = "accounts")]
-pub(crate) use accounts::best_bmaas_password_policy;
-#[cfg(feature = "accounts")]
-pub(crate) mod accounts;
+/// Support of NVIDIA Bluefield DPU.
+#[cfg(feature = "oem-nvidia-bluefield")]
+pub mod bluefield;
