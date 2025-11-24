@@ -16,20 +16,33 @@
 //! Support NVIDIA Bluefield ComputerSystem OEM extension.
 
 use crate::oem::nvidia::bluefield::schema::redfish::nvidia_computer_system::NvidiaComputerSystem as NvidiaComputerSystemSchema;
+use crate::schema::redfish::resource::Oem as ResourceOemSchema;
 use crate::Error;
 use crate::NvBmc;
-use crate::ResourceOemSchema;
 use nv_redfish_core::Bmc;
 use nv_redfish_core::NavProperty;
 use serde::Deserialize;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use tagged_types::TaggedType;
 
 #[derive(Deserialize)]
 struct Oem {
     #[serde(rename = "Nvidia")]
     nvidia: Option<NavProperty<NvidiaComputerSystemSchema>>,
 }
+
+#[doc(inline)]
+pub use crate::oem::nvidia::bluefield::schema::redfish::nvidia_computer_system::Mode;
+
+/// Base MAC address of the Bluefield DPU as reported by the device.
+pub type BaseMac<T> = TaggedType<T, BaseMacTag>;
+#[doc(hidden)]
+#[derive(tagged_types::Tag)]
+#[implement(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[transparent(Debug, Display, FromStr, Serialize, Deserialize)]
+#[capability(inner_access, cloned)]
+pub enum BaseMacTag {}
 
 /// Represents a NVIDIA extension of computer system in the BMC.
 ///
@@ -62,5 +75,20 @@ impl<B: Bmc> NvidiaComputerSystem<B> {
     #[must_use]
     pub fn raw(&self) -> Arc<NvidiaComputerSystemSchema> {
         self.data.clone()
+    }
+
+    /// Get base MAC address of the device.
+    #[must_use]
+    pub fn base_mac(&self) -> Option<BaseMac<&String>> {
+        self.data.base_mac.as_ref().map(BaseMac::new)
+    }
+
+    /// Get mode of the Bluefield device.
+    ///
+    /// Getting mode from directly from OEM extension is supported
+    /// only by Bluefield 3.
+    #[must_use]
+    pub fn mode(&self) -> Option<Mode> {
+        self.data.mode
     }
 }

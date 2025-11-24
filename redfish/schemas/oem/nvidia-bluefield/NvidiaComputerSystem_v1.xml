@@ -38,7 +38,23 @@ limitations under the License.
           <Annotation Term="OData.Description" String="DPU Base MAC address."/>
           <Annotation Term="OData.LongDescription" String="DPU Base MAC address is string that contains MAC address without colons. For example: '1070fd010203'."/>
         </Property>
+        <Property Name="Mode" Type="NvidiaComputerSystem.v1_0_0.Mode" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="DPU Base MAC address."/>
+          <Annotation Term="OData.LongDescription" String="DPU Base MAC address is string that contains MAC address without colons. For example: '1070fd010203'."/>
+        </Property>
       </EntityType>
+
+      <EnumType Name="Mode">
+        <Member Name="NicMode">
+          <Annotation Term="OData.Description" String="This DPU is in NIC mode."/>
+          <Annotation Term="OData.LongDescription" String="In this mode Bluefield device works as regular NIC for the host."/>
+        </Member>
+        <Member Name="DpuMode">
+          <Annotation Term="OData.Description" String="This Bluefield device is in DPU mode."/>
+          <Annotation Term="OData.LongDescription" String="In this mode Bluefield device represent 'bump in the wire' device that controls packet processing."/>
+        </Member>
+      </EnumType>
     </Schema>
 
   </edmx:DataServices>

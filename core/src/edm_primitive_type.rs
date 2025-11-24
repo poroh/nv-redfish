@@ -22,6 +22,8 @@ use serde::Serialize;
 pub enum EdmPrimitiveType {
     /// String primitive type.
     String(String),
+    /// Boolean primitive type.
+    Bool(bool),
     /// Integer primitive type.
     Integer(i64),
     /// Floating point primitive type.

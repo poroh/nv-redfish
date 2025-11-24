@@ -296,7 +296,7 @@ impl<B: Bmc> ComputerSystem<B> {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - The sytems does not have / provide ethernet interfaces
+    /// - The systems does not have / provide ethernet interfaces
     /// - Fetching ethernet internet data fails
     #[cfg(feature = "ethernet-interfaces")]
     pub async fn ethernet_interfaces(&self) -> Result<EthernetInterfaceCollection<B>, Error<B>> {
@@ -313,7 +313,7 @@ impl<B: Bmc> ComputerSystem<B> {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - The sytems does not have / provide boot options
+    /// - The systems does not have / provide boot options
     /// - Fetching boot options data fails
     #[cfg(feature = "boot-options")]
     pub async fn boot_options(&self) -> Result<BootOptionCollection<B>, Error<B>> {
@@ -329,6 +329,12 @@ impl<B: Bmc> ComputerSystem<B> {
     }
 
     /// NVIDIA Bluefield OEM extension
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `Error::NvidiaComputerSystemNotAvailable` if the systems does not have / provide NVIDIA OEM extension
+    /// - Fetching data fails
     #[cfg(feature = "oem-nvidia-bluefield")]
     pub async fn oem_nvidia_bluefield(&self) -> Result<NvidiaComputerSystem<B>, Error<B>> {
         let oem = self
@@ -338,7 +344,7 @@ impl<B: Bmc> ComputerSystem<B> {
             .oem
             .as_ref()
             .ok_or(Error::NvidiaComputerSystemNotAvailable)?;
-        NvidiaComputerSystem::new(&self.bmc, &oem).await
+        NvidiaComputerSystem::new(&self.bmc, oem).await
     }
 }
 

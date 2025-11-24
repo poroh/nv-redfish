@@ -52,8 +52,9 @@ async fn bios_basic_retrieval_and_types() -> Result<(), Box<dyn StdError>> {
             "Attributes": {
                 "BootMode": "Uefi",          // String
                 "WatchdogTimeout": 5,        // Integer
+                "Field Mode": false,         // Boolean
                 "PowerCapping": 125.5,       // Decimal (floating point)
-                "SetupPassword": null        // password-like, write-only
+                "SetupPassword": null,       // password-like, write-only
             }
         }),
     ));

@@ -19,3 +19,6 @@ pub(crate) mod schema;
 /// NVIDIA Bluefield OEM computer system support.
 #[cfg(feature = "computer-systems")]
 pub mod nvidia_computer_system;
+
+#[doc(inline)]
+pub use nvidia_computer_system::NvidiaComputerSystem;
