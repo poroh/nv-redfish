@@ -24,8 +24,8 @@ fn main() -> Result<(), Error> {
     let out_dir = PathBuf::from(var("OUT_DIR").unwrap());
     let output = out_dir.join("redfish.rs");
 
-    let redfish_schemas = "../../redfish/schemas/redfish-csdl/*.xml";
-    let swordfish_schemas = "../../redfish/schemas/swordfish-csdl/*.xml";
+    let redfish_schemas = "../../redfish/schemas/redfish-csdl/csdl/*.xml";
+    let swordfish_schemas = "../../redfish/schemas/swordfish-csdl/csdl-schema/*.xml";
 
     let mut csdls = Vec::new();
     csdls.extend(
@@ -34,10 +34,29 @@ fn main() -> Result<(), Error> {
             .filter_map(Result::ok)
             .map(|p| p.display().to_string()),
     );
+
+    // Swordwish contains same entities as Redfish, so we need to filter them as we want to use Redfish ones.
+    let swordfish_redfish_entities = [
+        "DriveCollection_v1.xml",
+        "EndpointCollection_v1.xml",
+        "EndpointGroupCollection_v1.xml",
+        "EndpointGroup_v1.xml",
+        "Endpoint_v1.xml",
+        "Schedule_v1.xml",
+        "ServiceRoot_v1.xml",
+        "VolumeCollection_v1.xml",
+        "Volume_v1.xml",
+    ];
+
     csdls.extend(
         glob(swordfish_schemas)
             .unwrap()
             .filter_map(Result::ok)
+            .filter(|p| {
+                p.file_name()
+                    .and_then(|f| f.to_str())
+                    .is_some_and(|name| !swordfish_redfish_entities.contains(&name))
+            })
             .map(|p| p.display().to_string()),
     );
 
