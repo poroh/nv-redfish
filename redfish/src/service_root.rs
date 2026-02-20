@@ -26,6 +26,8 @@ use crate::account::SlotDefinedConfig as SlotDefinedUserAccountsConfig;
 use crate::chassis::ChassisCollection;
 #[cfg(feature = "computer-systems")]
 use crate::computer_system::SystemCollection;
+#[cfg(feature = "event-service")]
+use crate::event_service::EventService;
 #[cfg(feature = "managers")]
 use crate::manager::ManagerCollection;
 use crate::schema::redfish::service_root::ServiceRoot as SchemaServiceRoot;
@@ -146,6 +148,16 @@ impl<B: Bmc> ServiceRoot<B> {
         UpdateService::new(&self.bmc, self).await
     }
 
+    /// Get event service in BMC
+    ///
+    /// # Errors
+    ///
+    /// Returns error if event service is not available in BMC
+    #[cfg(feature = "event-service")]
+    pub async fn event_service(&self) -> Result<EventService<B>, Error<B>> {
+        EventService::new(&self.bmc, self).await
+    }
+
     /// Get telemetry service in BMC
     ///
     /// # Errors
@@ -245,6 +257,45 @@ impl<B: Bmc> ServiceRoot<B> {
             .as_ref()
             .and_then(Option::as_ref)
             .is_some_and(|v| v == "Dell")
+    }
+
+    /// In some implementations, Event records in SSE payload do not include
+    /// `MemberId`.
+    #[cfg(feature = "event-service")]
+    pub(crate) fn event_service_sse_no_member_id(&self) -> bool {
+        self.root
+            .vendor
+            .as_ref()
+            .and_then(Option::as_ref)
+            .is_some_and(|v| v == "NVIDIA")
+    }
+
+    /// In some implementations, Event records in SSE payload use compact
+    /// timezone offsets in `EventTimestamp` (for example, `-0600`).
+    #[cfg(feature = "event-service")]
+    pub(crate) fn event_service_sse_wrong_timestamp_offset(&self) -> bool {
+        self.root
+            .vendor
+            .as_ref()
+            .and_then(Option::as_ref)
+            .is_some_and(|v| v == "Dell")
+    }
+
+    /// In some implementations, Event records in SSE payload use unsupported
+    /// values in `EventType`.
+    #[cfg(feature = "event-service")]
+    pub(crate) fn event_service_sse_wrong_event_type(&self) -> bool {
+        self.root
+            .vendor
+            .as_ref()
+            .and_then(Option::as_ref)
+            .is_some_and(|v| v == "NVIDIA")
+    }
+
+    /// SSE payload does not include `@odata.id`.
+    #[cfg(feature = "event-service")]
+    pub(crate) fn event_service_sse_no_odata_id(&self) -> bool {
+        self.root.vendor.as_ref().and_then(Option::as_ref).is_some()
     }
 
     /// In some cases we expand is not working according to spec,

@@ -10,6 +10,7 @@ members = [
    "examples/service-root-parser",
    "examples/explore-with-dummy-bmc",
    "examples/explore-with-reqwest-bmc",
+   "examples/event-stream-console",
    "examples/readme-minimal",
    "tests"
 ]
@@ -27,6 +28,9 @@ categories = ["hardware-support"]
 [workspace.dependencies]
 clap = { version = "4.5" }
 clap_derive = { version = "4.5" }
+sse-stream = { version = "0.2.1" }
+futures-util = { version = "0.3" }
+futures-core = { version = "0.3" }
 http = {version = "1.3"}
 glob = { version = "0.3" }
 prettyplease = { version = "0.2" }
