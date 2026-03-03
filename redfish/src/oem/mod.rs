@@ -13,28 +13,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! OEM-specific support.
+//! Different vendor OEM externsions to Resdish.
 
-/// OEM identifier.
 mod identifier;
 
-/// Support of NVIDIA.
+#[cfg(feature = "oem-ami")]
+pub mod ami;
+
 #[cfg(feature = "oem-nvidia")]
 pub mod nvidia;
 
-/// Support of Dell.
 #[cfg(feature = "oem-dell")]
 pub mod dell;
 
-/// Support of Lenovo.
 #[cfg(feature = "oem-lenovo")]
 pub mod lenovo;
 
-/// Support of HPE.
 #[cfg(feature = "oem-hpe")]
 pub mod hpe;
 
-/// Support of Supermicro.
 #[cfg(feature = "oem-supermicro")]
 pub mod supermicro;
 

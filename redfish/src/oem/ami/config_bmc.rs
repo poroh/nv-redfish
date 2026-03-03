@@ -1,0 +1,90 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Support AMI Manager ConfigBMC OEM extension.
+
+use crate::core::Bmc;
+use crate::core::NavProperty;
+use crate::core::ODataId;
+use crate::oem::ami::schema::redfish::ami_manager::ConfigBmc as ConfigBmcSchema;
+use crate::schema::redfish::manager::Manager as ManagerSchema;
+use crate::Error;
+use crate::NvBmc;
+use std::marker::PhantomData;
+use std::sync::Arc;
+
+#[doc(inline)]
+pub use crate::oem::ami::schema::redfish::ami_manager::LockdownBiosSettingsChangeState;
+#[doc(inline)]
+pub use crate::oem::ami::schema::redfish::ami_manager::LockdownBiosUpgradeDowngradeState;
+#[doc(inline)]
+pub use crate::oem::ami::schema::redfish::ami_manager::LockoutBiosVariableWriteMode;
+#[doc(inline)]
+pub use crate::oem::ami::schema::redfish::ami_manager::LockoutHostControlState;
+
+/// Represents a AMI OEM exstension to Manager schema. BMC Config object.
+pub struct ConfigBmc<B: Bmc> {
+    data: Arc<ConfigBmcSchema>,
+    _marker: PhantomData<B>,
+}
+
+impl<B: Bmc> ConfigBmc<B> {
+    /// Create a new BMC config handle.
+    ///
+    /// Returns `Ok(None)` when the manager does not include `Oem.ConfigBMC`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if failed to retrieve object data.
+    pub(crate) async fn new(
+        bmc: &NvBmc<B>,
+        manager: &ManagerSchema,
+    ) -> Result<Option<Self>, Error<B>> {
+        let oem = manager.base.base.oem.as_ref();
+        if oem
+            .and_then(|v| v.additional_properties.get("Ami"))
+            .is_some()
+        {
+            // AMI provides reference to ConfigBMC right in the Oem object.
+            // {"Oem":{"ConfigBMC":""/redfish/v1/Managers/Self/Oem/ConfigBMC"}}
+            if let Some(config_bmc_path) = oem
+                .and_then(|oem| oem.additional_properties.get("ConfigBMC"))
+                .and_then(|path| path.as_str())
+            {
+                let odata_id = ODataId::from(config_bmc_path.to_string());
+                bmc.expand_property(&NavProperty::new_reference(odata_id))
+                    .await
+                    .map(|data| Self {
+                        data,
+                        _marker: PhantomData,
+                    })
+                    .map(Some)
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get the raw schema data for this BMC config.
+    ///
+    /// Returns an `Arc` to the underlying schema, allowing cheap cloning
+    /// and sharing of the data.
+    #[must_use]
+    pub fn raw(&self) -> Arc<ConfigBmcSchema> {
+        self.data.clone()
+    }
+}

@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Support of NVIDIA Bluefield DPU OEM extensions to Redfish.
+
 /// NVIDIA Bluefield OEM Schema.
 pub(crate) mod schema;
 

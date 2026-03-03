@@ -13,10 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Support of NVIDIA Bluefield DPU.
+//! Support of NVIDIA OEM Extensions to Redfish.
+
 #[cfg(feature = "oem-nvidia-bluefield")]
 pub mod bluefield;
 
-/// Support of NVIDIA Baseboards.
 #[cfg(feature = "oem-nvidia-baseboard")]
 pub mod baseboard;
