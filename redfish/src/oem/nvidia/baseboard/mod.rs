@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Support of NVIDIA Baseboards OEM extensions to Redfish.
+
 /// NVIDIA Baseboard OEM Schema.
 pub(crate) mod schema;
 

@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Support of Supermicro OE extensions to Redfish.
+
 /// Support of Supermicro Manager OEM extension.
 #[cfg(feature = "managers")]
 pub mod manager;

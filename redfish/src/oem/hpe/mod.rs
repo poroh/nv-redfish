@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Support of HPE OEM extensions to Redfish.
+
 /// Support of HPE Manager OEM extension.
 #[cfg(feature = "managers")]
 pub mod manager;

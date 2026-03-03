@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,6 +28,8 @@ use crate::ethernet_interface::EthernetInterfaceCollection;
 use crate::host_interface::HostInterfaceCollection;
 #[cfg(feature = "log-services")]
 use crate::log_service::LogService;
+#[cfg(feature = "oem-ami")]
+use crate::oem::ami::config_bmc::ConfigBmc as AmiConfigBmc;
 #[cfg(feature = "oem-dell-attributes")]
 use crate::oem::dell::attributes::DellAttributes;
 #[cfg(feature = "oem-hpe")]
@@ -180,6 +182,18 @@ impl<B: Bmc> Manager<B> {
     #[cfg(feature = "oem-supermicro")]
     pub fn oem_supermicro(&self) -> Result<Option<SupermicroManager<B>>, Error<B>> {
         SupermicroManager::new(&self.bmc, &self.data)
+    }
+
+    /// Get AMI Manager ConfigBMC OEM extension.
+    ///
+    /// Returns `Ok(None)` when the manager does not include `Oem.Ami` or `Oem.ConfigBMC`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if retrieving BMC config data fails.
+    #[cfg(feature = "oem-ami")]
+    pub async fn oem_ami_config_bmc(&self) -> Result<Option<AmiConfigBmc<B>>, Error<B>> {
+        AmiConfigBmc::new(&self.bmc, &self.data).await
     }
 }
 

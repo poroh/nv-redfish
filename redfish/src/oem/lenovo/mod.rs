@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Support of Lenovo OEM extensions to Redfish.
+
 /// Support of Lenovo Manager OEM attributes.
 #[cfg(feature = "managers")]
 pub mod manager;

@@ -13,11 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Support of Dell OEM extensions to Redfish.
+//! Support of AMI OEM extensions to Redfish.
 
-/// Support of Dell iDRAC.
-#[cfg(feature = "oem-dell-attributes")]
-pub mod attributes;
+#[cfg(feature = "managers")]
+pub mod config_bmc;
 
-/// Dell OEM Schema.
 pub(crate) mod schema;
