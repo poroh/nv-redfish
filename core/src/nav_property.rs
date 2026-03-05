@@ -180,6 +180,15 @@ impl<T: EntityTypeRef> NavProperty<T> {
         Self::Reference(Reference { odata_id })
     }
 
+    /// Convert property to reference regardless expanded it or not.
+    #[must_use]
+    pub fn to_reference(self) -> Self {
+        match self {
+            Self::Reference(_) => self,
+            Self::Expanded(_) => Self::new_reference(self.id().clone()),
+        }
+    }
+
     /// Downcast to descendant type `D`.
     #[must_use]
     pub fn downcast<D: EntityTypeRef>(&self) -> NavProperty<D> {
