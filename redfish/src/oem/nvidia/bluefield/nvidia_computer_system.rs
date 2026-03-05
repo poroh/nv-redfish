@@ -16,6 +16,8 @@
 //! Support NVIDIA Bluefield ComputerSystem OEM extension.
 
 use crate::oem::nvidia::bluefield::schema::redfish::nvidia_computer_system::NvidiaComputerSystem as NvidiaComputerSystemSchema;
+use crate::patch_support::JsonValue;
+use crate::patch_support::Payload;
 use crate::schema::redfish::resource::Oem as ResourceOemSchema;
 use crate::Error;
 use crate::NvBmc;
@@ -60,8 +62,18 @@ impl<B: Bmc> NvidiaComputerSystem<B> {
     ) -> Result<Option<Self>, Error<B>> {
         let oem: Oem =
             serde_json::from_value(oem.additional_properties.clone()).map_err(Error::Json)?;
-        if let Some(p) = oem.nvidia {
-            p.get(bmc.as_ref()).await.map_err(Error::Bmc).map(|data| {
+        if let Some(nav) = oem.nvidia {
+            // We need nav.to_reference() here because in Bluefield-3
+            // sometimes provides not fully expanded object with some
+            // other navigation properties. to_reference() ignores it
+            // and forces to expand again.
+            Payload::get(
+                bmc.as_ref(),
+                &nav.to_reference(),
+                append_odata_id_if_missing,
+            )
+            .await
+            .map(|data| {
                 Some(Self {
                     data,
                     _marker: PhantomData,
@@ -94,5 +106,19 @@ impl<B: Bmc> NvidiaComputerSystem<B> {
     #[must_use]
     pub fn mode(&self) -> Option<Mode> {
         self.data.mode
+    }
+}
+
+// This patch is needed to fix response without `@odata.id` field.
+// This behavior was observed in BlueField-3 SmartNIC Main Card with
+// firmware: BF-24.07-14.
+fn append_odata_id_if_missing(v: JsonValue) -> JsonValue {
+    if let JsonValue::Object(mut obj) = v {
+        obj.entry("@odata.id").or_insert(JsonValue::String(
+            "/redfish/v1/Systems/Bluefield/Oem/Nvidia".into(),
+        ));
+        JsonValue::Object(obj)
+    } else {
+        v
     }
 }
