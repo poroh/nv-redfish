@@ -20,11 +20,21 @@ use nv_redfish_scraper::Runtime;
 use nv_redfish_scraper::TargetConfig;
 
 #[test]
-fn target_ids_are_generated() {
-    let mut runtime = Runtime::<String, String>::new();
+fn runtime_construction_returns_consumer_and_handle() {
+    let (_runtime, handle) = Runtime::<String, String>::new();
+    let _cloned = handle.clone();
+}
 
-    let first = runtime.add_target(TargetConfig {});
-    let second = runtime.add_target(TargetConfig {});
+#[test]
+fn target_ids_are_generated() {
+    let (_runtime, handle) = Runtime::<String, String>::new();
+
+    let first = handle
+        .add_target(TargetConfig {})
+        .expect("add first target");
+    let second = handle
+        .add_target(TargetConfig {})
+        .expect("add second target");
 
     assert_ne!(first, second);
     assert_eq!(first.to_string(), "target #1");
@@ -33,20 +43,24 @@ fn target_ids_are_generated() {
 
 #[test]
 fn generator_ids_include_target_ids() {
-    let mut runtime = Runtime::<String, String>::new();
-    let first_target = runtime.add_target(TargetConfig {});
-    let second_target = runtime.add_target(TargetConfig {});
+    let (_runtime, handle) = Runtime::<String, String>::new();
+    let first_target = handle
+        .add_target(TargetConfig {})
+        .expect("add first target");
+    let second_target = handle
+        .add_target(TargetConfig {})
+        .expect("add second target");
     let (first_generator, _) = QueueGenerator::new(true, [Ok(vec!["a".to_owned()])]);
     let (second_generator, _) = QueueGenerator::new(true, [Ok(vec!["b".to_owned()])]);
     let (third_generator, _) = QueueGenerator::new(true, [Ok(vec!["c".to_owned()])]);
 
-    let first = runtime
+    let first = handle
         .add_generator(first_target, first_generator)
         .expect("add first generator");
-    let second = runtime
+    let second = handle
         .add_generator(first_target, second_generator)
         .expect("add second generator");
-    let third = runtime
+    let third = handle
         .add_generator(second_target, third_generator)
         .expect("add third generator");
 

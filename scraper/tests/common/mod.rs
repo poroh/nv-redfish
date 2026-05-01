@@ -17,6 +17,7 @@
 
 use nv_redfish_scraper::Generator;
 use nv_redfish_scraper::Readiness;
+use nv_redfish_scraper::Runtime;
 use nv_redfish_scraper::RuntimeOutput;
 use nv_redfish_scraper::ScheduledWork;
 use nv_redfish_scraper::WorkCompletion;
@@ -135,12 +136,25 @@ impl<'rt> Generator<'rt, String, String> for RepeatingGenerator {
     }
 }
 
-pub fn only_string_events(outputs: Vec<RuntimeOutput<String, String>>) -> Vec<String> {
-    outputs
-        .into_iter()
-        .flat_map(|output| match output {
-            RuntimeOutput::Work(Ok(success)) => success.events,
+pub async fn next_work(runtime: &mut Runtime<'_, String, String>) -> Vec<String> {
+    loop {
+        match runtime.next().await {
+            RuntimeOutput::Work(Ok(success)) => return success.events,
             RuntimeOutput::Work(Err(error)) => panic!("unexpected error: {}", error.error),
-        })
-        .collect()
+            RuntimeOutput::Shutdown => panic!("unexpected shutdown"),
+            #[cfg(feature = "runtime-events")]
+            RuntimeOutput::Runtime(_) => {}
+        }
+    }
+}
+
+pub async fn collect_string_events(
+    runtime: &mut Runtime<'_, String, String>,
+    count: usize,
+) -> Vec<String> {
+    let mut events = Vec::new();
+    while events.len() < count {
+        events.extend(next_work(runtime).await);
+    }
+    events
 }

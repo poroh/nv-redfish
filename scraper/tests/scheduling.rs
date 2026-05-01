@@ -17,49 +17,43 @@ mod common;
 
 use common::QueueGenerator;
 use common::RepeatingGenerator;
-use nv_redfish_scraper::RunOnce;
 use nv_redfish_scraper::Runtime;
 use nv_redfish_scraper::TargetConfig;
 
 #[tokio::test]
 async fn flat_round_robin_order() {
-    let mut runtime = Runtime::<String, String>::new();
-    let target = runtime.add_target(TargetConfig {});
+    let (mut runtime, handle) = Runtime::<String, String>::new();
+    let target = handle.add_target(TargetConfig {}).expect("add target");
     let generators = ["A", "B", "C"].iter().map(|event| {
         let (generator, _) = RepeatingGenerator::new(true, event);
         generator
     });
-    generators.for_each(|generator| {
-        runtime
+    for generator in generators {
+        handle
             .add_generator(target, generator)
             .expect("add generator");
-    });
-
-    for _ in 0..6 {
-        assert_eq!(runtime.run_once().await, RunOnce::Executed);
     }
 
     assert_eq!(
-        common::only_string_events(runtime.drain_outputs()),
+        common::collect_string_events(&mut runtime, 6).await,
         vec!["A", "B", "C", "A", "B", "C"]
     );
 }
 
 #[tokio::test]
 async fn not_ready_generator_is_skipped() {
-    let mut runtime = Runtime::<String, String>::new();
-    let target = runtime.add_target(TargetConfig {});
+    let (mut runtime, handle) = Runtime::<String, String>::new();
+    let target = handle.add_target(TargetConfig {}).expect("add target");
     let (not_ready, not_ready_probe) = RepeatingGenerator::new(false, "not-ready");
     let (ready, ready_probe) = RepeatingGenerator::new(true, "ready");
-    runtime
+    handle
         .add_generator(target, not_ready)
         .expect("add not-ready generator");
-    runtime
+    handle
         .add_generator(target, ready)
         .expect("add ready generator");
 
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
-
+    assert_eq!(common::next_work(&mut runtime).await, vec!["ready"]);
     assert_eq!(
         not_ready_probe.lock().expect("probe lock").readiness_checks,
         1
@@ -69,31 +63,27 @@ async fn not_ready_generator_is_skipped() {
         0
     );
     assert_eq!(ready_probe.lock().expect("probe lock").take_next_calls, 1);
-    assert_eq!(
-        common::only_string_events(runtime.drain_outputs()),
-        vec!["ready"]
-    );
 }
 
 #[tokio::test]
 async fn work_is_created_only_when_selected() {
-    let mut runtime = Runtime::<String, String>::new();
-    let target = runtime.add_target(TargetConfig {});
+    let (mut runtime, handle) = Runtime::<String, String>::new();
+    let target = handle.add_target(TargetConfig {}).expect("add target");
     let (first, first_probe) = QueueGenerator::new(true, [Ok(vec!["A".to_owned()])]);
     let (second, second_probe) = QueueGenerator::new(true, [Ok(vec!["B".to_owned()])]);
-    runtime
+    handle
         .add_generator(target, first)
         .expect("add first generator");
-    runtime
+    handle
         .add_generator(target, second)
         .expect("add second generator");
 
     assert_eq!(first_probe.lock().expect("probe lock").take_next_calls, 0);
     assert_eq!(second_probe.lock().expect("probe lock").take_next_calls, 0);
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
+    assert_eq!(common::next_work(&mut runtime).await, vec!["A"]);
     assert_eq!(first_probe.lock().expect("probe lock").take_next_calls, 1);
     assert_eq!(second_probe.lock().expect("probe lock").take_next_calls, 0);
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
+    assert_eq!(common::next_work(&mut runtime).await, vec!["B"]);
     assert_eq!(first_probe.lock().expect("probe lock").take_next_calls, 1);
     assert_eq!(second_probe.lock().expect("probe lock").take_next_calls, 1);
 }

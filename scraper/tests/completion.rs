@@ -16,21 +16,20 @@
 mod common;
 
 use common::QueueGenerator;
-use nv_redfish_scraper::RunOnce;
 use nv_redfish_scraper::Runtime;
 use nv_redfish_scraper::TargetConfig;
 use nv_redfish_scraper::WorkOutcome;
 
 #[tokio::test]
 async fn completion_callback_on_success() {
-    let mut runtime = Runtime::<String, String>::new();
-    let target = runtime.add_target(TargetConfig {});
+    let (mut runtime, handle) = Runtime::<String, String>::new();
+    let target = handle.add_target(TargetConfig {}).expect("add target");
     let (generator, probe) = QueueGenerator::new(true, [Ok(vec!["event".to_owned()])]);
-    runtime
+    handle
         .add_generator(target, generator)
         .expect("add generator");
 
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
+    assert_eq!(common::next_work(&mut runtime).await, vec!["event"]);
 
     assert_eq!(
         probe.lock().expect("probe lock").completions,
@@ -40,14 +39,18 @@ async fn completion_callback_on_success() {
 
 #[tokio::test]
 async fn completion_callback_on_failure() {
-    let mut runtime = Runtime::<String, String>::new();
-    let target = runtime.add_target(TargetConfig {});
+    let (mut runtime, handle) = Runtime::<String, String>::new();
+    let target = handle.add_target(TargetConfig {}).expect("add target");
     let (generator, probe) = QueueGenerator::new(true, [Err("failed".to_owned())]);
-    runtime
+    handle
         .add_generator(target, generator)
         .expect("add generator");
 
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
+    loop {
+        if let nv_redfish_scraper::RuntimeOutput::Work(Err(_)) = runtime.next().await {
+            break;
+        }
+    }
 
     assert_eq!(
         probe.lock().expect("probe lock").completions,

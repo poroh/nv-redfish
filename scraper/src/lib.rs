@@ -62,6 +62,10 @@ pub use generator::WorkOutcome;
 pub use ids::GeneratorId;
 #[doc(inline)]
 pub use ids::TargetId;
+#[cfg(feature = "runtime-events")]
+#[doc(inline)]
+pub use output::RuntimeEvent;
+#[doc(inline)]
 #[doc(inline)]
 pub use output::RuntimeOutput;
 #[doc(inline)]
@@ -71,10 +75,10 @@ pub use output::WorkResult;
 #[doc(inline)]
 pub use output::WorkSuccess;
 #[doc(inline)]
-pub use runtime::AddGeneratorError;
-#[doc(inline)]
-pub use runtime::RunOnce;
+pub use runtime::ControlError;
 #[doc(inline)]
 pub use runtime::Runtime;
+#[doc(inline)]
+pub use runtime::RuntimeHandle;
 #[doc(inline)]
 pub use runtime::TargetConfig;

@@ -15,8 +15,8 @@
 
 use nv_redfish_scraper::Generator;
 use nv_redfish_scraper::Readiness;
-use nv_redfish_scraper::RunOnce;
 use nv_redfish_scraper::Runtime;
+use nv_redfish_scraper::RuntimeHandle;
 use nv_redfish_scraper::RuntimeOutput;
 use nv_redfish_scraper::ScheduledWork;
 use nv_redfish_scraper::TargetConfig;
@@ -91,9 +91,9 @@ impl<'rt> Generator<'rt, FakeExplorerEvent, FakeExplorerError> for OneShotDiscov
 
 #[tokio::test]
 async fn bmc_explorer_like_discovery_flow() {
-    let mut runtime = Runtime::<FakeExplorerEvent, FakeExplorerError>::new();
-    let target = runtime.add_target(TargetConfig {});
-    runtime
+    let (mut runtime, handle) = Runtime::<FakeExplorerEvent, FakeExplorerError>::new();
+    let target = handle.add_target(TargetConfig {}).expect("add target");
+    handle
         .add_generator(
             target,
             OneShotDiscoveryGenerator::service_root(
@@ -103,16 +103,14 @@ async fn bmc_explorer_like_discovery_flow() {
         )
         .expect("add service-root generator");
 
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
-    let service_root_outputs = runtime.drain_outputs();
-    add_follow_up_generators(&mut runtime, service_root_outputs, target);
+    let service_root_output = next_discovery_work(&mut runtime).await;
+    add_follow_up_generators(&handle, vec![service_root_output], target);
 
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
-    assert_eq!(runtime.run_once().await, RunOnce::Idle);
-
-    let report = build_report(target, runtime.drain_outputs());
+    let mut outputs = Vec::new();
+    for _ in 0..3 {
+        outputs.push(next_discovery_work(&mut runtime).await);
+    }
+    let report = build_report(target, outputs);
 
     assert_eq!(
         report,
@@ -124,8 +122,21 @@ async fn bmc_explorer_like_discovery_flow() {
     );
 }
 
-fn add_follow_up_generators(
+async fn next_discovery_work(
     runtime: &mut Runtime<'_, FakeExplorerEvent, FakeExplorerError>,
+) -> RuntimeOutput<FakeExplorerEvent, FakeExplorerError> {
+    loop {
+        match runtime.next().await {
+            output @ RuntimeOutput::Work(_) => return output,
+            RuntimeOutput::Shutdown => panic!("unexpected shutdown"),
+            #[cfg(feature = "runtime-events")]
+            RuntimeOutput::Runtime(_) => {}
+        }
+    }
+}
+
+fn add_follow_up_generators(
+    handle: &RuntimeHandle<'_, FakeExplorerEvent, FakeExplorerError>,
     outputs: Vec<RuntimeOutput<FakeExplorerEvent, FakeExplorerError>>,
     expected_target: TargetId,
 ) {
@@ -134,24 +145,26 @@ fn add_follow_up_generators(
         .flat_map(|output| follow_up_requests(output, expected_target))
         .collect::<Vec<_>>();
 
-    requests.into_iter().for_each(|request| match request {
-        FollowUpRequest::System(system_id) => {
-            runtime
-                .add_generator(
-                    expected_target,
-                    OneShotDiscoveryGenerator::system(system_id),
-                )
-                .expect("add system generator");
+    for request in requests {
+        match request {
+            FollowUpRequest::System(system_id) => {
+                handle
+                    .add_generator(
+                        expected_target,
+                        OneShotDiscoveryGenerator::system(system_id),
+                    )
+                    .expect("add system generator");
+            }
+            FollowUpRequest::Chassis(chassis_id) => {
+                handle
+                    .add_generator(
+                        expected_target,
+                        OneShotDiscoveryGenerator::chassis(chassis_id),
+                    )
+                    .expect("add chassis generator");
+            }
         }
-        FollowUpRequest::Chassis(chassis_id) => {
-            runtime
-                .add_generator(
-                    expected_target,
-                    OneShotDiscoveryGenerator::chassis(chassis_id),
-                )
-                .expect("add chassis generator");
-        }
-    });
+    }
 }
 
 fn follow_up_requests(
@@ -176,6 +189,9 @@ fn follow_up_requests(
                 .collect()
         }
         RuntimeOutput::Work(Err(_)) => panic!("unexpected discovery error"),
+        RuntimeOutput::Shutdown => panic!("unexpected shutdown"),
+        #[cfg(feature = "runtime-events")]
+        RuntimeOutput::Runtime(_) => Vec::new(),
     }
 }
 
@@ -196,6 +212,9 @@ fn build_report(
                 success.events
             }
             RuntimeOutput::Work(Err(_)) => panic!("unexpected discovery error"),
+            RuntimeOutput::Shutdown => panic!("unexpected shutdown"),
+            #[cfg(feature = "runtime-events")]
+            RuntimeOutput::Runtime(_) => Vec::new(),
         })
         .collect::<Vec<_>>();
     let systems = events

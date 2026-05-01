@@ -24,5 +24,9 @@ edition.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[features]
+default = []
+runtime-events = []
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }

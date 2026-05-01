@@ -18,7 +18,6 @@ mod common;
 use common::QueueGenerator;
 use nv_redfish_scraper::Generator;
 use nv_redfish_scraper::Readiness;
-use nv_redfish_scraper::RunOnce;
 use nv_redfish_scraper::Runtime;
 use nv_redfish_scraper::RuntimeOutput;
 use nv_redfish_scraper::ScheduledWork;
@@ -28,8 +27,8 @@ use std::time::Instant;
 
 #[tokio::test]
 async fn output_event_ordering_inside_one_work_item() {
-    let mut runtime = Runtime::<String, String>::new();
-    let target = runtime.add_target(TargetConfig {});
+    let (mut runtime, handle) = Runtime::<String, String>::new();
+    let target = handle.add_target(TargetConfig {}).expect("add target");
     let (generator, _) = QueueGenerator::new(
         true,
         [Ok(vec![
@@ -38,61 +37,51 @@ async fn output_event_ordering_inside_one_work_item() {
             "third".to_owned(),
         ])],
     );
-    runtime
+    handle
         .add_generator(target, generator)
         .expect("add generator");
 
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
-
     assert_eq!(
-        common::only_string_events(runtime.drain_outputs()),
+        common::next_work(&mut runtime).await,
         vec!["first", "second", "third"]
     );
 }
 
 #[tokio::test]
 async fn work_error_output() {
-    let mut runtime = Runtime::<String, String>::new();
-    let target = runtime.add_target(TargetConfig {});
+    let (mut runtime, handle) = Runtime::<String, String>::new();
+    let target = handle.add_target(TargetConfig {}).expect("add target");
     let (generator, _) = QueueGenerator::new(true, [Err("failed".to_owned())]);
-    let generator_id = runtime
+    let generator_id = handle
         .add_generator(target, generator)
         .expect("add generator");
 
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
-
-    let outputs = runtime.drain_outputs();
-    assert_eq!(outputs.len(), 1);
-    match outputs.into_iter().next().expect("one output") {
-        RuntimeOutput::Work(Err(error)) => {
-            assert_eq!(error.generator_id, generator_id);
-            assert_eq!(error.error, "failed");
+    loop {
+        match runtime.next().await {
+            RuntimeOutput::Work(Err(error)) => {
+                assert_eq!(error.generator_id, generator_id);
+                assert_eq!(error.error, "failed");
+                break;
+            }
+            RuntimeOutput::Work(Ok(_)) => panic!("unexpected success"),
+            RuntimeOutput::Shutdown => panic!("unexpected shutdown"),
+            #[cfg(feature = "runtime-events")]
+            RuntimeOutput::Runtime(_) => {}
         }
-        RuntimeOutput::Work(Ok(_)) => panic!("unexpected success"),
     }
 }
 
 #[tokio::test]
-async fn next_output_preserves_fifo_order() {
-    let mut runtime = Runtime::<String, String>::new();
-    let target = runtime.add_target(TargetConfig {});
+async fn next_preserves_fifo_order() {
+    let (mut runtime, handle) = Runtime::<String, String>::new();
+    let target = handle.add_target(TargetConfig {}).expect("add target");
     let (first, _) = QueueGenerator::new(true, [Ok(vec!["first".to_owned()])]);
     let (second, _) = QueueGenerator::new(true, [Ok(vec!["second".to_owned()])]);
-    runtime.add_generator(target, first).expect("add first");
-    runtime.add_generator(target, second).expect("add second");
+    handle.add_generator(target, first).expect("add first");
+    handle.add_generator(target, second).expect("add second");
 
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
-
-    assert_eq!(
-        common::only_string_events(vec![runtime.next_output().expect("first output")]),
-        vec!["first"]
-    );
-    assert_eq!(
-        common::only_string_events(vec![runtime.next_output().expect("second output")]),
-        vec!["second"]
-    );
-    assert!(runtime.next_output().is_none());
+    assert_eq!(common::next_work(&mut runtime).await, vec!["first"]);
+    assert_eq!(common::next_work(&mut runtime).await, vec!["second"]);
 }
 
 #[tokio::test]
@@ -125,18 +114,24 @@ async fn payloads_do_not_need_common_traits() {
         fn on_complete(&mut self, _completion: &WorkCompletion) {}
     }
 
-    let mut runtime = Runtime::<EventWithoutCommonTraits, ErrorWithoutCommonTraits>::new();
-    let target = runtime.add_target(TargetConfig {});
-    runtime
+    let (mut runtime, handle) =
+        Runtime::<EventWithoutCommonTraits, ErrorWithoutCommonTraits>::new();
+    let target = handle.add_target(TargetConfig {}).expect("add target");
+    handle
         .add_generator(target, PayloadGenerator)
         .expect("add generator");
 
-    assert_eq!(runtime.run_once().await, RunOnce::Executed);
-    match runtime.next_output().expect("one output") {
-        RuntimeOutput::Work(Ok(success)) => {
-            assert_eq!(success.events.len(), 1);
-            assert_eq!(success.events[0].value, 7);
+    loop {
+        match runtime.next().await {
+            RuntimeOutput::Work(Ok(success)) => {
+                assert_eq!(success.events.len(), 1);
+                assert_eq!(success.events[0].value, 7);
+                break;
+            }
+            RuntimeOutput::Work(Err(_)) => panic!("unexpected error"),
+            RuntimeOutput::Shutdown => panic!("unexpected shutdown"),
+            #[cfg(feature = "runtime-events")]
+            RuntimeOutput::Runtime(_) => {}
         }
-        RuntimeOutput::Work(Err(_)) => panic!("unexpected error"),
     }
 }

@@ -16,7 +16,8 @@
 //! Ordered runtime output types.
 
 use crate::GeneratorId;
-use std::convert::Infallible;
+#[cfg(feature = "runtime-events")]
+use crate::TargetId;
 
 /// Result emitted by one completed work item.
 pub type WorkResult<Ev, Err> = Result<WorkSuccess<Ev>, WorkError<Err>>;
@@ -38,9 +39,37 @@ pub struct WorkError<Err> {
 }
 
 /// Output item emitted by the runtime.
-pub enum RuntimeOutput<Ev, Err, R = Infallible> {
+pub enum RuntimeOutput<Ev, Err> {
     /// Completed work output.
     Work(WorkResult<Ev, Err>),
-    /// Runtime event output; Phase 0 runtime code does not emit this variant.
-    Runtime(R),
+    /// Graceful runtime termination.
+    Shutdown,
+    /// Runtime-owned control-plane event.
+    #[cfg(feature = "runtime-events")]
+    Runtime(RuntimeEvent),
+}
+
+/// Runtime-owned control-plane event.
+#[cfg(feature = "runtime-events")]
+pub enum RuntimeEvent {
+    /// A target was added.
+    TargetAdded {
+        /// Added target id.
+        target_id: TargetId,
+    },
+    /// A generator was added.
+    GeneratorAdded {
+        /// Added generator id.
+        generator_id: GeneratorId,
+    },
+    /// A generator removal finalized.
+    GeneratorRemoved {
+        /// Removed generator id.
+        generator_id: GeneratorId,
+    },
+    /// A target removal finalized.
+    TargetRemoved {
+        /// Removed target id.
+        target_id: TargetId,
+    },
 }
