@@ -32,6 +32,7 @@
 //!   [`RuntimeConfig::output_queue_capacity`]),
 //! - producing the single ordered [`crate::RuntimeOutput`] stream.
 
+use crate::ScheduledWork;
 use core::future::Future;
 use core::marker::PhantomData;
 use core::pin::Pin;
@@ -39,7 +40,6 @@ use core::task::Context;
 use core::task::Poll;
 
 use crate::RuntimeEventType;
-use crate::scheduler::Scheduler;
 use crate::stats::RuntimeStats;
 use crate::work::WorkResult;
 
@@ -63,7 +63,10 @@ where
 {
     /// Build a new runtime with the given configuration.
     #[must_use]
-    pub fn new(_config: RuntimeConfig, _root: Box<dyn Scheduler<Ev, Err> + Send>) -> Self {
+    pub fn new(
+        _config: RuntimeConfig,
+        _root: Box<dyn Future<Output = ScheduledWork<Ev, Err>>>,
+    ) -> Self {
         unimplemented!("scaffold")
     }
 
@@ -119,7 +122,6 @@ where
     }
 }
 
-
 /// Runtime-wide configuration set when the runtime is constructed.
 ///
 /// Per-node policy lives inside each [`Scheduler`] implementation; this
@@ -158,7 +160,7 @@ impl<Ev, Err> Clone for RuntimeHandle<Ev, Err> {
     }
 }
 
-impl<Ev, Err> RuntimeHandle<Ev, Err> {   
+impl<Ev, Err> RuntimeHandle<Ev, Err> {
     /// Begin graceful shutdown. Idempotent: subsequent calls do nothing.
     ///
     /// After shutdown starts, mutating control operations reject new node

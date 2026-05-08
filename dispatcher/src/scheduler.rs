@@ -33,13 +33,16 @@
 //! Leaf nodes ignore the routing path; they account locally and produce work
 //! futures that close over whatever the application needs.
 
+use crate::work::NodeId;
+use crate::work::WorkMeta;
 use core::future::Future;
 use core::pin::Pin;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::task::Context;
+use std::task::Poll;
 use std::time::Instant;
-
-use crate::work::Readiness;
-use crate::work::WorkCompletion;
-use crate::work::WorkMeta;
 
 /// Result type returned by a [`ScheduledWork`] future.
 ///
@@ -90,28 +93,58 @@ impl<Ev, Err> ScheduledWork<Ev, Err> {
 /// indicated child. Leaf implementations produce work and account locally.
 ///
 /// Removed nodes are never queried again.
-pub trait Scheduler<Ev, Err> {
+pub trait SchedulerAlg {
     /// Refresh readiness using the supplied reference clock.
     ///
     /// Branches should aggregate across children (any-ready -> ready,
     /// `next_update_at` = min over children, `next_cost` per branch policy).
-    fn update_ready(&mut self, now: Instant) -> Readiness;
-
-    /// Produce the next executable work item, if any.
-    ///
-    /// Called only when the runtime selects this node (or, recursively, when
-    /// a parent branch selects this node). May return `None` to indicate that
-    /// no work is currently available; the runtime/parent will then continue
-    /// scanning other ready children.
-    ///
-    /// Branch contract: after a successful child selection, push the chosen
-    /// child index onto `work.meta.routing` before returning.
-    fn take_next(&mut self) -> Option<ScheduledWork<Ev, Err>>;
+    fn select(&mut self, now: Instant) -> Option<NodeId>;
 
     /// Receive the completion summary for a previously dispatched work item.
     ///
     /// Reported exactly once per dispatched work item. The runtime delivers
     /// completions to the *root* node; branches pop their own routing tag
     /// from `completion.routing` and forward to the originating child.
-    fn on_complete(&mut self, completion: &mut WorkCompletion);
+    fn on_complete(&mut self);
+}
+
+/// Scheduler.
+pub struct Scheduler<Ev, Err, Alg: SchedulerAlg> {
+    alg: Mutex<Alg>,
+    items: Arc<
+        Mutex<HashMap<NodeId, Pin<Box<dyn Future<Output = ScheduledWork<Ev, Err>> + 'static>>>>,
+    >,
+}
+
+impl<Ev, Err, Alg> Future for Scheduler<Ev, Err, Alg>
+where
+    Alg: SchedulerAlg,
+{
+    type Output = Option<ScheduledWork<Ev, Err>>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        loop {
+            let Some(item_id) = self.alg.lock().unwrap().select(now_from_context(cx)) else {
+                break Poll::Ready(None);
+            };
+            let Some(mut item) = self.items.lock().unwrap().remove(&item_id) else {
+                continue;
+            };
+            let poll_result = item.as_mut().poll(cx);
+            match poll_result {
+                Poll::Ready(result) => {
+                    self.alg.lock().unwrap().on_complete();
+                    break Poll::Ready(Some(result));
+                }
+                Poll::Pending => {
+                    self.items.lock().unwrap().insert(item_id, item);
+                    break Poll::Pending;
+                }
+            }
+        }
+    }
+}
+
+fn now_from_context(_cx: &Context<'_>) -> Instant {
+    todo!()
 }

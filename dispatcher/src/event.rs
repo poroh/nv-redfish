@@ -38,7 +38,7 @@ pub type RuntimeEventType = Infallible;
 
 #[cfg(feature = "runtime-events")]
 mod with_events {
-    use crate::ids::NodeId;
+    use crate::work::NodeId;
 
     /// Out-of-band scheduler, executor, and queue events emitted by the
     /// runtime when the `runtime-events` feature is enabled.
