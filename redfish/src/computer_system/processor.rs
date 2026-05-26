@@ -26,6 +26,10 @@ use nv_redfish_core::NavProperty;
 use std::sync::Arc;
 
 #[cfg(feature = "sensors")]
+use crate::control::extract_environment_power_limit_control;
+#[cfg(feature = "sensors")]
+use crate::control::Control;
+#[cfg(feature = "sensors")]
 use crate::extract_sensor_uris;
 #[cfg(feature = "sensors")]
 use crate::sensor::extract_environment_sensors;
@@ -104,6 +108,22 @@ impl<B: Bmc> Processor<B> {
             .into_iter()
             .map(|r| SensorLink::new(&self.bmc, r))
             .collect())
+    }
+
+    /// Get the environment power limit control for this processor.
+    ///
+    /// Returns `Ok(None)` when environment metrics or `PowerLimitWatts` is absent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if fetching environment metrics or the control fails.
+    #[cfg(feature = "sensors")]
+    pub async fn environment_power_limit_control(&self) -> Result<Option<Control<B>>, Error<B>> {
+        let Some(env_ref) = &self.data.environment_metrics else {
+            return Ok(None);
+        };
+
+        extract_environment_power_limit_control(&self.bmc, env_ref).await
     }
 
     /// Get the metrics sensors for this processor.

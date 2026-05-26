@@ -30,6 +30,7 @@ nv-redfish = { workspace = true, features = [
     "oem-supermicro",
     "oem-liteon",
     "power-supplies",
+    "sensors",
     "session-service",
     "task-service",
     "update-service",

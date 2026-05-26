@@ -31,6 +31,7 @@ std-redfish = [
     "bios",
     "chassis",
     "computer-systems",
+    "controls",
     "ethernet-interfaces",
     "event-service",
     "host-interfaces",
@@ -59,6 +60,7 @@ bios = []
 boot-options = []
 chassis = ["patch-payload-get", "patch-collection", "impl-nv-bmc-expand", "impl-entity-link"]
 computer-systems = ["patch-payload-get", "patch-collection"]
+controls = []
 ethernet-interfaces = []
 host-interfaces = []
 network-adapters = []
@@ -74,7 +76,7 @@ power-supplies = []
 processors = []
 resource-status = []
 secure-boot = []
-sensors = ["impl-entity-link"]
+sensors = ["impl-entity-link", "controls"]
 session-service = ["impl-nv-bmc-expand"]
 storages = []
 task-service = ["impl-entity-link"]
