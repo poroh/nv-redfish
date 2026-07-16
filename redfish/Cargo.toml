@@ -37,6 +37,7 @@ std-redfish = [
     "host-interfaces",
     "log-services",
     "managers",
+    "manager-network-protocol",
     "memory",
     "network-adapters",
     "network-device-functions",
@@ -71,6 +72,7 @@ event-service = ["patch"]
 telemetry-service = ["impl-nv-bmc-expand"]
 log-services = []
 managers = ["impl-nv-bmc-expand", "patch-collection"]
+manager-network-protocol = []
 memory = []
 pcie-devices = ["resource-status"]
 power = [] # Support of legacy PowerSubsystem

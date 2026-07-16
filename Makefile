@@ -24,6 +24,8 @@ all-std-features = accounts \
                    computer-systems \
                    ethernet-interfaces \
                    log-services \
+                   managers \
+                   manager-network-protocol \
                    memory \
                    network-adapters \
                    power \
@@ -45,6 +47,7 @@ std-not-standalone-features = assembly \
              boot-options \
              ethernet-interfaces \
              log-services \
+             manager-network-protocol \
              network-adapters \
              processors \
              power \
@@ -62,6 +65,7 @@ compile-one-feature = $(indent)cargo build -p nv-redfish --features $1$(new-line
 
 define build-and-test
 	cargo fmt --all -- --check
+	cargo clippy $1
 	cargo build -p nv-redfish --features computer-systems,processors,controls
 	cargo build -p nv-redfish --features managers,oem-hpe
 	cargo build -p nv-redfish --features managers,oem-supermicro
@@ -77,7 +81,6 @@ define build-and-test
 	cargo test -p nv-redfish-bmc-http --test reqwest_client_tests --features reqwest,update-service-deprecated
 	cargo test -p nv-redfish-tests --test test-update-service --features update-service-deprecated
 	cargo build -p update-multipart --features update-service-deprecated
-	cargo clippy $1
 	cargo clippy -p nv-redfish-dispatcher --all-targets
 	cargo clippy -p nv-redfish-bmc-http --bench cache
 	cargo build  $1

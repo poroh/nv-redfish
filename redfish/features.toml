@@ -276,6 +276,15 @@ patterns = [
 ]
 
 [[features]]
+name = "manager-network-protocol"
+csdl_files = [
+    "ManagerNetworkProtocol_v1.xml",
+]
+patterns = [
+    "ManagerNetworkProtocol.*",
+]
+
+[[features]]
 name = "pcie-devices"
 csdl_files = [
     "PCIeDevice_v1.xml",

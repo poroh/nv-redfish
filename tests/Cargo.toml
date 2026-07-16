@@ -29,6 +29,7 @@ nv-redfish = { workspace = true, features = [
     "controls",
     "computer-systems",
     "managers",
+    "manager-network-protocol",
     "oem-dell-attributes",
     "oem-ami",
     "oem-hpe",

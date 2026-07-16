@@ -41,6 +41,63 @@ use tokio::test;
 
 const MANAGER_COLLECTION_DATA_TYPE: &str = "#ManagerCollection.ManagerCollection";
 const MANAGER_DATA_TYPE: &str = "#Manager.v1_16_0.Manager";
+const MANAGER_NETWORK_PROTOCOL_DATA_TYPE: &str =
+    "#ManagerNetworkProtocol.v1_5_0.ManagerNetworkProtocol";
+
+#[test]
+async fn network_protocol_returns_none_when_link_is_absent() -> Result<(), Box<dyn StdError>> {
+    let bmc = Arc::new(Bmc::default());
+    let ids = ids();
+    let manager = get_manager(bmc, &ids, manager_payload(&ids)).await?;
+
+    assert!(manager.network_protocol().await?.is_none());
+
+    Ok(())
+}
+
+#[test]
+async fn network_protocol_fetches_linked_resource() -> Result<(), Box<dyn StdError>> {
+    let bmc = Arc::new(Bmc::default());
+    let ids = ids();
+    let manager = get_manager(
+        bmc.clone(),
+        &ids,
+        manager_payload_with_fields(
+            &ids,
+            json!({ "NetworkProtocol": { ODATA_ID: &ids.manager_network_protocol_id } }),
+        ),
+    )
+    .await?;
+
+    bmc.expect(Expect::get(
+        &ids.manager_network_protocol_id,
+        json!({
+            ODATA_ID: &ids.manager_network_protocol_id,
+            ODATA_TYPE: MANAGER_NETWORK_PROTOCOL_DATA_TYPE,
+            "Id": "NetworkProtocol",
+            "Name": "Manager Network Protocol",
+            "IPMI": {
+                "ProtocolEnabled": true,
+                "Port": 1623
+            }
+        }),
+    ));
+
+    let network_protocol = manager
+        .network_protocol()
+        .await?
+        .ok_or_else(|| std::io::Error::other("missing manager network protocol"))?;
+    let raw = network_protocol.raw();
+    let ipmi = raw
+        .ipmi
+        .as_ref()
+        .ok_or_else(|| std::io::Error::other("missing IPMI protocol"))?;
+
+    assert_eq!(ipmi.protocol_enabled, Some(Some(true)));
+    assert_eq!(ipmi.port, Some(Some(1623)));
+
+    Ok(())
+}
 
 #[test]
 async fn reset_invokes_manager_reset_action() -> Result<(), Box<dyn StdError>> {
@@ -274,16 +331,19 @@ struct Ids {
     root_id: ODataId,
     managers_id: String,
     manager_id: String,
+    manager_network_protocol_id: String,
 }
 
 fn ids() -> Ids {
     let root_id = ODataId::service_root();
     let managers_id = format!("{root_id}/Managers");
     let manager_id = format!("{managers_id}/1");
+    let manager_network_protocol_id = format!("{manager_id}/NetworkProtocol");
     Ids {
         root_id,
         managers_id,
         manager_id,
+        manager_network_protocol_id,
     }
 }
 
