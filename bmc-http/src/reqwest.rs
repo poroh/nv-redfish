@@ -17,6 +17,7 @@
 
 use std::error::Error as StdErr;
 use std::fmt;
+use std::future::ready;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -31,6 +32,9 @@ use crate::MultipartUpdateRequest;
 use crate::RejectedUriReferenceError;
 use crate::RequestError;
 
+use bytes::Bytes;
+use futures_util::stream::unfold;
+use futures_util::Stream;
 use futures_util::StreamExt as _;
 use http::header;
 use http::HeaderMap;
@@ -53,6 +57,7 @@ use reqwest::Error as ReqwestError;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::time::sleep;
+use tokio::time::timeout;
 use tokio_util::compat::FuturesAsyncReadCompatExt as _;
 use tokio_util::io::ReaderStream;
 use url::Url;
@@ -85,6 +90,16 @@ pub enum BmcError {
     EncodeError(serde_json::Error),
     /// Request rejected before transport.
     InvalidRequest(String),
+    /// A single SSE event exceeded the configured maximum buffered size.
+    SseEventTooLarge {
+        /// Configured byte limit that was exceeded.
+        limit: usize,
+    },
+    /// No SSE event was received within the configured idle timeout.
+    SseIdleTimeout {
+        /// Idle duration that elapsed with no event.
+        idle: Duration,
+    },
 }
 
 impl From<reqwest::Error> for BmcError {
@@ -139,6 +154,13 @@ impl fmt::Display for BmcError {
             Self::DecodeError(e) => write!(f, "JSON Decode error: {e}"),
             Self::EncodeError(e) => write!(f, "JSON Encode error: {e}"),
             Self::InvalidRequest(e) => write!(f, "Invalid request: {e}"),
+            Self::SseEventTooLarge { limit } => write!(
+                f,
+                "SSE event exceeded maximum buffered size of {limit} bytes"
+            ),
+            Self::SseIdleTimeout { idle } => {
+                write!(f, "SSE stream idle for longer than {idle:?}")
+            }
         }
     }
 }
@@ -152,6 +174,126 @@ impl StdErr for BmcError {
             Self::DecodeError(e) | Self::EncodeError(e) => Some(e),
             _ => None,
         }
+    }
+}
+
+impl BmcError {
+    /// Returns `true` if this error should terminate an SSE stream.
+    ///
+    /// A JSON decode error is scoped to a single event and is therefore
+    /// non-fatal; every other error ends the stream.
+    const fn is_stream_fatal(&self) -> bool {
+        !matches!(self, Self::JsonError(_))
+    }
+}
+
+/// Error produced by the byte-counting adapter that feeds the SSE decoder.
+///
+/// It is passed through the decoder's error channel so a transport failure and
+/// the "event too large" guard can be distinguished once the decoder surfaces
+/// them (see [`map_sse_error`]).
+#[derive(Debug)]
+enum SseByteError {
+    /// Underlying transport error from the response body stream.
+    Upstream(reqwest::Error),
+    /// The per-event byte budget was exceeded before the event terminated.
+    EventTooLarge {
+        /// Configured byte limit that was exceeded.
+        limit: usize,
+    },
+}
+
+impl fmt::Display for SseByteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Upstream(e) => write!(f, "{e}"),
+            Self::EventTooLarge { limit } => {
+                write!(f, "SSE event exceeded {limit} bytes without terminating")
+            }
+        }
+    }
+}
+
+impl StdErr for SseByteError {}
+
+/// Translate an [`sse_stream::Error`] back into a [`BmcError`], recovering the
+/// [`SseByteError`] that the byte-counting adapter passed through the decoder.
+fn map_sse_error(err: sse_stream::Error) -> BmcError {
+    match err {
+        sse_stream::Error::Body(boxed) => match boxed.downcast::<SseByteError>() {
+            Ok(inner) => match *inner {
+                SseByteError::Upstream(e) => BmcError::ReqwestError(e),
+                SseByteError::EventTooLarge { limit } => BmcError::SseEventTooLarge { limit },
+            },
+            Err(other) => BmcError::SseStreamError(sse_stream::Error::Body(other)),
+        },
+        other => BmcError::SseStreamError(other),
+    }
+}
+
+/// Line-terminator state used by [`cap_event_bytes`] to detect SSE record
+/// boundaries (blank lines) directly in the raw byte stream.
+#[derive(Clone, Copy)]
+enum DelimiterState {
+    /// Inside a line.
+    Data,
+    /// Saw `\r`; a following `\n` belongs to the same terminator.
+    Cr,
+    /// Saw one complete line terminator.
+    Eol,
+}
+
+/// Bound the bytes buffered for a single, not-yet-terminated SSE event.
+///
+/// Counts bytes on the raw transport stream and resets the count at each SSE
+/// record boundary (a blank line), aborting with [`SseByteError::EventTooLarge`]
+/// once an unterminated event exceeds `limit`. Working on raw bytes (rather than
+/// decoded events) means comment/heartbeat records that end in a blank line also
+/// reset the budget, and a well-behaved long-lived stream is never penalized.
+fn cap_event_bytes(
+    bytes: impl Stream<Item = Result<Bytes, reqwest::Error>>,
+    limit: usize,
+) -> impl Stream<Item = Result<Bytes, SseByteError>> {
+    use DelimiterState::{Cr, Data, Eol};
+    bytes.scan((0_usize, Data), move |(count, state), chunk| {
+        let item = chunk.map_err(SseByteError::Upstream).and_then(|bytes| {
+            for &b in bytes.as_ref() {
+                *count += 1;
+                *state = match (*state, b) {
+                    (Data, b'\r') => Cr,
+                    (Data | Cr, b'\n') => Eol,
+                    (Cr | Eol, b'\r') => {
+                        *count = 0; // blank line: event delimited
+                        Cr
+                    }
+                    (Eol, b'\n') => {
+                        *count = 0; // blank line: event delimited
+                        Eol
+                    }
+                    _ => Data,
+                };
+            }
+            if *count > limit {
+                Err(SseByteError::EventTooLarge { limit })
+            } else {
+                Ok(bytes)
+            }
+        });
+        ready(Some(item))
+    })
+}
+
+/// Decode one SSE record into a typed item, or `None` for records without data
+/// (e.g. comments) so they are filtered out of the stream.
+fn event_to_item<T: DeserializeOwned>(
+    event: Result<sse_stream::Sse, sse_stream::Error>,
+) -> Option<Result<T, BmcError>> {
+    match event {
+        Err(err) => Some(Err(map_sse_error(err))),
+        Ok(sse) => sse.data.map(|data| {
+            serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(&data))
+                .map_err(BmcError::JsonError)
+        }),
     }
 }
 
@@ -286,6 +428,29 @@ pub struct ClientParams {
     pub use_rust_tls: bool,
     /// Retry policy for received responses, `None` disables retries
     pub retry: Option<RetryPolicy>,
+    /// SSE-specific limits applied by [`Client::sse`].
+    pub sse: SseOptions,
+}
+
+/// Limits applied to Server-Sent Event streams opened by [`Client::sse`].
+#[derive(Clone, Copy, Debug)]
+pub struct SseOptions {
+    /// Maximum bytes buffered for a single, not-yet-terminated SSE event before
+    /// [`Client::sse`] aborts with [`BmcError::SseEventTooLarge`]. Guards against
+    /// a server that never sends the SSE event terminator.
+    pub max_event_bytes: usize,
+    /// Maximum idle time between SSE events before [`Client::sse`] aborts with
+    /// [`BmcError::SseIdleTimeout`]. `None` disables the check.
+    pub idle_timeout: Option<Duration>,
+}
+
+impl Default for SseOptions {
+    fn default() -> Self {
+        Self {
+            max_event_bytes: 1024 * 1024,
+            idle_timeout: None,
+        }
+    }
 }
 
 impl Default for ClientParams {
@@ -302,6 +467,7 @@ impl Default for ClientParams {
             default_headers: None,
             use_rust_tls: true,
             retry: None,
+            sse: SseOptions::default(),
         }
     }
 }
@@ -389,6 +555,24 @@ impl ClientParams {
         self.retry = Some(retry);
         self
     }
+
+    /// Sets the maximum buffered size of a single, not-yet-terminated SSE event.
+    ///
+    /// See [`SseOptions::max_event_bytes`].
+    #[must_use]
+    pub const fn sse_max_event_bytes(mut self, bytes: usize) -> Self {
+        self.sse.max_event_bytes = bytes;
+        self
+    }
+
+    /// Sets the maximum idle time between SSE events.
+    ///
+    /// See [`SseOptions::idle_timeout`].
+    #[must_use]
+    pub const fn sse_idle_timeout(mut self, timeout: Duration) -> Self {
+        self.sse.idle_timeout = Some(timeout);
+        self
+    }
 }
 
 /// HTTP client implementation using the reqwest library.
@@ -398,8 +582,9 @@ impl ClientParams {
 /// TLS, authentication, and connection pooling.
 #[derive(Clone)]
 pub struct Client {
-    client: ReqwestClient,
+    inner: ReqwestClient,
     retry: Option<RetryPolicy>,
+    sse: SseOptions,
 }
 
 impl Client {
@@ -469,8 +654,9 @@ impl Client {
         }
 
         Ok(Self {
-            client: builder.build()?,
+            inner: builder.build()?,
             retry: params.retry,
+            sse: params.sse,
         })
     }
 
@@ -484,10 +670,11 @@ impl Client {
     /// The supplied client must reject cross-origin redirects. Reqwest's default redirect policy
     /// can forward Redfish `X-Auth-Token` and arbitrary custom headers to another origin.
     #[must_use]
-    pub const fn with_client(client: ReqwestClient) -> Self {
+    pub fn with_client(client: ReqwestClient) -> Self {
         Self {
-            client,
+            inner: client,
             retry: None,
+            sse: SseOptions::default(),
         }
     }
 }
@@ -499,7 +686,7 @@ impl Client {
     /// bodies cannot be cloned and are sent exactly once.
     async fn send(&self, request: reqwest::Request) -> Result<reqwest::Response, BmcError> {
         let Some(policy) = &self.retry else {
-            return Ok(self.client.execute(request).await?);
+            return Ok(self.inner.execute(request).await?);
         };
 
         let mut attempt: u32 = 0;
@@ -509,7 +696,7 @@ impl Client {
             // try_clone() returns None for streaming bodies, which therefore
             // get a single attempt.
             let next = if is_last { None } else { current.try_clone() };
-            let response = self.client.execute(current).await?;
+            let response = self.inner.execute(current).await?;
             match next {
                 // The clone is identical to the request just sent, so the
                 // classifier sees what went over the wire.
@@ -887,7 +1074,7 @@ impl HttpClient for Client {
         T: DeserializeOwned,
     {
         let mut request =
-            auth_headers(self.client.get(url), credentials).headers(custom_headers.clone());
+            auth_headers(self.inner.get(url), credentials).headers(custom_headers.clone());
 
         if let Some(etag) = etag {
             request = request.header(header::IF_NONE_MATCH, etag.to_string());
@@ -908,7 +1095,7 @@ impl HttpClient for Client {
         B: Serialize + Send + Sync,
         T: DeserializeOwned + Send + Sync,
     {
-        let request = auth_headers(self.client.post(url), credentials)
+        let request = auth_headers(self.inner.post(url), credentials)
             .headers(custom_headers.clone())
             .json(body);
 
@@ -927,7 +1114,7 @@ impl HttpClient for Client {
         T: DeserializeOwned + Send + Sync,
     {
         let request = self
-            .client
+            .inner
             .post(url)
             .headers(custom_headers.clone())
             .json(body);
@@ -949,7 +1136,7 @@ impl HttpClient for Client {
         T: DeserializeOwned + Send + Sync,
     {
         let mut request =
-            auth_headers(self.client.patch(url), credentials).headers(custom_headers.clone());
+            auth_headers(self.inner.patch(url), credentials).headers(custom_headers.clone());
 
         request = request.header(header::IF_MATCH, etag.to_string());
 
@@ -967,7 +1154,7 @@ impl HttpClient for Client {
         T: DeserializeOwned + Send + Sync,
     {
         let request =
-            auth_headers(self.client.delete(url), credentials).headers(custom_headers.clone());
+            auth_headers(self.inner.delete(url), credentials).headers(custom_headers.clone());
 
         let response = self.send(request.build()?).await?;
         self.handle_modification_response(response).await
@@ -1014,7 +1201,7 @@ impl HttpClient for Client {
             form = form.part(name, part);
         }
 
-        let request = auth_headers(self.client.post(url), credentials)
+        let request = auth_headers(self.inner.post(url), credentials)
             .headers(custom_headers.clone())
             .multipart(form)
             .timeout(upload_timeout);
@@ -1047,7 +1234,7 @@ impl HttpClient for Client {
 
         let body = reqwest::Body::wrap_stream(ReaderStream::new(reader.compat()));
 
-        let mut request = auth_headers(self.client.post(url), credentials)
+        let mut request = auth_headers(self.inner.post(url), credentials)
             .headers(custom_headers.clone())
             .header(header::CONTENT_TYPE, "application/octet-stream")
             .body(body)
@@ -1061,13 +1248,17 @@ impl HttpClient for Client {
         self.handle_modification_response(response).await
     }
 
+    // The idle branch matches on `Option<Duration>` where both arms await
+    // distinct future types, which cannot be expressed as an `Option` combinator
+    // without boxing; `option_if_let_else`'s suggestion does not apply.
+    #[allow(clippy::option_if_let_else)]
     async fn sse<T: Send + Sized + for<'de> serde::Deserialize<'de>>(
         &self,
         url: Url,
         credentials: &BmcCredentials,
         custom_headers: &HeaderMap,
     ) -> Result<BoxTryStream<T, Self::Error>, Self::Error> {
-        let request = auth_headers(self.client.get(url), credentials)
+        let request = auth_headers(self.inner.get(url), credentials)
             .headers(custom_headers.clone())
             .header(header::ACCEPT, "text/event-stream")
             .timeout(Duration::MAX);
@@ -1082,21 +1273,40 @@ impl HttpClient for Client {
             });
         }
 
-        let stream = sse_stream::SseStream::from_bytes_stream(response.bytes_stream()).filter_map(
-            |event| async move {
-                match event {
-                    Err(err) => Some(Err(BmcError::SseStreamError(err))),
-                    Ok(sse) => sse.data.map(|data| {
-                        serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(
-                            &data,
-                        ))
-                        .map_err(BmcError::JsonError)
-                    }),
+        let capped = cap_event_bytes(response.bytes_stream(), self.sse.max_event_bytes);
+        let events = sse_stream::SseStream::from_bytes_stream(capped)
+            .filter_map(|event| async move { event_to_item::<T>(event) });
+
+        // Liveness bound: optionally abort if no event arrives within the idle
+        // window. It is keyed on decoded events, so comment heartbeats (which
+        // `sse_stream` discards) do NOT reset it; a server relying solely on
+        // comment heartbeats should not enable the idle timeout.
+        let idle = self.sse.idle_timeout;
+        let guarded = unfold(
+            (Box::pin(events), false),
+            move |(mut events, done)| async move {
+                if done {
+                    return None;
+                }
+                let next = match idle {
+                    Some(d) => match timeout(d, events.next()).await {
+                        Ok(item) => item,
+                        Err(_) => Some(Err(BmcError::SseIdleTimeout { idle: d })),
+                    },
+                    None => events.next().await,
+                };
+                match next {
+                    Some(Err(e)) => {
+                        let terminal = e.is_stream_fatal();
+                        Some((Err(e), (events, terminal)))
+                    }
+                    Some(ok) => Some((ok, (events, false))),
+                    None => None,
                 }
             },
         );
 
-        Ok(Box::pin(stream))
+        Ok(Box::pin(guarded))
     }
 }
 
