@@ -13,13 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! In-flight response patching and scoped registry access.
+
+mod context;
 pub(crate) mod fixes;
 pub mod patch_registry;
-use std::cell::RefCell;
-use std::fmt::Display;
-use std::sync::Arc;
 
-use crate::patch_registry::InflightPatchRegistry;
+pub use context::patch_inflight;
+pub use context::with_registry;
+
+use std::fmt::Display;
 
 /// Errors of patch inflight crate
 #[derive(Debug)]
@@ -37,7 +40,3 @@ impl Display for InflightPatchError {
     }
 }
 impl std::error::Error for InflightPatchError {}
-
-thread_local! {
-    pub static INFLIGHT_PATCH_REGISTRY: RefCell<Option<Arc<InflightPatchRegistry>>> = const { RefCell::new(None) };
-}

@@ -33,6 +33,7 @@
 //! - OASIS OData 4.01 — navigation properties in CSDL
 //!
 
+use crate::patch_inflight;
 use crate::Bmc;
 use crate::Creatable;
 use crate::Deletable;
@@ -47,7 +48,6 @@ use serde::de::Deserializer;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::Serializer;
-use serde_json::Value;
 use std::sync::Arc;
 
 /// Reference variant of the navigation property (only `@odata.id`
@@ -141,7 +141,6 @@ where
             Ok(Self::Reference(reference))
         } else {
             // Non-reference payloads are always parsed as expanded `T`.
-            //
             let value = patch_inflight(value);
 
             let expanded = serde_json::from_value::<T>(value)
@@ -149,24 +148,6 @@ where
             Ok(Self::Expanded(Expanded(Arc::new(expanded))))
         }
     }
-}
-
-#[cfg(feature = "patch-inflight")]
-fn patch_inflight(mut v: Value) -> Value {
-    v = nv_redfish_patch_inflight::INFLIGHT_PATCH_REGISTRY.with_borrow(|r| {
-        if let Some(registry) = r.as_deref() {
-            registry.patch_inflight(v)
-        } else {
-            v
-        }
-    });
-    v
-}
-
-#[cfg(not(feature = "patch-inflight"))]
-#[inline]
-const fn patch_inflight(v: Value) -> Value {
-    v
 }
 
 impl<T> Serialize for NavProperty<T>
@@ -361,6 +342,35 @@ mod tests {
             }
             NavProperty::Expanded(_) => panic!("expected reference variant"),
         }
+    }
+
+    #[cfg(feature = "patch-inflight")]
+    #[test]
+    fn nav_property_deserializes_with_active_patch_context() {
+        use crate::MaybeInflightPatchRegistry;
+        use nv_redfish_patch_inflight::patch_registry::InflightPatch;
+        use nv_redfish_patch_inflight::patch_registry::InflightPatchRegistry;
+        use std::sync::Arc;
+
+        let registry = InflightPatchRegistry::new(vec![InflightPatch {
+            priority: 0,
+            name: "fix_name".into(),
+            oid_predicate: "/redfish/v1/Systems/*".into(),
+            patch: Arc::new(|mut value| {
+                value["Name"] = "System_1".into();
+                value
+            }),
+        }])
+        .unwrap();
+        let payload = serde_json::json!({
+            "@odata.id": "/redfish/v1/Systems/System_1",
+            "Name": null
+        });
+        let parsed: NavProperty<DummyEntity> = MaybeInflightPatchRegistry::from(registry)
+            .with_context(|| serde_json::from_value(payload.clone()))
+            .unwrap();
+        assert_eq!(serde_json::to_value(parsed).unwrap()["Name"], "System_1");
+        assert!(serde_json::from_value::<NavProperty<DummyEntity>>(payload).is_err());
     }
 
     #[test]

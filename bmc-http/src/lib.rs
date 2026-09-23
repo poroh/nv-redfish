@@ -67,14 +67,13 @@ use nv_redfish_core::BoxTryStream;
 use nv_redfish_core::EntityTypeRef;
 use nv_redfish_core::Expandable;
 use nv_redfish_core::FilterQuery;
+use nv_redfish_core::MaybeInflightPatchRegistry;
 use nv_redfish_core::ModificationResponse;
 use nv_redfish_core::ODataETag;
 use nv_redfish_core::ODataId;
 use nv_redfish_core::SessionCreateResponse;
 use nv_redfish_core::StreamEvent;
 use nv_redfish_core::UploadReader;
-#[cfg(feature = "patch-inflight")]
-use nv_redfish_patch_inflight::patch_registry::InflightPatchRegistry;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use url::Url;
 
@@ -108,8 +107,7 @@ pub trait HttpClient: Send + Sync {
         credentials: &BmcCredentials,
         etag: Option<ODataETag>,
         custom_headers: &HeaderMap,
-
-        #[cfg(feature = "patch-inflight")] patch_registry: Option<Arc<InflightPatchRegistry>>,
+        patch_context: MaybeInflightPatchRegistry,
     ) -> impl Future<Output = Result<T, Self::Error>> + Send
     where
         T: DeserializeOwned + Send + Sync;
@@ -254,8 +252,7 @@ pub struct HttpBmc<C: HttpClient> {
     // 304 Not Modified response contains no replacement body.
     cache_enabled: bool,
 
-    #[cfg(feature = "patch-inflight")]
-    patch_registry: Arc<InflightPatchRegistry>,
+    patch_context: MaybeInflightPatchRegistry,
 }
 
 impl<C: HttpClient> HttpBmc<C>
@@ -369,8 +366,7 @@ where
             custom_headers,
             cache_enabled: cache_settings.capacity > 0,
 
-            #[cfg(feature = "patch-inflight")]
-            patch_registry: Arc::new(InflightPatchRegistry::default()),
+            patch_context: MaybeInflightPatchRegistry::default(),
         }
     }
 
@@ -643,8 +639,7 @@ where
                 credentials.as_ref(),
                 etag,
                 &self.custom_headers,
-                #[cfg(feature = "patch-inflight")]
-                Some(self.patch_registry.clone()),
+                self.patch_context.clone(),
             )
             .await
         {

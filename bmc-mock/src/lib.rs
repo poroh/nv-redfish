@@ -19,8 +19,8 @@ pub mod expect;
 pub use expect::Expect;
 pub use expect::ExpectedRequest;
 
-#[cfg(feature = "patch-inflight")]
-use nv_redfish_patch_inflight::{patch_registry::InflightPatchRegistry, INFLIGHT_PATCH_REGISTRY};
+use nv_redfish_core::patch_inflight;
+use nv_redfish_core::MaybeInflightPatchRegistry;
 
 use std::collections::VecDeque;
 use std::error::Error as StdError;
@@ -201,23 +201,10 @@ where
                 request: ExpectedRequest::Expand { id },
                 response,
             } if id == *in_id => {
-                #[cfg(feature = "patch-inflight")]
-                let mut response = response.map_err(|err| Error::ErrorResponse(Box::new(err)))?;
-
-                #[cfg(not(feature = "patch-inflight"))]
                 let response = response.map_err(|err| Error::ErrorResponse(Box::new(err)))?;
-
-                #[cfg(feature = "patch-inflight")]
-                {
-                    let patch_registry = Some(Arc::new(InflightPatchRegistry::default()));
-                    INFLIGHT_PATCH_REGISTRY.with_borrow_mut(|r| {
-                        *r = patch_registry.clone();
-                    });
-                    if let Some(registry) = patch_registry {
-                        response = registry.patch_inflight(response)
-                    }
-                }
-                let result: T = from_value(response).map_err(Error::BadResponseJson)?;
+                let result: T = MaybeInflightPatchRegistry::default()
+                    .with_context(|| from_value(patch_inflight(response)))
+                    .map_err(Error::BadResponseJson)?;
                 Ok(Arc::new(result))
             }
             _ => Err(Error::UnexpectedExpand(in_id.clone(), expect.request)),
@@ -239,23 +226,10 @@ where
                 request: ExpectedRequest::Get { id },
                 response,
             } if id == *in_id => {
-                #[cfg(feature = "patch-inflight")]
-                let mut response = response.map_err(|err| Error::ErrorResponse(Box::new(err)))?;
-
-                #[cfg(not(feature = "patch-inflight"))]
                 let response = response.map_err(|err| Error::ErrorResponse(Box::new(err)))?;
-
-                #[cfg(feature = "patch-inflight")]
-                {
-                    let patch_registry = Some(Arc::new(InflightPatchRegistry::default()));
-                    INFLIGHT_PATCH_REGISTRY.with_borrow_mut(|r| {
-                        *r = patch_registry.clone();
-                    });
-                    if let Some(registry) = patch_registry {
-                        response = registry.patch_inflight(response)
-                    }
-                }
-                let result: T = from_value(response).map_err(Error::BadResponseJson)?;
+                let result: T = MaybeInflightPatchRegistry::default()
+                    .with_context(|| from_value(patch_inflight(response)))
+                    .map_err(Error::BadResponseJson)?;
                 Ok(Arc::new(result))
             }
             _ => Err(Error::UnexpectedGet(in_id.clone(), expect.request)),

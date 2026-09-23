@@ -25,7 +25,6 @@ bytes = { workspace = true, optional = true }
 futures-core = { workspace = true }
 futures-util = { workspace = true, optional = true }
 nv-redfish-core = { workspace = true }
-nv-redfish-patch-inflight = { workspace = true }
 http = { workspace = true }
 reqwest = { workspace = true, optional = true, features = [
     "json",

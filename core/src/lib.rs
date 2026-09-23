@@ -77,6 +77,7 @@ pub mod edm_date_time_offset;
 pub mod edm_duration;
 /// `Edm.PrimitiveType` type.
 pub mod edm_primitive_type;
+mod inflight_patch;
 /// Navigation property wrapper.
 pub mod nav_property;
 /// Type for `@odata.id` identifier.
@@ -120,6 +121,10 @@ pub use edm_date_time_offset::EdmDateTimeOffset;
 pub use edm_duration::EdmDuration;
 #[doc(inline)]
 pub use edm_primitive_type::EdmPrimitiveType;
+#[doc(inline)]
+pub use inflight_patch::patch_inflight;
+#[doc(inline)]
+pub use inflight_patch::MaybeInflightPatchRegistry;
 #[doc(inline)]
 pub use nav_property::NavProperty;
 #[doc(inline)]
